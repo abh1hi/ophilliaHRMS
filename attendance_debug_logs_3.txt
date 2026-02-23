@@ -1,0 +1,7 @@
+﻿hrms-attendance  | INFO:     Started server process [1]
+hrms-attendance  | INFO:     Waiting for application startup.
+hrms-attendance  | {"timestamp": "2026-02-23T13:45:06.216137+00:00", "level": "INFO", "service_name": "attendance-service", "logger": "app.events.publisher", "message": "Connected to RabbitMQ", "service_task": "rabbitmq_connect"}
+hrms-attendance  | {"timestamp": "2026-02-23T13:45:06.216504+00:00", "level": "INFO", "service_name": "attendance-service", "logger": "app.main", "message": "Attendance service started", "service_task": "startup"}
+hrms-attendance  | INFO:     Application startup complete.
+hrms-attendance  | INFO:     Uvicorn running on http://0.0.0.0:8002 (Press CTRL+C to quit)
+hrms-attendance  | {"timestamp": "2026-02-23T13:45:07.984645+00:00", "level": "INFO", "service_name": "attendance-service", "logger": "app.middleware.request_id", "message": "Request completed", "request_id": "7e5bce1c-bb71-4726-ba3f-b4375f97ef1a", "method": "GET", "path": "/health", "status_code": 200, "duration_ms": 0.88}

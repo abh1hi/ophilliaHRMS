@@ -27,25 +27,20 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        logger.info(f"Decoding token with SECRET_KEY starting with: {settings.SECRET_KEY[:5]}...")
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        logger.info(f"Decoded payload successfully: {payload}")
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
         email: str = payload.get("email")
         if not user_id or not role:
-            logger.error(f"Missing claims in token: user_id={user_id}, role={role}")
             raise credentials_exception
         return TokenPayload(sub=user_id, role=role, email=email or "")
     except ExpiredSignatureError:
-        logger.warning("Token expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired. Please refresh your token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except JWTError as e:
-        logger.error(f"JWT Decode Error: {str(e)}")
+    except JWTError:
         raise credentials_exception
 
 

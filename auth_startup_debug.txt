@@ -1,0 +1,336 @@
+﻿hrms-auth  | Traceback (most recent call last):
+hrms-auth  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+hrms-auth  |     sys.exit(main())
+hrms-auth  |              ^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+hrms-auth  |     return self.main(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+hrms-auth  |     rv = self.invoke(ctx)
+hrms-auth  |          ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+hrms-auth  |     return ctx.invoke(self.callback, **ctx.params)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+hrms-auth  |     return callback(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 418, in main
+hrms-auth  |     run(
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 587, in run
+hrms-auth  |     server.run()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 62, in run
+hrms-auth  |     return asyncio.run(self.serve(sockets=sockets))
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
+hrms-auth  |     return runner.run(main)
+hrms-auth  |            ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+hrms-auth  |     return self._loop.run_until_complete(task)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+hrms-auth  |     return future.result()
+hrms-auth  |            ^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 69, in serve
+hrms-auth  |     config.load()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 458, in load
+hrms-auth  |     self.loaded_app = import_from_string(self.app)
+hrms-auth  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 24, in import_from_string
+hrms-auth  |     raise exc from None
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 21, in import_from_string
+hrms-auth  |     module = importlib.import_module(module_str)
+hrms-auth  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+hrms-auth  |     return _bootstrap._gcd_import(name[level:], package, level)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+hrms-auth  |   File "/app/app/main.py", line 13, in <module>
+hrms-auth  |     from app.tasks.scheduled_jobs import create_scheduler
+hrms-auth  |   File "/app/app/tasks/scheduled_jobs.py", line 12, in <module>
+hrms-auth  |     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+hrms-auth  | ModuleNotFoundError: No module named 'apscheduler'
+hrms-auth  | Traceback (most recent call last):
+hrms-auth  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+hrms-auth  |     sys.exit(main())
+hrms-auth  |              ^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+hrms-auth  |     return self.main(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+hrms-auth  |     rv = self.invoke(ctx)
+hrms-auth  |          ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+hrms-auth  |     return ctx.invoke(self.callback, **ctx.params)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+hrms-auth  |     return callback(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 418, in main
+hrms-auth  |     run(
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 587, in run
+hrms-auth  |     server.run()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 62, in run
+hrms-auth  |     return asyncio.run(self.serve(sockets=sockets))
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
+hrms-auth  |     return runner.run(main)
+hrms-auth  |            ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+hrms-auth  |     return self._loop.run_until_complete(task)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+hrms-auth  |     return future.result()
+hrms-auth  |            ^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 69, in serve
+hrms-auth  |     config.load()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 458, in load
+hrms-auth  |     self.loaded_app = import_from_string(self.app)
+hrms-auth  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 24, in import_from_string
+hrms-auth  |     raise exc from None
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 21, in import_from_string
+hrms-auth  |     module = importlib.import_module(module_str)
+hrms-auth  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+hrms-auth  |     return _bootstrap._gcd_import(name[level:], package, level)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+hrms-auth  |   File "/app/app/main.py", line 13, in <module>
+hrms-auth  |     from app.tasks.scheduled_jobs import create_scheduler
+hrms-auth  |   File "/app/app/tasks/scheduled_jobs.py", line 12, in <module>
+hrms-auth  |     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+hrms-auth  | ModuleNotFoundError: No module named 'apscheduler'
+hrms-auth  | Traceback (most recent call last):
+hrms-auth  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+hrms-auth  |     sys.exit(main())
+hrms-auth  |              ^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+hrms-auth  |     return self.main(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+hrms-auth  |     rv = self.invoke(ctx)
+hrms-auth  |          ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+hrms-auth  |     return ctx.invoke(self.callback, **ctx.params)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+hrms-auth  |     return callback(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 418, in main
+hrms-auth  |     run(
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 587, in run
+hrms-auth  |     server.run()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 62, in run
+hrms-auth  |     return asyncio.run(self.serve(sockets=sockets))
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
+hrms-auth  |     return runner.run(main)
+hrms-auth  |            ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+hrms-auth  |     return self._loop.run_until_complete(task)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+hrms-auth  |     return future.result()
+hrms-auth  |            ^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 69, in serve
+hrms-auth  |     config.load()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 458, in load
+hrms-auth  |     self.loaded_app = import_from_string(self.app)
+hrms-auth  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 24, in import_from_string
+hrms-auth  |     raise exc from None
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 21, in import_from_string
+hrms-auth  |     module = importlib.import_module(module_str)
+hrms-auth  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+hrms-auth  |     return _bootstrap._gcd_import(name[level:], package, level)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+hrms-auth  |   File "/app/app/main.py", line 13, in <module>
+hrms-auth  |     from app.tasks.scheduled_jobs import create_scheduler
+hrms-auth  |   File "/app/app/tasks/scheduled_jobs.py", line 12, in <module>
+hrms-auth  |     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+hrms-auth  | ModuleNotFoundError: No module named 'apscheduler'
+hrms-auth  | Traceback (most recent call last):
+hrms-auth  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+hrms-auth  |     sys.exit(main())
+hrms-auth  |              ^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+hrms-auth  |     return self.main(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+hrms-auth  |     rv = self.invoke(ctx)
+hrms-auth  |          ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+hrms-auth  |     return ctx.invoke(self.callback, **ctx.params)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+hrms-auth  |     return callback(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 418, in main
+hrms-auth  |     run(
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 587, in run
+hrms-auth  |     server.run()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 62, in run
+hrms-auth  |     return asyncio.run(self.serve(sockets=sockets))
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
+hrms-auth  |     return runner.run(main)
+hrms-auth  |            ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+hrms-auth  |     return self._loop.run_until_complete(task)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+hrms-auth  |     return future.result()
+hrms-auth  |            ^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 69, in serve
+hrms-auth  |     config.load()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 458, in load
+hrms-auth  |     self.loaded_app = import_from_string(self.app)
+hrms-auth  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 24, in import_from_string
+hrms-auth  |     raise exc from None
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 21, in import_from_string
+hrms-auth  |     module = importlib.import_module(module_str)
+hrms-auth  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+hrms-auth  |     return _bootstrap._gcd_import(name[level:], package, level)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+hrms-auth  |   File "/app/app/main.py", line 13, in <module>
+hrms-auth  |     from app.tasks.scheduled_jobs import create_scheduler
+hrms-auth  |   File "/app/app/tasks/scheduled_jobs.py", line 12, in <module>
+hrms-auth  |     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+hrms-auth  | ModuleNotFoundError: No module named 'apscheduler'
+hrms-auth  | Traceback (most recent call last):
+hrms-auth  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+hrms-auth  |     sys.exit(main())
+hrms-auth  |              ^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+hrms-auth  |     return self.main(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+hrms-auth  |     rv = self.invoke(ctx)
+hrms-auth  |          ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+hrms-auth  |     return ctx.invoke(self.callback, **ctx.params)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+hrms-auth  |     return callback(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 418, in main
+hrms-auth  |     run(
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 587, in run
+hrms-auth  |     server.run()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 62, in run
+hrms-auth  |     return asyncio.run(self.serve(sockets=sockets))
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
+hrms-auth  |     return runner.run(main)
+hrms-auth  |            ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+hrms-auth  |     return self._loop.run_until_complete(task)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+hrms-auth  |     return future.result()
+hrms-auth  |            ^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 69, in serve
+hrms-auth  |     config.load()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 458, in load
+hrms-auth  |     self.loaded_app = import_from_string(self.app)
+hrms-auth  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 24, in import_from_string
+hrms-auth  |     raise exc from None
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 21, in import_from_string
+hrms-auth  |     module = importlib.import_module(module_str)
+hrms-auth  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+hrms-auth  |     return _bootstrap._gcd_import(name[level:], package, level)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+hrms-auth  |   File "/app/app/main.py", line 13, in <module>
+hrms-auth  |     from app.tasks.scheduled_jobs import create_scheduler
+hrms-auth  |   File "/app/app/tasks/scheduled_jobs.py", line 12, in <module>
+hrms-auth  |     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+hrms-auth  | ModuleNotFoundError: No module named 'apscheduler'
+hrms-auth  | Traceback (most recent call last):
+hrms-auth  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+hrms-auth  |     sys.exit(main())
+hrms-auth  |              ^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+hrms-auth  |     return self.main(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+hrms-auth  |     rv = self.invoke(ctx)
+hrms-auth  |          ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+hrms-auth  |     return ctx.invoke(self.callback, **ctx.params)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+hrms-auth  |     return callback(*args, **kwargs)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 418, in main
+hrms-auth  |     run(
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 587, in run
+hrms-auth  |     server.run()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 62, in run
+hrms-auth  |     return asyncio.run(self.serve(sockets=sockets))
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
+hrms-auth  |     return runner.run(main)
+hrms-auth  |            ^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+hrms-auth  |     return self._loop.run_until_complete(task)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+hrms-auth  |     return future.result()
+hrms-auth  |            ^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 69, in serve
+hrms-auth  |     config.load()
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 458, in load
+hrms-auth  |     self.loaded_app = import_from_string(self.app)
+hrms-auth  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 24, in import_from_string
+hrms-auth  |     raise exc from None
+hrms-auth  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 21, in import_from_string
+hrms-auth  |     module = importlib.import_module(module_str)
+hrms-auth  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+hrms-auth  |     return _bootstrap._gcd_import(name[level:], package, level)
+hrms-auth  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+hrms-auth  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+hrms-auth  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+hrms-auth  |   File "/app/app/main.py", line 13, in <module>
+hrms-auth  |     from app.tasks.scheduled_jobs import create_scheduler
+hrms-auth  |   File "/app/app/tasks/scheduled_jobs.py", line 12, in <module>
+hrms-auth  |     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+hrms-auth  | ModuleNotFoundError: No module named 'apscheduler'

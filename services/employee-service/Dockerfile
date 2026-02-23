@@ -31,9 +31,9 @@ RUN pip install --no-cache /wheels/*
 
 COPY . .
 
-RUN chown -R appuser:appuser /app
+RUN chmod +x entrypoint.sh && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8001
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+ENTRYPOINT ["sh", "entrypoint.sh"]

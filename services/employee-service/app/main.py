@@ -61,10 +61,10 @@ app.add_middleware(
 app.add_middleware(BaseHTTPMiddleware, dispatch=request_id_middleware)
 
 # API routes
-app.include_router(api_router, prefix=settings.API_V1_STR)
-
-
 @app.get("/health", tags=["health"])
 async def health_check():
     """Healthcheck endpoint as required by HRMS rulebook."""
     return {"status": "healthy", "service": "employee-service", "version": "1.0.0"}
+
+
+app.include_router(api_router, prefix=settings.API_V1_STR)
