@@ -1,0 +1,65 @@
+import json
+import uuid
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+try:
+    import aio_pika
+    HAS_AIOPIKA = True
+except ImportError:
+    HAS_AIOPIKA = False
+    logger.warning("aio-pika not installed. Event publishing disabled.")
+
+
+class EventPublisher:
+    """Publishes domain events to RabbitMQ following HRMS standard format."""
+
+    def __init__(self, rabbitmq_url: str, exchange_name: str = "hrms_events"):
+        self.rabbitmq_url = rabbitmq_url
+        self.exchange_name = exchange_name
+        self._connection = None
+        self._channel = None
+        self._exchange = None
+
+    async def connect(self) -> None:
+        if not HAS_AIOPIKA:
+            return
+        try:
+            self._connection = await aio_pika.connect_robust(self.rabbitmq_url)
+            self._channel = await self._connection.channel()
+            self._exchange = await self._channel.declare_exchange(
+                self.exchange_name, aio_pika.ExchangeType.TOPIC, durable=True
+            )
+            logger.info("Connected to RabbitMQ", extra={"service_task": "rabbitmq_connect"})
+        except Exception as e:
+            logger.error(f"Failed to connect to RabbitMQ: {e}", extra={"service_task": "rabbitmq_connect"})
+            self._connection = None
+
+    async def publish(self, event_type: str, payload: dict) -> None:
+        event = {
+            "event_id": str(uuid.uuid4()),
+            "event_type": event_type,
+            "service_source": "attendance-service",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "payload": payload,
+        }
+        if not HAS_AIOPIKA or self._exchange is None:
+            logger.warning(f"RabbitMQ unavailable — event not published: {event_type}")
+            return
+        try:
+            message = aio_pika.Message(
+                body=json.dumps(event).encode(),
+                content_type="application/json",
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            )
+            await self._exchange.publish(message, routing_key=event_type)
+            logger.info(f"Event published: {event_type}", extra={"service_task": "event_publish"})
+        except Exception as e:
+            logger.error(f"Failed to publish event {event_type}: {e}")
+
+    async def close(self) -> None:
+        if self._connection and not self._connection.is_closed:
+            await self._connection.close()
