@@ -4,242 +4,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HRMS API Test Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>HRMS API Test Dashboard v2</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <style>
+        :root {
+            --bg: #0b0e14;
+            --surface: #151921;
+            --surface-lighter: #1e242e;
+            --border: #2d343f;
+            --text: #e1e7ef;
+            --text-muted: #94a3b8;
+            --primary: #8b5cf6;
+            --primary-glow: rgba(139, 92, 246, 0.3);
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --radius: 12px;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        :root {
-            --bg: #0f1117;
-            --surface: #1a1d27;
-            --surface2: #242836;
-            --border: #2e3348;
-            --text: #e4e6f0;
-            --text-muted: #8b8fa3;
-            --primary: #6c5ce7;
-            --primary-hover: #7f70f0;
-            --green: #00b894;
-            --red: #e17055;
-            --orange: #fdcb6e;
-            --blue: #74b9ff;
-            --radius: 10px;
-        }
-
         body {
             font-family: 'Inter', sans-serif;
             background: var(--bg);
             color: var(--text);
-            min-height: 100vh;
-            padding: 24px;
+            line-height: 1.5;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
         }
 
         h1 {
-            font-size: 1.6rem;
+            font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 6px;
+            color: var(--text);
         }
 
         h1 span {
             color: var(--primary);
         }
 
-        .subtitle {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-            margin-bottom: 24px;
-        }
-
-        /* Config Bar */
-        .config-bar {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 16px 20px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 12px;
-            align-items: end;
-            flex-wrap: wrap;
-        }
-
-        .config-bar label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            display: block;
-            margin-bottom: 4px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .config-bar input,
-        .config-bar select {
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-family: inherit;
-            min-width: 180px;
-        }
-
-        .config-bar input:focus,
-        .config-bar select:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 0;
-            margin-bottom: 20px;
-            border-bottom: 2px solid var(--border);
-        }
-
-        .tab {
-            padding: 10px 24px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            border-bottom: 2px solid transparent;
-            margin-bottom: -2px;
-            transition: all 0.2s;
-        }
-
-        .tab:hover {
-            color: var(--text);
-        }
-
-        .tab.active {
-            color: var(--primary);
-            border-color: var(--primary);
-        }
-
-        /* Panels */
-        .panel {
-            display: none;
-        }
-
-        .panel.active {
-            display: block;
-        }
-
-        /* Section */
-        .section {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-            margin-bottom: 16px;
-        }
-
-        .section-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .method-badge {
+        .badge {
             font-size: 0.7rem;
             font-weight: 700;
-            padding: 3px 8px;
+            padding: 0.2rem 0.5rem;
             border-radius: 4px;
             text-transform: uppercase;
         }
 
-        .method-post {
-            background: rgba(0, 184, 148, 0.15);
-            color: var(--green);
+        .badge-post {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
         }
 
-        .method-get {
-            background: rgba(116, 185, 255, 0.15);
-            color: var(--blue);
+        .badge-get {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--info);
         }
 
-        .method-patch {
-            background: rgba(253, 203, 110, 0.15);
-            color: var(--orange);
+        .badge-patch {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
         }
 
-        .method-delete {
-            background: rgba(225, 112, 85, 0.15);
-            color: var(--red);
+        .badge-delete {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
         }
 
-        .path {
-            font-family: 'Courier New', monospace;
-            font-size: 0.8rem;
-            color: var(--text-muted);
+        /* Configuration Grid */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            background: var(--surface);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
         }
 
-        /* Form */
-        .form-row {
+        .input-group {
             display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        .form-group {
-            flex: 1;
-            min-width: 150px;
-        }
-
-        .form-group label {
-            font-size: 0.7rem;
+        .input-group label {
+            font-size: 0.75rem;
+            font-weight: 600;
             color: var(--text-muted);
-            display: block;
-            margin-bottom: 3px;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
         }
 
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            background: var(--surface2);
+        input,
+        select,
+        textarea {
+            background: var(--surface-lighter);
             border: 1px solid var(--border);
             color: var(--text);
-            padding: 7px 10px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-family: inherit;
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 60px;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 8px 18px;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
             font-family: inherit;
             transition: all 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
 
         .btn-primary {
@@ -248,739 +151,663 @@
         }
 
         .btn-primary:hover {
-            background: var(--primary-hover);
+            opacity: 0.9;
+            transform: translateY(-1px);
         }
 
-        .btn-green {
-            background: var(--green);
-            color: white;
-        }
-
-        .btn-red {
-            background: var(--red);
-            color: white;
-        }
-
-        .btn-sm {
-            padding: 5px 12px;
-            font-size: 0.75rem;
-        }
-
-        /* Response */
-        .response-box {
-            background: #0d0f14;
+        .btn-secondary {
+            background: var(--surface-lighter);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 12px;
-            margin-top: 10px;
-            max-height: 300px;
-            overflow-y: auto;
+            color: var(--text);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-error {
+            background: var(--error);
+            color: white;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        /* Layout */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        @media (max-width: 1200px) {
+            .layout-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .control-panel {
             display: none;
         }
 
-        .response-box.show {
-            display: block;
+        .control-panel.active {
+            display: grid;
+            gap: 1.5rem;
         }
 
-        .response-status {
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
-
-        .response-status.ok {
-            color: var(--green);
-        }
-
-        .response-status.err {
-            color: var(--red);
-        }
-
-        .response-body {
-            font-family: 'Courier New', monospace;
-            font-size: 0.75rem;
-            white-space: pre-wrap;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-
-        /* Token display */
-        .token-display {
-            background: var(--surface2);
+        .card {
+            background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-family: monospace;
-            font-size: 0.7rem;
-            color: var(--green);
-            word-break: break-all;
-            margin-top: 8px;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .status-dot.connected {
-            background: var(--green);
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
         }
 
-        .status-dot.disconnected {
-            background: var(--red);
+        .card-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
 
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            gap: 1rem;
         }
 
-        @media (max-width: 768px) {
-            .grid-2 {
-                grid-template-columns: 1fr;
-            }
+        /* Console */
+        .console {
+            position: sticky;
+            top: 2rem;
+            background: #000;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 4rem);
+        }
+
+        .console-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #console-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .log-entry {
+            border-left: 3px solid var(--border);
+            padding-left: 0.75rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .log-header {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .log-req {
+            color: var(--info);
+        }
+
+        .log-res {
+            font-weight: 700;
+        }
+
+        .log-body {
+            white-space: pre-wrap;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .log-ok {
+            border-color: var(--success);
+        }
+
+        .log-ok .log-res {
+            color: var(--success);
+        }
+
+        .log-err {
+            border-color: var(--error);
+        }
+
+        .log-err .log-res {
+            color: var(--error);
         }
 
         .divider {
-            border: none;
+            border: 0;
             border-top: 1px solid var(--border);
-            margin: 16px 0;
+            margin: 0.5rem 0;
+        }
+
+        /* Floating helpers */
+        .id-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .id-pill {
+            background: var(--surface-lighter);
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-family: monospace;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .id-pill span {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .copy-btn {
+            cursor: pointer;
+            opacity: 0.6;
+        }
+
+        .copy-btn:hover {
+            opacity: 1;
         }
     </style>
 </head>
 
 <body>
-
-    <h1>🧪 HRMS <span>API Test Dashboard</span></h1>
-    <p class="subtitle">Test Auth, Employee & Attendance services via API Gateway</p>
-
-    <!-- Config Bar -->
-    <div class="config-bar">
-        <div>
-            <label>API Gateway URL</label>
-            <input type="text" id="gatewayUrl" value="http://localhost" />
+    <header>
+        <h1>🧪 HRMS <span>Unified API Tester</span></h1>
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary" onclick="checkAllHealth()">🩺 Check All Services</button>
+            <button class="btn btn-error" onclick="clearStorage()">🧹 Reset All</button>
         </div>
-        <div>
-            <label>JWT Token</label>
-            <input type="text" id="jwtToken" placeholder="Paste token or use Login below" />
+    </header>
+
+    <div class="config-grid">
+        <div class="input-group">
+            <label>API Gateway</label>
+            <input type="text" id="gatewayUrl" value="http://localhost" oninput="saveConfig()">
         </div>
-        <button class="btn btn-primary btn-sm" onclick="checkHealth()">🩺 Health Check</button>
+        <div class="input-group">
+            <label>Auth Token</label>
+            <input type="text" id="jwtToken" placeholder="Login to obtain" oninput="saveConfig()">
+        </div>
+        <div class="input-group">
+            <label>Refresh Token</label>
+            <input type="text" id="refreshToken" placeholder="Expires in 7 days" oninput="saveConfig()">
+        </div>
     </div>
-    <div id="healthResults" class="response-box"></div>
 
-    <!-- Tabs -->
+    <!-- Persistent ID Tracker -->
+    <div class="card" style="margin-bottom: 1.5rem; padding: 1rem;">
+        <label style="font-size: 0.7rem; font-weight: bold; color: var(--text-muted);">ACTIVE SESSION OBJECTS</label>
+        <div class="id-stack" id="id-stack">
+            <!-- Pills will be injected here -->
+        </div>
+    </div>
+
     <div class="tabs">
-        <div class="tab active" onclick="switchTab('auth')">🔐 Auth Service</div>
-        <div class="tab" onclick="switchTab('employee')">👤 Employee Service</div>
-        <div class="tab" onclick="switchTab('attendance')">📋 Attendance Service</div>
+        <div class="tab active" onclick="switchTab('auth')">🔐 Authentication</div>
+        <div class="tab" onclick="switchTab('employee')">👤 Employees</div>
+        <div class="tab" onclick="switchTab('attendance')">📋 Attendance</div>
     </div>
 
-    <!-- ==================== AUTH PANEL ==================== -->
-    <div id="panel-auth" class="panel active">
-        <div class="grid-2">
-            <!-- Register -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Register</div>
-                <p class="path">/api/v1/auth/register</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Email</label><input type="email" id="regEmail"
-                            value="test@example.com" /></div>
-                    <div class="form-group"><label>Password</label><input type="password" id="regPassword"
-                            value="password123" /></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Role</label>
-                        <select id="regRole">
-                            <option>employee</option>
-                            <option>hr</option>
-                            <option>manager</option>
-                            <option>super_admin</option>
-                        </select>
+    <div class="layout-grid">
+        <main>
+            <!-- AUTH PANEL -->
+            <div id="panel-auth" class="control-panel active">
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Register User</span>
+                            <span class="badge badge-post">POST</span>
+                        </div>
+                        <span class="card-path">/auth/register</span>
+                        <div class="input-group"><label>Email</label><input type="email" id="regEmail"
+                                value="admin@ophillia.com"></div>
+                        <div class="grid-2">
+                            <div class="input-group"><label>Password</label><input type="password" id="regPass"
+                                    value="password123"></div>
+                            <div class="input-group"><label>Role</label>
+                                <select id="regRole">
+                                    <option value="super_admin">Super Admin</option>
+                                    <option value="hr">HR</option>
+                                    <option value="manager">Manager</option>
+                                    <option value="employee">Employee</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="register()">Create User</button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Login</span>
+                            <span class="badge badge-post">POST</span>
+                        </div>
+                        <span class="card-path">/auth/login</span>
+                        <div class="input-group"><label>Email</label><input type="email" id="loginEmail"
+                                value="admin@ophillia.com"></div>
+                        <div class="input-group"><label>Password</label><input type="password" id="loginPass"
+                                value="password123"></div>
+                        <button class="btn btn-success" onclick="login()">Authenticate & Persist</button>
                     </div>
                 </div>
-                <button class="btn btn-primary" onclick="register()">Register</button>
-                <div class="response-box" id="res-register"></div>
-            </div>
 
-            <!-- Login -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Login</div>
-                <p class="path">/api/v1/auth/login</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Email</label><input type="email" id="loginEmail"
-                            value="test@example.com" /></div>
-                    <div class="form-group"><label>Password</label><input type="password" id="loginPassword"
-                            value="password123" /></div>
-                </div>
-                <button class="btn btn-green" onclick="login()">Login & Set Token</button>
-                <div class="response-box" id="res-login"></div>
-            </div>
-        </div>
-
-        <div class="grid-2">
-            <!-- Me -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> Current User (Me)</div>
-                <p class="path">/api/v1/auth/me</p>
-                <hr class="divider">
-                <button class="btn btn-primary" onclick="getMe()">Get Me</button>
-                <div class="response-box" id="res-me"></div>
-            </div>
-
-            <!-- Refresh Token -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Refresh Token</div>
-                <p class="path">/api/v1/auth/refresh</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Refresh Token</label><input type="text" id="refreshToken"
-                            placeholder="From login response" /></div>
-                </div>
-                <button class="btn btn-primary" onclick="refreshToken()">Refresh</button>
-                <div class="response-box" id="res-refresh"></div>
-            </div>
-        </div>
-
-        <!-- Update Role -->
-        <div class="section">
-            <div class="section-title"><span class="method-badge method-patch">PATCH</span> Update User Role</div>
-            <p class="path">/api/v1/auth/users/{user_id}/role</p>
-            <hr class="divider">
-            <div class="form-row">
-                <div class="form-group"><label>User ID (UUID)</label><input type="text" id="roleUserId"
-                        placeholder="uuid" /></div>
-                <div class="form-group">
-                    <label>New Role</label>
-                    <select id="newRole">
-                        <option>employee</option>
-                        <option>hr</option>
-                        <option>manager</option>
-                        <option>super_admin</option>
-                    </select>
-                </div>
-            </div>
-            <button class="btn btn-primary" onclick="updateRole()">Update Role</button>
-            <div class="response-box" id="res-role"></div>
-        </div>
-    </div>
-
-    <!-- ==================== EMPLOYEE PANEL ==================== -->
-    <div id="panel-employee" class="panel">
-        <div class="grid-2">
-            <!-- Create Employee -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Create Employee</div>
-                <p class="path">/api/v1/employees</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>User ID (from auth)</label><input type="text" id="empUserId"
-                            placeholder="uuid" /></div>
-                    <div class="form-group"><label>Email</label><input type="email" id="empEmail"
-                            value="john@example.com" /></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label>First Name</label><input type="text" id="empFirst" value="John" />
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Role Management</span><span
+                            class="badge badge-patch">PATCH</span></div>
+                    <span class="card-path">/auth/users/{id}/role</span>
+                    <div class="grid-2">
+                        <div class="input-group"><label>Target User ID</label><input type="text" id="targetUserId"
+                                placeholder="UUID"></div>
+                        <div class="input-group"><label>New Role</label>
+                            <select id="newRole">
+                                <option value="super_admin">Super Admin</option>
+                                <option value="hr">HR</option>
+                                <option value="manager">Manager</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group"><label>Last Name</label><input type="text" id="empLast" value="Doe" /></div>
+                    <button class="btn btn-primary" onclick="updateRole()">Change Permissions</button>
                 </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Phone</label><input type="text" id="empPhone"
-                            value="+91-9876543210" /></div>
-                    <div class="form-group"><label>Date Joined</label><input type="date" id="empDateJoined" /></div>
+            </div>
+
+            <!-- EMPLOYEE PANEL -->
+            <div id="panel-employee" class="control-panel">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Employee Profile Initiation</span><span
+                            class="badge badge-post">POST</span></div>
+                    <span class="card-path">/employees</span>
+                    <div class="grid-2">
+                        <div class="input-group"><label>Auth User ID</label><input type="text" id="empUserId"
+                                placeholder="Bind to Auth UUID"></div>
+                        <div class="input-group"><label>Email</label><input type="email" id="empEmail"
+                                value="j.doe@ophillia.com"></div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="input-group"><label>First Name</label><input type="text" id="empFn" value="John">
+                        </div>
+                        <div class="input-group"><label>Last Name</label><input type="text" id="empLn" value="Doe">
+                        </div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="input-group"><label>Designation</label><input type="text" id="empDesig"
+                                value="Lead Developer"></div>
+                        <div class="input-group"><label>Joining Date</label><input type="date" id="empJoin"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="createEmployee()">Build Profile</button>
                 </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Designation</label><input type="text" id="empDesignation"
-                            value="Software Engineer" /></div>
-                    <div class="form-group">
-                        <label>Gender</label>
-                        <select id="empGender">
-                            <option value="">--</option>
-                            <option>male</option>
-                            <option>female</option>
-                            <option>other</option>
-                        </select>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Directory Search</span><span
+                                class="badge badge-get">GET</span></div>
+                        <span class="card-path">/employees</span>
+                        <input type="text" id="empSearch" placeholder="Name/Email contains...">
+                        <button class="btn btn-secondary" onclick="listEmployees()">Fetch Paginated List</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Direct Lookup</span><span
+                                class="badge badge-get">GET</span></div>
+                        <span class="card-path">/employees/{id}</span>
+                        <input type="text" id="lookupId" placeholder="Employee UUID">
+                        <button class="btn btn-secondary" onclick="getEmployee()">Get Details</button>
                     </div>
                 </div>
-                <button class="btn btn-primary" onclick="createEmployee()">Create Employee</button>
-                <div class="response-box" id="res-create-emp"></div>
             </div>
 
-            <!-- My Profile -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> My Employee Profile</div>
-                <p class="path">/api/v1/employees/me</p>
-                <hr class="divider">
-                <button class="btn btn-primary" onclick="getMyProfile()">Get My Profile</button>
-                <div class="response-box" id="res-my-profile"></div>
-            </div>
-        </div>
-
-        <div class="grid-2">
-            <!-- List Employees -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> List Employees</div>
-                <p class="path">/api/v1/employees</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Search</label><input type="text" id="empSearch"
-                            placeholder="Name or email" /></div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select id="empStatusFilter">
-                            <option value="">All</option>
-                            <option>active</option>
-                            <option>inactive</option>
-                            <option>terminated</option>
-                        </select>
+            <!-- ATTENDANCE PANEL -->
+            <div id="panel-attendance" class="control-panel">
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Clock In / Start Day</span><span
+                                class="badge badge-post">POST</span></div>
+                        <span class="card-path">/attendance/clock-in</span>
+                        <div class="grid-2">
+                            <input type="number" step="any" id="clkLat" placeholder="Lat">
+                            <input type="number" step="any" id="clkLng" placeholder="Lng">
+                        </div>
+                        <button class="btn btn-success" onclick="clockIn()">📍 Mark Present</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Clock Out / End Day</span><span
+                                class="badge badge-post">POST</span></div>
+                        <span class="card-path">/attendance/clock-out</span>
+                        <button class="btn btn-error" onclick="clockOut()">⏰ Terminate Session</button>
                     </div>
                 </div>
-                <button class="btn btn-primary" onclick="listEmployees()">List</button>
-                <div class="response-box" id="res-list-emp"></div>
-            </div>
 
-            <!-- Get Employee by ID -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> Get Employee</div>
-                <p class="path">/api/v1/employees/{id}</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Employee ID</label><input type="text" id="getEmpId"
-                            placeholder="uuid" /></div>
-                </div>
-                <button class="btn btn-primary" onclick="getEmployee()">Get</button>
-                <div class="response-box" id="res-get-emp"></div>
-            </div>
-        </div>
-
-        <!-- Departments -->
-        <div class="grid-2">
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Create Department</div>
-                <p class="path">/api/v1/departments</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Name</label><input type="text" id="deptName" value="Engineering" />
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Bulk Records (Admin)</span><span
+                            class="badge badge-get">GET</span></div>
+                    <span class="card-path">/attendance</span>
+                    <div class="grid-2">
+                        <div class="input-group"><label>Employee Filter</label><input type="text" id="attFilterId"
+                                placeholder="UUID (Optional)"></div>
+                        <div class="input-group"><label>Status</label>
+                            <select id="attFilterStatus">
+                                <option value="">All Statuses</option>
+                                <option value="present">Present</option>
+                                <option value="late">Late</option>
+                                <option value="absent">Absent</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group"><label>Description</label><input type="text" id="deptDesc"
-                            value="Software team" /></div>
-                </div>
-                <button class="btn btn-primary" onclick="createDept()">Create</button>
-                <div class="response-box" id="res-create-dept"></div>
-            </div>
-
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> List Departments</div>
-                <p class="path">/api/v1/departments</p>
-                <hr class="divider">
-                <button class="btn btn-primary" onclick="listDepts()">List Departments</button>
-                <div class="response-box" id="res-list-dept"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ==================== ATTENDANCE PANEL ==================== -->
-    <div id="panel-attendance" class="panel">
-        <div class="grid-2">
-            <!-- Clock In -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Clock In</div>
-                <p class="path">/api/v1/attendance/clock-in</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Latitude (optional)</label><input type="number" step="any"
-                            id="clockInLat" placeholder="28.6139" /></div>
-                    <div class="form-group"><label>Longitude (optional)</label><input type="number" step="any"
-                            id="clockInLng" placeholder="77.2090" /></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Notes</label><input type="text" id="clockInNotes"
-                            placeholder="Optional" /></div>
-                </div>
-                <button class="btn btn-green" onclick="clockIn()">⏰ Clock In</button>
-                <button class="btn btn-sm btn-primary" onclick="fillMyLocation('clockInLat','clockInLng')"
-                    style="margin-left:8px">📍 Use My Location</button>
-                <div class="response-box" id="res-clock-in"></div>
-            </div>
-
-            <!-- Clock Out -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Clock Out</div>
-                <p class="path">/api/v1/attendance/clock-out</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Latitude (optional)</label><input type="number" step="any"
-                            id="clockOutLat" placeholder="28.6139" /></div>
-                    <div class="form-group"><label>Longitude (optional)</label><input type="number" step="any"
-                            id="clockOutLng" placeholder="77.2090" /></div>
-                </div>
-                <button class="btn btn-red" onclick="clockOut()">⏰ Clock Out</button>
-                <button class="btn btn-sm btn-primary" onclick="fillMyLocation('clockOutLat','clockOutLng')"
-                    style="margin-left:8px">📍 Use My Location</button>
-                <div class="response-box" id="res-clock-out"></div>
-            </div>
-        </div>
-
-        <div class="grid-2">
-            <!-- Today -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> My Today</div>
-                <p class="path">/api/v1/attendance/me/today</p>
-                <hr class="divider">
-                <button class="btn btn-primary" onclick="getMyToday()">Get Today's Record</button>
-                <div class="response-box" id="res-today"></div>
-            </div>
-
-            <!-- My Records -->
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> My Attendance History</div>
-                <p class="path">/api/v1/attendance/me</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>From</label><input type="date" id="myAttFrom" /></div>
-                    <div class="form-group"><label>To</label><input type="date" id="myAttTo" /></div>
-                </div>
-                <button class="btn btn-primary" onclick="getMyAttendance()">Get History</button>
-                <div class="response-box" id="res-my-att"></div>
-            </div>
-        </div>
-
-        <!-- Admin: List All -->
-        <div class="section">
-            <div class="section-title"><span class="method-badge method-get">GET</span> All Attendance (Admin)</div>
-            <p class="path">/api/v1/attendance</p>
-            <hr class="divider">
-            <div class="form-row">
-                <div class="form-group"><label>Employee ID</label><input type="text" id="attEmpId"
-                        placeholder="uuid (optional)" /></div>
-                <div class="form-group"><label>Status</label>
-                    <select id="attStatus">
-                        <option value="">All</option>
-                        <option>present</option>
-                        <option>late</option>
-                        <option>half_day</option>
-                        <option>absent</option>
-                    </select>
-                </div>
-                <div class="form-row"><label>From</label><input type="date" id="attFrom" /></div>
-                <div class="form-group"><label>To</label><input type="date" id="attTo" /></div>
-            </div>
-            <button class="btn btn-primary" onclick="listAllAttendance()">List All</button>
-            <div class="response-box" id="res-all-att"></div>
-        </div>
-
-        <!-- Geofences -->
-        <div class="grid-2">
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Create Geofence</div>
-                <p class="path">/api/v1/attendance/geofences</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Name</label><input type="text" id="geoName" value="HQ Office" />
+                    <div class="grid-2">
+                        <div class="input-group"><label>From</label><input type="date" id="attFrom"></div>
+                        <div class="input-group"><label>To</label><input type="date" id="attTo"></div>
                     </div>
-                    <div class="form-group"><label>Radius (m)</label><input type="number" id="geoRadius" value="200" />
+                    <button class="btn btn-primary" onclick="listAllAttendance()">Query Global Ledger</button>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Geofencing</span><span
+                                class="badge badge-post">POST</span></div>
+                        <span class="card-path">/attendance/geofences</span>
+                        <input type="text" id="geoName" value="HQ Main Office">
+                        <div class="grid-2">
+                            <input type="number" step="any" id="geoLat" value="28.6139">
+                            <input type="number" step="any" id="geoLng" value="77.2090">
+                        </div>
+                        <input type="number" id="geoRad" value="200" placeholder="Radius (meters)">
+                        <button class="btn btn-primary" onclick="createGeofence()">Establish Boundary</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Current Policies</span><span
+                                class="badge badge-get">GET</span></div>
+                        <span class="card-path">/attendance/policies</span>
+                        <button class="btn btn-secondary" onclick="listPolicies()">View Rulebook</button>
                     </div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Latitude</label><input type="number" step="any" id="geoLat"
-                            placeholder="28.6139" /></div>
-                    <div class="form-group"><label>Longitude</label><input type="number" step="any" id="geoLng"
-                            placeholder="77.2090" /></div>
-                </div>
-                <button class="btn btn-primary" onclick="createGeofence()">Create Geofence</button>
-                <button class="btn btn-sm btn-primary" onclick="fillMyLocation('geoLat','geoLng')"
-                    style="margin-left:8px">📍 Use My Location</button>
-                <div class="response-box" id="res-create-geo"></div>
             </div>
+        </main>
 
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> List Geofences</div>
-                <p class="path">/api/v1/attendance/geofences</p>
-                <hr class="divider">
-                <button class="btn btn-primary" onclick="listGeofences()">List</button>
-                <div class="response-box" id="res-list-geo"></div>
+        <aside class="console">
+            <div class="console-header">
+                <span style="font-weight: bold; font-size: 0.75rem;">DEBUG STREAM</span>
+                <button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem;" onclick="clearLogs()">Reset
+                    Logs</button>
             </div>
-        </div>
-
-        <!-- Policies -->
-        <div class="grid-2">
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-post">POST</span> Create Policy</div>
-                <p class="path">/api/v1/attendance/policies</p>
-                <hr class="divider">
-                <div class="form-row">
-                    <div class="form-group"><label>Department ID</label><input type="text" id="polDeptId"
-                            placeholder="uuid (optional)" /></div>
-                    <div class="form-group"><label>Employee ID</label><input type="text" id="polEmpId"
-                            placeholder="uuid (optional)" /></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Method</label>
-                        <select id="polMethod">
-                            <option>manual</option>
-                            <option>geofence</option>
-                            <option>both</option>
-                        </select>
-                    </div>
-                    <div class="form-group"><label>Geofence ID</label><input type="text" id="polGeoId"
-                            placeholder="uuid (for geofence method)" /></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Work Start Time</label><input type="time" id="polStart"
-                            value="09:00" /></div>
-                    <div class="form-group"><label>Hours/Day</label><input type="number" step="0.5" id="polHours"
-                            value="8" /></div>
-                </div>
-                <button class="btn btn-primary" onclick="createPolicy()">Create Policy</button>
-                <div class="response-box" id="res-create-pol"></div>
+            <div id="console-output">
+                <!-- Logs injected here -->
             </div>
-
-            <div class="section">
-                <div class="section-title"><span class="method-badge method-get">GET</span> List Policies</div>
-                <p class="path">/api/v1/attendance/policies</p>
-                <hr class="divider">
-                <button class="btn btn-primary" onclick="listPolicies()">List</button>
-                <div class="response-box" id="res-list-pol"></div>
-            </div>
-        </div>
+        </aside>
     </div>
 
     <script>
-        // ── Helpers ──
         const $ = id => document.getElementById(id);
-        const getBase = svc => $('gatewayUrl').value;
-        const getToken = () => $('jwtToken').value;
 
-        function showResult(boxId, status, body) {
-            const box = $(boxId);
-            box.classList.add('show');
-            const isOk = status >= 200 && status < 300;
-            box.innerHTML = `<div class="response-status ${isOk ? 'ok' : 'err'}">${status} ${isOk ? 'OK' : 'ERROR'}</div><div class="response-body">${typeof body === 'string' ? body : JSON.stringify(body, null, 2)}</div>`;
+        // ── PERSISTENCE ──
+        const state = {
+            ids: JSON.parse(localStorage.getItem('hrms_ids') || '{}')
+        };
+
+        function init() {
+            $('gatewayUrl').value = localStorage.getItem('gatewayUrl') || 'http://localhost';
+            $('jwtToken').value = localStorage.getItem('jwtToken') || '';
+            $('refreshToken').value = localStorage.getItem('refreshToken') || '';
+            updateIdStack();
+
+            // Default dates
+            const today = new Date().toISOString().split('T')[0];
+            $('empJoin').value = today;
+            if ($('attTo')) $('attTo').value = today;
         }
 
-        async function apiCall(service, method, path, body, resultBoxId) {
-            const url = getBase(service) + '/api/v1' + path;
+        function saveConfig() {
+            localStorage.setItem('gatewayUrl', $('gatewayUrl').value);
+            localStorage.setItem('jwtToken', $('jwtToken').value);
+            localStorage.setItem('refreshToken', $('refreshToken').value);
+        }
+
+        function setLocalId(key, val) {
+            if (!val) return;
+            state.ids[key] = val;
+            localStorage.setItem('hrms_ids', JSON.stringify(state.ids));
+            updateIdStack();
+            syncIdsToInputs();
+        }
+
+        function updateIdStack() {
+            const container = $('id-stack');
+            container.innerHTML = '';
+            Object.entries(state.ids).forEach(([key, val]) => {
+                const div = document.createElement('div');
+                div.className = 'id-pill';
+                div.innerHTML = `<span>${key}:</span> ${val.substring(0, 8)}... <span class="copy-btn" onclick="copyId('${val}')">📋</span>`;
+                container.appendChild(div);
+            });
+        }
+
+        function syncIdsToInputs() {
+            if (state.ids.userId) {
+                $('targetUserId').value = state.ids.userId;
+                $('empUserId').value = state.ids.userId;
+                $('attFilterId').value = state.ids.userId;
+            }
+            if (state.ids.employeeId) {
+                $('lookupId').value = state.ids.employeeId;
+                $('attFilterId').value = state.ids.employeeId;
+            }
+        }
+
+        function copyId(val) {
+            navigator.clipboard.writeText(val);
+            log('System', 'ID copied to clipboard');
+        }
+
+        function clearStorage() {
+            if (confirm('Clear all settings and cached IDs?')) {
+                localStorage.clear();
+                window.location.reload();
+            }
+        }
+
+        // ── LOGGING ──
+        function log(source, msg, body = null, status = 200) {
+            const out = $('console-output');
+            const entry = document.createElement('div');
+            const isOk = status >= 200 && status < 400;
+            entry.className = `log-entry ${isOk ? 'log-ok' : 'log-err'}`;
+
+            entry.innerHTML = `
+                <div class="log-header">
+                    <span class="log-req">${source}</span>
+                    <span class="log-res">${status || 'INFO'}</span>
+                </div>
+                <div>${msg}</div>
+                ${body ? `<div class="log-body">${JSON.stringify(body, null, 2)}</div>` : ''}
+            `;
+            out.prepend(entry);
+        }
+
+        function clearLogs() {
+            $('console-output').innerHTML = '';
+        }
+
+        // ── CORE API ──
+        async function api(method, path, body = null) {
+            const url = `${$('gatewayUrl').value}/api/v1${path}`;
+            const token = $('jwtToken').value;
             const headers = { 'Content-Type': 'application/json' };
-            const token = getToken();
-            if (token) headers['Authorization'] = 'Bearer ' + token;
+            if (token) headers['Authorization'] = `Bearer ${token}`;
 
+            const startTime = Date.now();
             try {
-                const opts = { method, headers };
-                if (body && method !== 'GET') opts.body = JSON.stringify(body);
-                const res = await fetch(url, opts);
-                const data = await res.json().catch(() => res.statusText);
-                showResult(resultBoxId, res.status, data);
-                return { status: res.status, data };
-            } catch (e) {
-                showResult(resultBoxId, 0, 'Network Error: ' + e.message);
-                return null;
+                const response = await fetch(url, {
+                    method,
+                    headers,
+                    body: body ? JSON.stringify(body) : null
+                });
+
+                const duration = Date.now() - startTime;
+                const data = await response.json().catch(() => ({}));
+
+                log(`${method} ${path}`, `Completed in ${duration}ms`, data, response.status);
+                return { status: response.status, data };
+            } catch (err) {
+                log(`${method} ${path}`, `Network error: ${err.message}`, null, 0);
             }
         }
 
-        // ── Tabs ──
-        function switchTab(name) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            event.target.classList.add('active');
-            $('panel-' + name).classList.add('active');
-        }
-
-        // ── Health Check ──
-        async function checkHealth() {
-            const box = $('healthResults');
-            box.classList.add('show');
-            box.innerHTML = '<div class="response-body">Checking...</div>';
-            try {
-                const res = await fetch($('gatewayUrl').value + '/health');
-                const data = await res.json();
-                box.innerHTML = `<div class="response-body"><span class="status-dot connected"></span> <strong>API Gateway</strong>: ${JSON.stringify(data)}</div>`;
-            } catch (e) {
-                box.innerHTML = `<div class="response-body"><span class="status-dot disconnected"></span> <strong>API Gateway</strong>: ❌ Unreachable (${e.message})</div>`;
-            }
-        }
-
-        // ── Auth ──
+        // ── ACTIONS ──
         async function register() {
-            await apiCall('auth', 'POST', '/auth/register', {
+            const res = await api('POST', '/auth/register', {
                 email: $('regEmail').value,
-                password: $('regPassword').value,
-                role: $('regRole').value,
-            }, 'res-register');
+                password: $('regPass').value,
+                role: $('regRole').value
+            });
+            if (res && res.data.id) setLocalId('userId', res.data.id);
         }
 
         async function login() {
-            const formData = new URLSearchParams();
-            formData.append('username', $('loginEmail').value);
-            formData.append('password', $('loginPassword').value);
+            const res = await api('POST', '/auth/login', {
+                email: $('loginEmail').value,
+                password: $('loginPass').value
+            });
+            if (res && res.data.access_token) {
+                $('jwtToken').value = res.data.access_token;
+                $('refreshToken').value = res.data.refresh_token || '';
+                saveConfig();
 
-            try {
-                const res = await fetch(getBase('auth') + '/api/v1/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData,
-                });
-                const data = await res.json();
-                showResult('res-login', res.status, data);
-                if (data.access_token) {
-                    $('jwtToken').value = data.access_token;
-                    if (data.refresh_token) $('refreshToken').value = data.refresh_token;
-                }
-            } catch (e) {
-                showResult('res-login', 0, 'Network Error: ' + e.message);
+                // Fetch profile to get user ID if missing
+                const me = await api('GET', '/auth/me');
+                if (me && me.data.id) setLocalId('userId', me.data.id);
             }
         }
 
-        async function getMe() {
-            await apiCall('auth', 'GET', '/auth/me', null, 'res-me');
-        }
-
-        async function refreshToken() {
-            const token = $('refreshToken').value;
-            try {
-                const res = await fetch(getBase('auth') + '/api/v1/auth/refresh?refresh_token=' + encodeURIComponent(token), { method: 'POST' });
-                const data = await res.json();
-                showResult('res-refresh', res.status, data);
-                if (data.access_token) {
-                    $('jwtToken').value = data.access_token;
-                    if (data.refresh_token) $('refreshToken').value = data.refresh_token;
-                }
-            } catch (e) {
-                showResult('res-refresh', 0, 'Network Error: ' + e.message);
-            }
-        }
-
-        async function updateRole() {
-            await apiCall('auth', 'PATCH', `/auth/users/${$('roleUserId').value}/role`, {
-                role: $('newRole').value,
-            }, 'res-role');
-        }
-
-        // ── Employee ──
         async function createEmployee() {
-            const body = {
-                user_id: $('empUserId').value,
-                first_name: $('empFirst').value,
-                last_name: $('empLast').value,
+            const res = await api('POST', '/employees', {
+                user_id: $('empUserId').value || state.ids.userId,
+                first_name: $('empFn').value,
+                last_name: $('empLn').value,
                 email: $('empEmail').value,
-                phone: $('empPhone').value || null,
-                date_joined: $('empDateJoined').value || new Date().toISOString().split('T')[0],
-                designation: $('empDesignation').value || null,
-            };
-            const gender = $('empGender').value;
-            if (gender) body.gender = gender;
-            await apiCall('employee', 'POST', '/employees', body, 'res-create-emp');
-        }
-
-        async function getMyProfile() {
-            await apiCall('employee', 'GET', '/employees/me', null, 'res-my-profile');
+                designation: $('empDesig').value,
+                date_joined: $('empJoin').value
+            });
+            if (res && res.data.id) setLocalId('employeeId', res.data.id);
         }
 
         async function listEmployees() {
             let path = '/employees?skip=0&limit=20';
-            const search = $('empSearch').value;
-            const status = $('empStatusFilter').value;
-            if (search) path += '&search=' + encodeURIComponent(search);
-            if (status) path += '&employment_status=' + status;
-            await apiCall('employee', 'GET', path, null, 'res-list-emp');
+            if ($('empSearch').value) path += `&search=${encodeURIComponent($('empSearch').value)}`;
+            await api('GET', path);
         }
 
         async function getEmployee() {
-            await apiCall('employee', 'GET', `/employees/${$('getEmpId').value}`, null, 'res-get-emp');
+            await api('GET', `/employees/${$('lookupId').value}`);
         }
 
-        async function createDept() {
-            await apiCall('employee', 'POST', '/departments', {
-                name: $('deptName').value,
-                description: $('deptDesc').value || null,
-            }, 'res-create-dept');
-        }
-
-        async function listDepts() {
-            await apiCall('employee', 'GET', '/departments', null, 'res-list-dept');
-        }
-
-        // ── Attendance ──
         async function clockIn() {
             const body = {};
-            if ($('clockInLat').value) body.latitude = parseFloat($('clockInLat').value);
-            if ($('clockInLng').value) body.longitude = parseFloat($('clockInLng').value);
-            if ($('clockInNotes').value) body.notes = $('clockInNotes').value;
-            await apiCall('attendance', 'POST', '/attendance/clock-in', body, 'res-clock-in');
+            if ($('clkLat').value) body.latitude = parseFloat($('clkLat').value);
+            if ($('clkLng').value) body.longitude = parseFloat($('clkLng').value);
+            await api('POST', '/attendance/clock-in', body);
         }
 
         async function clockOut() {
-            const body = {};
-            if ($('clockOutLat').value) body.latitude = parseFloat($('clockOutLat').value);
-            if ($('clockOutLng').value) body.longitude = parseFloat($('clockOutLng').value);
-            await apiCall('attendance', 'POST', '/attendance/clock-out', body, 'res-clock-out');
-        }
-
-        async function getMyToday() {
-            await apiCall('attendance', 'GET', '/attendance/me/today', null, 'res-today');
-        }
-
-        async function getMyAttendance() {
-            let path = '/attendance/me?skip=0&limit=20';
-            if ($('myAttFrom').value) path += '&date_from=' + $('myAttFrom').value;
-            if ($('myAttTo').value) path += '&date_to=' + $('myAttTo').value;
-            await apiCall('attendance', 'GET', path, null, 'res-my-att');
+            await api('POST', '/attendance/clock-out', {});
         }
 
         async function listAllAttendance() {
-            let path = '/attendance?skip=0&limit=20';
-            if ($('attEmpId').value) path += '&employee_id=' + $('attEmpId').value;
-            if ($('attStatus').value) path += '&status=' + $('attStatus').value;
-            if ($('attFrom').value) path += '&date_from=' + $('attFrom').value;
-            if ($('attTo').value) path += '&date_to=' + $('attTo').value;
-            await apiCall('attendance', 'GET', path, null, 'res-all-att');
+            let p = '/attendance?skip=0&limit=50';
+            if ($('attFilterId').value) p += `&employee_id=${$('attFilterId').value}`;
+            if ($('attFilterStatus').value) p += `&status=${$('attFilterStatus').value}`;
+            await api('GET', p);
         }
 
         async function createGeofence() {
-            await apiCall('attendance', 'POST', '/attendance/geofences', {
+            const res = await api('POST', '/attendance/geofences', {
                 name: $('geoName').value,
                 latitude: parseFloat($('geoLat').value),
                 longitude: parseFloat($('geoLng').value),
-                radius_meters: parseInt($('geoRadius').value),
-            }, 'res-create-geo');
-        }
-
-        async function listGeofences() {
-            await apiCall('attendance', 'GET', '/attendance/geofences', null, 'res-list-geo');
-        }
-
-        async function createPolicy() {
-            const body = {
-                method: $('polMethod').value,
-                work_hours_per_day: parseFloat($('polHours').value),
-            };
-            if ($('polDeptId').value) body.department_id = $('polDeptId').value;
-            if ($('polEmpId').value) body.employee_id = $('polEmpId').value;
-            if ($('polGeoId').value) body.geofence_id = $('polGeoId').value;
-            if ($('polStart').value) body.work_start_time = $('polStart').value;
-            await apiCall('attendance', 'POST', '/attendance/policies', body, 'res-create-pol');
+                radius_meters: parseInt($('geoRad').value)
+            });
+            if (res && res.data.id) setLocalId('geofenceId', res.data.id);
         }
 
         async function listPolicies() {
-            await apiCall('attendance', 'GET', '/attendance/policies', null, 'res-list-pol');
+            await api('GET', '/attendance/policies');
         }
 
-        // ── Geolocation helper ──
-        function fillMyLocation(latId, lngId) {
-            if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
-            navigator.geolocation.getCurrentPosition(
-                pos => { $(latId).value = pos.coords.latitude.toFixed(6); $(lngId).value = pos.coords.longitude.toFixed(6); },
-                err => alert('Location error: ' + err.message)
-            );
+        async function checkAllHealth() {
+            const services = [
+                { name: 'Gateway', url: '/health' },
+                { name: 'Auth', url: '/api/v1/auth/health' },
+                { name: 'Employee', url: '/api/v1/employees/health' },
+                { name: 'Attendance', url: '/api/v1/attendance/health' }
+            ];
+            for (const s of services) {
+                try {
+                    const r = await fetch($('gatewayUrl').value + s.url);
+                    log('Health', `${s.name} is ${r.ok ? 'OK' : 'ERR'}`, null, r.status);
+                } catch (e) {
+                    log('Health', `${s.name} unreachable`, null, 503);
+                }
+            }
         }
 
-        // Set today's date as default for date_joined
-        $('empDateJoined').value = new Date().toISOString().split('T')[0];
+        // ── TABS ──
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.control-panel').forEach(p => p.classList.remove('active'));
+            event.target.classList.add('active');
+            $(`panel-${name}`).classList.add('active');
+        }
+
+        init();
     </script>
 </body>
 

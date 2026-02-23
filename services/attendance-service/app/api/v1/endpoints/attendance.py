@@ -13,6 +13,7 @@ from app.schemas.attendance import (
     ClockInRequest,
     ClockOutRequest,
     ManualAttendanceCreate,
+    SchoolModeAttendanceCreate,
     AttendanceUpdate,
     AttendanceResponse,
     AttendanceListResponse,
@@ -162,6 +163,18 @@ async def manual_entry(
 ):
     """Create a manual/backdated attendance entry. HR/Super Admin only."""
     return await service.manual_entry(data, created_by=current_user.sub)
+
+
+@router.post("/school-mode", response_model=AttendanceResponse, status_code=201)
+async def school_mode_entry(
+    data: SchoolModeAttendanceCreate,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Mark an employee's attendance on their behalf. HR/Super Admin only."""
+    return await service.mark_school_mode_attendance(data, created_by=current_user.sub)
 
 
 # ──────────────────── GEOFENCES ────────────────────

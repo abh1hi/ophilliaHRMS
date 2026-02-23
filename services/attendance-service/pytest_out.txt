@@ -1,0 +1,47 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-7.4.4, pluggy-1.6.0
+rootdir: C:\Users\abhin\Desktop\ophilliaHRMS\services\attendance-service
+plugins: anyio-4.12.1, locust-2.43.1, asyncio-0.23.3, cov-7.0.0, html-4.1.1, metadata-3.1.1
+asyncio: mode=Mode.STRICT
+collected 11 items
+
+tests\integration\test_attendance_api.py .Validation error: {'detail': [{'type': 'missing', 'loc': ['query', 'args'], 'msg': 'Field required', 'input': None, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}, {'type': 'missing', 'loc': ['query', 'kwargs'], 'msg': 'Field required', 'input': None, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}]}
+F.
+tests\unit\test_attendance_service.py ........
+
+================================== FAILURES ===================================
+__________________________ test_school_mode_api_rbac __________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001BBAE224050>
+
+    @pytest.mark.asyncio
+    async def test_school_mode_api_rbac(monkeypatch):
+        """Test creating a school mode attendance record without HR/Super Admin privileges."""
+        from app.main import app
+        from app.core.security import get_current_user, TokenPayload
+    
+        async def mock_get_current_user(*args, **kwargs):
+            return TokenPayload(sub=str(uuid4()), role="employee", email="test@emp.com")
+    
+        app.dependency_overrides[get_current_user] = mock_get_current_user
+    
+        async with AsyncClient(app=app, base_url="http://testServer") as ac:
+            response = await ac.post("/api/v1/attendance/school-mode", json={
+                "employee_id": str(uuid4()),
+                "status": "present",
+                "notes": "Admin testing"
+            })
+    
+            if response.status_code == 422:
+                print("Validation error:", response.json())
+>           assert response.status_code == 403
+E           assert 422 == 403
+E            +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+
+tests\integration\test_attendance_api.py:38: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     app.middleware.request_id:request_id.py:18 Request completed
+INFO     httpx:_client.py:1758 HTTP Request: POST http://testserver/api/v1/attendance/school-mode "HTTP/1.1 422 Unprocessable Entity"
+=========================== short test summary info ===========================
+FAILED tests/integration/test_attendance_api.py::test_school_mode_api_rbac - ...
+======================== 1 failed, 10 passed in 2.40s =========================

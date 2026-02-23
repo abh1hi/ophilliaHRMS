@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from app.db.base import Base
 
 
+def naive_utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class MagicToken(Base):
     __tablename__ = "magic_tokens"
 
@@ -16,7 +20,7 @@ class MagicToken(Base):
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False, nullable=False)
     purpose = Column(String, nullable=False)  # 'login' | 'reset_password'
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=naive_utcnow, nullable=False)
 
     user = relationship("User", back_populates="magic_tokens")
 

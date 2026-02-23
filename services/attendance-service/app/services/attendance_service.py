@@ -19,6 +19,7 @@ from app.schemas.attendance import (
     AttendanceUpdate,
     GeofenceCreate,
     PolicyCreate,
+    SchoolModeAttendanceCreate,
 )
 from app.events.publisher import EventPublisher
 from app.utils.geofence import is_within_geofence
@@ -314,6 +315,44 @@ class AttendanceService:
             await self.event_publisher.publish("attendance.manual_entry", {
                 "employee_id": str(data.employee_id),
                 "date": str(data.date),
+                "created_by": created_by,
+            })
+
+        return record
+
+
+    # ──────────── SCHOOL MODE (Admin/HR) ────────────
+
+    async def mark_school_mode_attendance(self, data: "SchoolModeAttendanceCreate", created_by: str) -> AttendanceRecord:
+        today = date.today()
+        existing = await self.attendance_repo.get_by_employee_and_date(
+            data.employee_id, today
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Attendance record already exists for today",
+            )
+
+        now = datetime.now(timezone.utc)
+        record = AttendanceRecord(
+            employee_id=data.employee_id,
+            clock_in=now,  # Using current time as clock-in time for school mode
+            clock_out=now, # Automatically clocking out to complete the entry immediately, or leave None
+            work_hours=settings.DEFAULT_WORK_HOURS_PER_DAY if data.status.value in ["present", "late"] else 0, # Assuming full day for present
+            overtime_hours=0.0,
+            status=data.status.value,
+            method="school_mode",
+            notes=data.notes,
+            date=today,
+        )
+        record = await self.attendance_repo.create(record)
+
+        if self.event_publisher:
+            await self.event_publisher.publish("attendance.school_mode_entry", {
+                "employee_id": str(data.employee_id),
+                "date": str(today),
+                "status": record.status,
                 "created_by": created_by,
             })
 

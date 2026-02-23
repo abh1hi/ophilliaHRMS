@@ -13,7 +13,7 @@ pydantic[email]==2.5.3
 pydantic-settings==2.1.0
 email-validator==2.1.0
 
-# Security — JWT decode (same secret as auth-service)
+# Security
 python-jose[cryptography]==3.3.0
 
 # Service-to-service HTTP client
@@ -25,7 +25,7 @@ aio-pika==9.3.1
 # Rate Limiting
 slowapi==0.1.9
 
-# Geofence — haversine distance calculation
+# Geofence
 geopy==2.4.1
 
 # Testing
@@ -33,3 +33,5 @@ pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-html==4.1.1
 testcontainers[postgres]==3.7.1
+pytest-cov>=4.1.0
+aiosqlite>=0.19.0

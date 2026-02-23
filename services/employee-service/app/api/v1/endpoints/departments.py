@@ -25,10 +25,10 @@ def _get_service(db: AsyncSession = Depends(get_db)) -> DepartmentService:
 @router.post("", response_model=DepartmentResponse, status_code=201)
 async def create_department(
     data: DepartmentCreate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN)),
     service: DepartmentService = Depends(_get_service),
 ):
-    """Create a new department. Requires HR or Super Admin role."""
+    """Create a new department. Requires Super Admin role."""
     return await service.create_department(data)
 
 
@@ -59,8 +59,8 @@ async def get_department(
 async def update_department(
     department_id: UUID,
     data: DepartmentUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN)),
     service: DepartmentService = Depends(_get_service),
 ):
-    """Update a department. Requires HR or Super Admin role."""
+    """Update a department. Requires Super Admin role."""
     return await service.update_department(department_id, data)

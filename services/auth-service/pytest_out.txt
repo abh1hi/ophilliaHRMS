@@ -1,0 +1,109 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-7.4.4, pluggy-1.6.0
+rootdir: C:\Users\abhin\Desktop\ophilliaHRMS\services\auth-service
+plugins: anyio-4.12.1, locust-2.43.1, asyncio-0.23.3, cov-7.0.0, html-4.1.1, metadata-3.1.1
+asyncio: mode=Mode.STRICT
+collected 7 items
+
+tests\integration\test_auth_api.py FFF                                   [ 42%]
+tests\unit\test_auth_service.py ....                                     [100%]
+
+================================== FAILURES ===================================
+__________________________ test_auth_status_endpoint __________________________
+
+    @pytest.mark.asyncio
+    async def test_auth_status_endpoint():
+        # As an initial check we will create a direct test against the actual FastAPI app
+>       from app.main import app
+
+tests\integration\test_auth_api.py:19: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+app\main.py:13: in <module>
+    from app.tasks.scheduled_jobs import create_scheduler
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+______________________________ test_register_api ______________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001BBDCB562A0>
+
+    @pytest.mark.asyncio
+    async def test_register_api(monkeypatch):
+        """Integration style test for POST /register bypassing actual DB to allow CI/CD pure logic execution."""
+>       from app.main import app
+
+tests\integration\test_auth_api.py:28: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+app\main.py:13: in <module>
+    from app.tasks.scheduled_jobs import create_scheduler
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+_______________________________ test_login_api ________________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001BBDCB83320>
+
+    @pytest.mark.asyncio
+    async def test_login_api(monkeypatch):
+>       from app.main import app
+
+tests\integration\test_auth_api.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+app\main.py:13: in <module>
+    from app.tasks.scheduled_jobs import create_scheduler
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+============================== warnings summary ===============================
+tests/unit/test_auth_service.py::TestAuthService::test_register_user_success
+  C:\Users\abhin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\passlib\handlers\argon2.py:716: DeprecationWarning: Accessing argon2.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for structlog's packaging metadata.
+    _argon2_cffi.__version__, max_version)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_auth_api.py::test_auth_status_endpoint - Module...
+FAILED tests/integration/test_auth_api.py::test_register_api - ModuleNotFound...
+FAILED tests/integration/test_auth_api.py::test_login_api - ModuleNotFoundErr...
+=================== 3 failed, 4 passed, 1 warning in 2.43s ====================

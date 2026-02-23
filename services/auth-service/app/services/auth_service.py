@@ -51,7 +51,7 @@ class AuthService:
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
-        access_token = create_access_token(subject=user.id)
+        access_token = create_access_token(subject=user.id, role=user.role, email=user.email)
         refresh_token_secret = create_refresh_token()
         expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
@@ -85,7 +85,7 @@ class AuthService:
         await self.token_repository.revoke(db_token)
 
         user = db_token.user
-        new_access_token = create_access_token(subject=user.id)
+        new_access_token = create_access_token(subject=user.id, role=user.role, email=user.email)
         new_refresh_secret = create_refresh_token()
         new_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
@@ -134,7 +134,7 @@ class AuthService:
         await self.magic_token_repository.mark_as_used(db_token)
 
         user = db_token.user
-        access_token = create_access_token(subject=user.id)
+        access_token = create_access_token(subject=user.id, role=user.role, email=user.email)
         refresh_token_secret = create_refresh_token()
         refresh_expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS

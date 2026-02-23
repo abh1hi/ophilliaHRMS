@@ -39,7 +39,7 @@ async def get_my_profile(
 @router.post("", response_model=EmployeeResponse, status_code=201)
 async def create_employee(
     data: EmployeeCreate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN)),
     service: EmployeeService = Depends(_get_service),
 ):
     """Create a new employee profile. Requires HR or Super Admin role."""
@@ -90,7 +90,7 @@ async def get_employee(
 async def update_employee(
     employee_id: UUID,
     data: EmployeeUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN)),
     service: EmployeeService = Depends(_get_service),
 ):
     """Update an employee's profile. Requires HR or Super Admin role."""

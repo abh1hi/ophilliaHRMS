@@ -1,0 +1,75 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-7.4.4, pluggy-1.6.0
+rootdir: C:\Users\abhin\Desktop\ophilliaHRMS\services\employee-service
+plugins: anyio-4.12.1, locust-2.43.1, asyncio-0.23.3, cov-7.0.0, html-4.1.1, metadata-3.1.1
+asyncio: mode=Mode.STRICT
+collected 9 items
+
+tests\integration\test_employee_api.py FF                                [ 22%]
+tests\unit\test_department_service.py ...                                [ 55%]
+tests\unit\test_employee_service.py ....                                 [100%]
+
+================================== FAILURES ===================================
+________________________ test_employee_status_endpoint ________________________
+
+    @pytest.mark.asyncio
+    async def test_employee_status_endpoint():
+        from app.main import app
+        async with AsyncClient(app=app, base_url="http://testServer") as ac:
+            response = await ac.get("/health")
+            assert response.status_code == 200
+>           assert response.json()["status"] == "ok"
+E           AssertionError: assert 'healthy' == 'ok'
+E             - ok
+E             + healthy
+
+tests\integration\test_employee_api.py:15: AssertionError
+---------------------------- Captured stderr call -----------------------------
+{"timestamp": "2026-02-23T12:41:39.952516+00:00", "level": "INFO", "service_name": "employee-service", "logger": "app.middleware.request_id", "message": "Request completed", "request_id": "faaeee82-166e-41af-bcc9-16e249b1c67a", "method": "GET", "path": "/health", "status_code": 200, "duration_ms": 0.87}
+{"timestamp": "2026-02-23T12:41:39.953768+00:00", "level": "INFO", "service_name": "employee-service", "logger": "httpx", "message": "HTTP Request: GET http://testserver/health \"HTTP/1.1 200 OK\""}
+_________________________ test_create_employee_rbaca __________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001E9D2A54FE0>
+
+    @pytest.mark.asyncio
+    async def test_create_employee_rbaca(monkeypatch):
+        """Test creating an employee without Super Admin privileges."""
+        from app.main import app
+        from app.core.security import require_role
+        from fastapi import Depends
+    
+        # Normally this would be handled by auth dependencies, so we mock the token payload
+        # to simulate a regular user which should yield a 403 Forbidden manually, however
+        # we'll test the route integration assuming the middleware correctly raises HTTP 403
+        async def mock_require_role(*args, **kwargs):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+        # We selectively mock the dependency in the app overrides
+        from app.api.v1.endpoints.employees import require_role as real_require_role
+        app.dependency_overrides[real_require_role] = mock_require_role
+    
+        async with AsyncClient(app=app, base_url="http://testServer") as ac:
+            response = await ac.post("/api/v1/employees", json={
+                "first_name": "API",
+                "last_name": "Test",
+                "email": "test@emp.com",
+                "user_id": str(uuid4())
+            })
+    
+            # the app dependency overrrides feature ensures 403 is triggered
+>           assert response.status_code == 403
+E           assert 401 == 403
+E            +  where 401 = <Response [401 Unauthorized]>.status_code
+
+tests\integration\test_employee_api.py:44: AssertionError
+---------------------------- Captured stderr call -----------------------------
+{"timestamp": "2026-02-23T12:41:40.203093+00:00", "level": "INFO", "service_name": "employee-service", "logger": "app.middleware.request_id", "message": "Request completed", "request_id": "6c7ea0fe-ccd5-43d3-992e-0ea9de38f9f2", "method": "POST", "path": "/api/v1/employees", "status_code": 401, "duration_ms": 1.8}
+{"timestamp": "2026-02-23T12:41:40.203617+00:00", "level": "INFO", "service_name": "employee-service", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/employees \"HTTP/1.1 401 Unauthorized\""}
+------------------------------ Captured log call ------------------------------
+INFO     app.middleware.request_id:request_id.py:19 Request completed
+INFO     httpx:_client.py:1758 HTTP Request: POST http://testserver/api/v1/employees "HTTP/1.1 401 Unauthorized"
+=========================== short test summary info ===========================
+FAILED tests/integration/test_employee_api.py::test_employee_status_endpoint
+FAILED tests/integration/test_employee_api.py::test_create_employee_rbaca - a...
+========================= 2 failed, 7 passed in 1.84s =========================

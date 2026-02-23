@@ -30,6 +30,13 @@ class ManualAttendanceCreate(BaseModel):
     notes: Optional[str] = None
 
 
+# ──────────── SCHOOL MODE ENTRY (Admin/HR) ────────────
+class SchoolModeAttendanceCreate(BaseModel):
+    employee_id: UUID
+    status: AttendanceStatus = AttendanceStatus.PRESENT
+    notes: Optional[str] = None
+
+
 # ──────────── UPDATE (Admin correction) ────────────
 class AttendanceUpdate(BaseModel):
     clock_in: Optional[datetime] = None
