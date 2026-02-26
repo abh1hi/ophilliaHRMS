@@ -17,12 +17,13 @@ class TokenPayload(BaseModel):
     sub: str        # user_id (UUID)
     role: str       # employee | manager | hr | super_admin
     email: str
+    company_id: str
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
     """Decode and validate JWT from Authorization header.
 
-    Returns a TokenPayload with user_id, role, and email.
+    Returns a TokenPayload with user_id, role, email, and company_id.
     Does NOT call auth-service — validates locally using shared SECRET_KEY.
     """
     credentials_exception = HTTPException(
@@ -37,11 +38,17 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
         email: str = payload.get("email")
+        company_id: str = payload.get("company_id")
 
-        if not user_id or not role:
+        if not user_id or not role or not company_id:
             raise credentials_exception
 
-        return TokenPayload(sub=user_id, role=role, email=email or "")
+        return TokenPayload(
+            sub=user_id, 
+            role=role, 
+            email=email or "", 
+            company_id=company_id
+        )
 
     except ExpiredSignatureError:
         raise HTTPException(

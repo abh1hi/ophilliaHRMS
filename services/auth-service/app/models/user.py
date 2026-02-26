@@ -12,10 +12,23 @@ def naive_utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+class Company(Base):
+    __tablename__ = "companies"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, unique=True, index=True, nullable=False)
+    domain = Column(String, unique=True, index=True, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=naive_utcnow, nullable=False)
+    
+    users = relationship("User", back_populates="company", cascade="all, delete-orphan")
+
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), sqlalchemy.ForeignKey("companies.id"), nullable=False, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=True)  # nullable for magic-link-only accounts
     role = Column(String, nullable=False, default=UserRole.EMPLOYEE.value, index=True)
@@ -28,6 +41,7 @@ class User(Base):
         nullable=False,
     )
 
+    company = relationship("Company", back_populates="users")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     magic_tokens = relationship("MagicToken", back_populates="user", cascade="all, delete-orphan")
 

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.api.v1.dependencies import get_current_user, get_db_with_tenant
 from app.core.security import require_roles
 from app.schemas.class_ import ClassCreate, ClassUpdate, ClassResponse, ClassListResponse
 from app.services.class_service import ClassService
@@ -19,7 +20,7 @@ router = APIRouter()
     dependencies=[Depends(require_roles(["Admin"]))],
 )
 async def create_class(
-    class_in: ClassCreate, db: AsyncSession = Depends(get_db)
+    class_in: ClassCreate, db: AsyncSession = Depends(get_db_with_tenant)
 ) -> Any:
     """Create new class/grade. Allowed: Admin."""
     service = ClassService(db)
@@ -32,7 +33,7 @@ async def list_classes(
     page_size: int = Query(20, ge=1, le=100),
     academic_year: str | None = Query(None),
     grade_level: int | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     # Ensure user is logged in (token valid)
     _user=Depends(require_roles(["Admin", "HR", "Teacher"])),
 ) -> Any:
@@ -52,7 +53,7 @@ async def list_classes(
 @router.get("/{class_id}", response_model=ClassResponse)
 async def get_class(
     class_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     _user=Depends(require_roles(["Admin", "HR", "Teacher"])),
 ) -> Any:
     """Get class details. Allowed: Admin, HR, Teacher."""
@@ -66,7 +67,7 @@ async def get_class(
     dependencies=[Depends(require_roles(["Admin"]))],
 )
 async def update_class(
-    class_id: uuid.UUID, class_in: ClassUpdate, db: AsyncSession = Depends(get_db)
+    class_id: uuid.UUID, class_in: ClassUpdate, db: AsyncSession = Depends(get_db_with_tenant)
 ) -> Any:
     """Update class info. Allowed: Admin."""
     service = ClassService(db)
@@ -79,7 +80,7 @@ async def update_class(
     dependencies=[Depends(require_roles(["Admin"]))],
 )
 async def delete_class(
-    class_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+    class_id: uuid.UUID, db: AsyncSession = Depends(get_db_with_tenant)
 ) -> None:
     """Delete class completely. Allowed: Admin."""
     service = ClassService(db)

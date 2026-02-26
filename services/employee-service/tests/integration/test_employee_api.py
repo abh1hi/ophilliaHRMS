@@ -21,19 +21,27 @@ async def test_create_employee_rbaca(monkeypatch):
     from app.core.security import get_current_user, TokenPayload
     
     async def mock_get_current_user():
-        return TokenPayload(sub=str(uuid4()), role="employee", email="test@emp.com")
+        return TokenPayload(sub=str(uuid4()), role="employee", email="test@emp.com", company_id=str(uuid4()))
     
     app.dependency_overrides[get_current_user] = mock_get_current_user
     
-    async with AsyncClient(app=app, base_url="http://testServer") as ac:
-        response = await ac.post("/api/v1/employees", json={
-            "first_name": "API",
-            "last_name": "Test",
-            "email": "test@emp.com",
-            "user_id": str(uuid4())
-        })
-        
-        # the app dependency overrrides feature ensures 403 is triggered
-        assert response.status_code == 403
+    try:
+        async with AsyncClient(app=app, base_url="http://testServer") as ac:
+            response = await ac.post("/api/v1/employees", json={
+                "first_name": "API",
+                "last_name": "Test",
+                "email": "test@emp.com",
+                "user_id": str(uuid4()),
+                "date_joined": "2024-01-01"
+            })
+            
+            # the app dependency overrrides feature ensures 403 is triggered
+            assert response.status_code == 403
+    except Exception as e:
+        import traceback
+        print("====== ERROR DETECTED ======")
+        print(e)
+        traceback.print_exc()
+        raise
         
     app.dependency_overrides.clear()

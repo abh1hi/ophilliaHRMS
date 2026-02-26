@@ -40,10 +40,12 @@ class StudentService:
         logger.info("Student enrolled", extra={"student_id": str(created.id)})
         
         # Publish event
+        company_id = self.repo.db.info.get("company_id")
         await self.event_publisher.publish(
             "student.enrolled",
             payload={
-                "student_id": str(created.id),
+                "company_id": str(company_id) if company_id else None,
+                "user_id": str(created.id), # Map to user_id for notification service
                 "student_number": created.student_number,
                 "first_name": created.first_name,
                 "last_name": created.last_name,
@@ -108,9 +110,12 @@ class StudentService:
             }
         )
 
+        company_id = self.repo.db.info.get("company_id")
+        
         await self.event_publisher.publish(
             "student.status_changed",
             payload={
+                "company_id": str(company_id) if company_id else None,
                 "student_id": str(updated.id),
                 "student_number": updated.student_number,
                 "old_status": old_status.value,
@@ -121,7 +126,7 @@ class StudentService:
         if new_status == StudentStatusEnum.graduated:
             await self.event_publisher.publish(
                 "student.graduated",
-                payload={"student_id": str(updated.id), "student_number": updated.student_number}
+                payload={"company_id": str(company_id) if company_id else None, "student_id": str(updated.id), "student_number": updated.student_number}
             )
 
         return updated

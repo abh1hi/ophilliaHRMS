@@ -6,14 +6,19 @@ from typing import List
 from app.db.session import get_db
 from app.models.notification import NotificationLog
 from app.schemas.notification import NotificationLogResponse
-from app.api.v1.dependencies import get_current_user, require_role, TokenPayload
+from app.api.v1.dependencies import (
+    get_current_user,
+    require_role,
+    TokenPayload,
+    get_db_with_tenant
+)
 from app.core.constants import UserRole
 
 router = APIRouter()
 
 @router.get("/", response_model=List[NotificationLogResponse])
 async def get_notification_logs(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     current_user: TokenPayload = Depends(get_current_user)
 ):
     query = select(NotificationLog)

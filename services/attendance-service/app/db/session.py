@@ -1,5 +1,6 @@
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, with_loader_criteria
 
 from app.core.config import settings
 
@@ -14,6 +15,47 @@ AsyncSessionLocal = sessionmaker(
 )
 
 
-async def get_db():
+async def get_db(company_id: str = None):
     async with AsyncSessionLocal() as session:
+        if company_id:
+            session.info["company_id"] = company_id
         yield session
+
+
+from sqlalchemy.orm import Session
+from app.db.base import Base
+
+@event.listens_for(Session, "do_orm_execute")
+def _add_tenant_filter(execute_state):
+    """
+    Intercepts ORM queries and adds a global filter for company_id 
+    if it's present in the session's info dictionary.
+    """
+    if (
+        execute_state.is_select
+        and not execute_state.is_column_load
+        and not execute_state.is_relationship_load
+    ):
+        company_id = execute_state.session.info.get("company_id")
+        if company_id:
+            # Add criteria to filter by company_id
+            execute_state.statement = execute_state.statement.options(
+                with_loader_criteria(
+                    Base,
+                    lambda cls: cls.company_id == company_id,
+                    include_aliases=True
+                )
+            )
+
+
+@event.listens_for(Session, "before_flush")
+def _set_company_id(session, flush_context, instances):
+    """
+    Automatically sets company_id on new objects if it's present in the session's info.
+    """
+    company_id = session.info.get("company_id")
+    if not company_id:
+        return
+    for obj in session.new:
+        if hasattr(obj, "company_id") and getattr(obj, "company_id") is None:
+            setattr(obj, "company_id", company_id)

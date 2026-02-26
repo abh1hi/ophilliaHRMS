@@ -7,8 +7,7 @@ from uuid import UUID
 from app.repositories.user_repository import UserRepository
 from app.repositories.token_repository import TokenRepository
 from app.repositories.magic_token_repository import MagicTokenRepository
-from app.services.email_service import EmailService
-from app.schemas.request_response_models import UserCreate, UserLogin, Token
+from app.schemas.request_response_models import UserCreate, UserLogin, Token, CompanyCreate
 from app.core.security import (
     get_password_hash,
     verify_password,
@@ -22,9 +21,26 @@ logger = logging.getLogger(__name__)
 
 class AuthService:
     def __init__(self, db: AsyncSession):
+        self.db = db
         self.user_repository = UserRepository(db)
         self.token_repository = TokenRepository(db)
         self.magic_token_repository = MagicTokenRepository(db)
+
+    async def register_company(self, company_in: CompanyCreate):
+        from app.models.user import Company
+        from sqlalchemy.future import select
+        
+        # Check if domain exists
+        if company_in.domain:
+            res = await self.db.execute(select(Company).filter(Company.domain == company_in.domain))
+            if res.scalars().first():
+                raise HTTPException(status_code=400, detail="Domain already registered")
+                
+        new_co = Company(name=company_in.name, domain=company_in.domain)
+        self.db.add(new_co)
+        await self.db.commit()
+        await self.db.refresh(new_co)
+        return new_co
 
     async def register_user(self, user_in: UserCreate):
         existing_user = await self.user_repository.get_by_email(user_in.email)
@@ -51,7 +67,7 @@ class AuthService:
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
-        access_token = create_access_token(subject=user.id, role=user.role, email=user.email)
+        access_token = create_access_token(subject=user.id, role=user.role, email=user.email, company_id=str(user.company_id))
         refresh_token_secret = create_refresh_token()
         expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
@@ -85,7 +101,7 @@ class AuthService:
         await self.token_repository.revoke(db_token)
 
         user = db_token.user
-        new_access_token = create_access_token(subject=user.id, role=user.role, email=user.email)
+        new_access_token = create_access_token(subject=user.id, role=user.role, email=user.email, company_id=str(user.company_id))
         new_refresh_secret = create_refresh_token()
         new_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
@@ -134,7 +150,7 @@ class AuthService:
         await self.magic_token_repository.mark_as_used(db_token)
 
         user = db_token.user
-        access_token = create_access_token(subject=user.id, role=user.role, email=user.email)
+        access_token = create_access_token(subject=user.id, role=user.role, email=user.email, company_id=str(user.company_id))
         refresh_token_secret = create_refresh_token()
         refresh_expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS

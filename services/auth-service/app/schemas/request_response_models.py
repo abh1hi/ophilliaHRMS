@@ -13,6 +13,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     role: UserRole = UserRole.EMPLOYEE
+    company_id: Optional[UUID] = None # Explicitly passed in during SaaS onboarding, auto-injected for Single-Tenant
 
     @field_validator("password")
     @classmethod
@@ -36,11 +37,26 @@ class UserLogin(BaseModel):
 
 class UserResponse(UserBase):
     id: UUID
+    company_id: UUID
     role: UserRole
     is_active: bool
     created_at: datetime
     updated_at: datetime
 
+    model_config = ConfigDict(from_attributes=True)
+
+class CompanyBase(BaseModel):
+    name: str
+    domain: Optional[str] = None
+
+class CompanyCreate(CompanyBase):
+    pass
+
+class CompanyResponse(CompanyBase):
+    id: UUID
+    is_active: bool
+    created_at: datetime
+    
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -52,7 +68,9 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     sub: Optional[str] = None
-
+    company_id: Optional[str] = None
+    role: Optional[str] = None
+    email: Optional[str] = None
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr

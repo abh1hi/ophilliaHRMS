@@ -10,6 +10,8 @@ from app.schemas.request_response_models import (
     PasswordResetRequest,
     PasswordResetConfirm,
     RoleUpdateRequest,
+    CompanyCreate,
+    CompanyResponse
 )
 from app.services.auth_service import AuthService
 from app.core.rate_limit import limiter
@@ -19,6 +21,11 @@ from app.core.constants import UserRole
 
 router = APIRouter()
 
+@router.post("/companies", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED)
+async def register_company(company_in: CompanyCreate, db: AsyncSession = Depends(get_db)):
+    """Register a new Company (Tenant) for SaaS mode."""
+    auth_service = AuthService(db)
+    return await auth_service.register_company(company_in)
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")

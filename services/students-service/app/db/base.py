@@ -1,5 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase, MappedColumn
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, Column
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 # Consistent naming convention for Alembic auto-generation
 NAMING_CONVENTION = {
@@ -13,3 +15,4 @@ NAMING_CONVENTION = {
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+    company_id = Column(UUID(as_uuid=True), index=True, nullable=False, default=uuid.uuid4)

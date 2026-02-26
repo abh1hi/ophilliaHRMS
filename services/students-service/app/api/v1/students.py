@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.api.v1.dependencies import get_current_user, get_db_with_tenant
 from app.core.security import require_roles
 from app.events.publisher import EventPublisher
 from app.models.student import StudentStatusEnum
@@ -19,13 +20,6 @@ from app.services.student_service import StudentService
 
 router = APIRouter()
 
-
-def get_event_publisher(request: Request) -> EventPublisher:
-    """Dependency to retrieve the global event publisher from app lifespan."""
-    import main # Avoid circular import by accessing global late
-    return main.event_publisher
-
-
 @router.post(
     "/",
     response_model=StudentResponse,
@@ -34,7 +28,7 @@ def get_event_publisher(request: Request) -> EventPublisher:
 )
 async def create_student(
     student_in: StudentCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     publisher: EventPublisher = Depends(get_event_publisher),
 ) -> Any:
     """Enroll new student. Allowed: Admin, HR."""
@@ -48,7 +42,7 @@ async def list_students(
     page_size: int = Query(20, ge=1, le=100),
     status_filter: StudentStatusEnum | None = Query(None, alias="status"),
     class_id: uuid.UUID | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     _user=Depends(require_roles(["Admin", "HR", "Teacher"])),
 ) -> Any:
     """List students. Allowed: Admin, HR, Teacher."""
@@ -66,12 +60,18 @@ async def list_students(
 @router.get("/{student_id}", response_model=StudentResponse)
 async def get_student(
     student_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     _user=Depends(require_roles(["Admin", "HR", "Teacher"])),
 ) -> Any:
     """Get student profile. Allowed: Admin, HR, Teacher."""
     service = StudentService(db, None)  # type: ignore
     return await service.get_student(student_id)
+
+
+def get_event_publisher(request: Request) -> EventPublisher:
+    """Dependency to retrieve the global event publisher from app lifespan."""
+    import main # Avoid circular import by accessing global late
+    return main.event_publisher
 
 
 @router.put(
@@ -82,7 +82,7 @@ async def get_student(
 async def update_student(
     student_id: uuid.UUID,
     student_in: StudentUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     publisher: EventPublisher = Depends(get_event_publisher),
 ) -> Any:
     """Update general student info. Allowed: Admin, HR."""
@@ -98,7 +98,7 @@ async def update_student(
 async def change_student_status(
     student_id: uuid.UUID,
     status_in: StudentStatusUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     publisher: EventPublisher = Depends(get_event_publisher),
 ) -> Any:
     """Change student enrollment status (emits event). Allowed: Admin."""
@@ -113,7 +113,7 @@ async def change_student_status(
 )
 async def delete_student(
     student_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     publisher: EventPublisher = Depends(get_event_publisher),
 ) -> None:
     """Hard delete student from DB. Allowed: Admin."""

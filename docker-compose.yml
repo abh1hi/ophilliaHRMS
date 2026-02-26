@@ -1,41 +1,65 @@
 # =============================================================
-#  HRMS Platform — Docker Compose (Single Command Deployment)
-#  docker compose up --build -d
-# =============================================================
+#  HRMS Platform — Docker Compose (SaaS / Multi-Tenant Edition)
+#  Deploy entire system:
+#      docker compose up --build -d
 #
-#  DB Architecture: Option B — Single PostgreSQL Instance,
-#  separate database per service (logical isolation).
-#  Option A (multiple instances) is commented below.
+#  Deploy modular blocks (e.g. Core + HR only):
+#      docker compose --profile core --profile hr up --build -d
+#
+#  Hardware Target: 1 vCPU, 4GB RAM minimum.
 # =============================================================
 
 version: "3.9"
 
+x-resource-limits-api: &api-limits
+  deploy:
+    resources:
+      limits:
+        cpus: '0.2'
+        memory: 200M
+
+x-resource-limits-db: &db-limits
+  deploy:
+    resources:
+      limits:
+        cpus: '0.4'
+        memory: 600M
+
+x-resource-limits-broker: &broker-limits
+  deploy:
+    resources:
+      limits:
+        cpus: '0.2'
+        memory: 250M
+
+x-resource-limits-cache: &cache-limits
+  deploy:
+    resources:
+      limits:
+        cpus: '0.1'
+        memory: 100M
+
 services:
   # ─────────────── API GATEWAY ───────────────
+  # Profile: CORE
   gateway:
+    profiles: ["core", "hr", "payroll", "student"] # gateway always needs to be available
     build: ./services/gateway/nginx
     container_name: hrms-gateway
+    <<: *api-limits
     ports:
       - "80:80"
-    depends_on:
-      auth-service:
-        condition: service_healthy
-      employee-service:
-        condition: service_healthy
-      attendance-service:
-        condition: service_healthy
-      students-service:
-        condition: service_healthy
     networks:
       - hrms-network
     restart: unless-stopped
 
-  # ═══════════════════════════════════════════
-  #  OPTION B: Single Postgres — Multiple DBs
-  # ═══════════════════════════════════════════
+  # ─────────────── POSTGRESQL (Single Master) ───────────────
+  # Profile: CORE
   hrms-db:
+    profiles: ["core"]
     image: postgres:16-alpine
     container_name: hrms-db
+    <<: *db-limits
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: changeme
@@ -54,98 +78,13 @@ services:
       timeout: 5s
       retries: 5
 
-  # ─────────────── AUTH SERVICE ───────────────
-  auth-service:
-    build: ./services/auth-service
-    container_name: hrms-auth
-    env_file: ./services/auth-service/.env.docker
-    ports:
-      - "8000:8000"
-    depends_on:
-      hrms-db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - hrms-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
-  # ─────────────── EMPLOYEE SERVICE ───────────────
-  employee-service:
-    build: ./services/employee-service
-    container_name: hrms-employee
-    env_file: ./services/employee-service/.env.docker
-    ports:
-      - "8001:8001"
-    depends_on:
-      hrms-db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - hrms-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
-  # ─────────────── ATTENDANCE SERVICE ───────────────
-  attendance-service:
-    build: ./services/attendance-service
-    container_name: hrms-attendance
-    env_file: ./services/attendance-service/.env.docker
-    ports:
-      - "8002:8002"
-    depends_on:
-      hrms-db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - hrms-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
-  # ─────────────── STUDENTS SERVICE ───────────────
-  students-service:
-    build: ./services/students-service
-    container_name: hrms-students
-    env_file: ./services/students-service/.env.docker
-    ports:
-      - "8003:8003"
-    depends_on:
-      hrms-db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - hrms-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
   # ─────────────── RABBITMQ (Event Broker) ───────────────
+  # Profile: CORE
   rabbitmq:
+    profiles: ["core"]
     image: rabbitmq:3.12-management-alpine
     container_name: hrms-rabbitmq
+    <<: *broker-limits
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -164,10 +103,13 @@ services:
       retries: 5
 
   # ─────────────── REDIS (Cache) ───────────────
+  # Profile: CORE
   redis:
+    profiles: ["core"]
     image: redis:7-alpine
     container_name: hrms-redis
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    <<: *cache-limits
+    command: redis-server --appendonly yes --maxmemory 100mb --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"
     volumes:
@@ -182,89 +124,159 @@ services:
       retries: 3
 
 
-# ═══════════════════════════════════════════════════════════════
-#  OPTION A: Separate PostgreSQL Instance Per Service
-#  (Strict Isolation — uncomment below and comment Option B above)
-# ═══════════════════════════════════════════════════════════════
-#
-#  auth-db:
-#    image: postgres:16-alpine
-#    container_name: hrms-auth-db
-#    environment:
-#      POSTGRES_USER: postgres
-#      POSTGRES_PASSWORD: changeme
-#      POSTGRES_DB: auth_db
-#    volumes:
-#      - auth-db-data:/var/lib/postgresql/data
-#    ports:
-#      - "5433:5432"
-#    networks:
-#      - hrms-network
-#    restart: unless-stopped
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_db"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#
-#  employee-db:
-#    image: postgres:16-alpine
-#    container_name: hrms-employee-db
-#    environment:
-#      POSTGRES_USER: postgres
-#      POSTGRES_PASSWORD: changeme
-#      POSTGRES_DB: employee_db
-#    volumes:
-#      - employee-db-data:/var/lib/postgresql/data
-#    ports:
-#      - "5434:5432"
-#    networks:
-#      - hrms-network
-#    restart: unless-stopped
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready -U postgres -d employee_db"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#
-#  attendance-db:
-#    image: postgres:16-alpine
-#    container_name: hrms-attendance-db
-#    environment:
-#      POSTGRES_USER: postgres
-#      POSTGRES_PASSWORD: changeme
-#      POSTGRES_DB: attendance_db
-#    volumes:
-#      - attendance-db-data:/var/lib/postgresql/data
-#    ports:
-#      - "5435:5432"
-#    networks:
-#      - hrms-network
-#    restart: unless-stopped
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready -U postgres -d attendance_db"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#
-# For Option A, update depends_on in each service from hrms-db to
-# auth-db / employee-db / attendance-db respectively, and update
-# DATABASE_URL in each .env.docker to point to the correct host.
-#
-# Option A volumes (uncomment if using):
-#  auth-db-data:
-#  employee-db-data:
-#  attendance-db-data:
-# ═══════════════════════════════════════════════════════════════
+  # ─────────────── CORE SERVICES ───────────────
+
+  # Profile: CORE 
+  auth-service:
+    profiles: ["core"]
+    build: ./services/auth-service
+    container_name: hrms-auth
+    <<: *api-limits
+    env_file: ./services/auth-service/.env.docker
+    ports:
+      - "8000:8000"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Profile: CORE (Generally required for most async tasks)
+  notification-service:
+    profiles: ["core"]
+    build: ./services/notification-service
+    container_name: hrms-notification
+    <<: *api-limits
+    env_file: ./services/notification-service/.env
+    ports:
+      - "8005:8005" # Assuming arbitrary port allocation if API access required
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ─────────────── HR MODULE ───────────────
+
+  employee-service:
+    profiles: ["hr"]
+    build: ./services/employee-service
+    container_name: hrms-employee
+    <<: *api-limits
+    env_file: ./services/employee-service/.env.docker
+    ports:
+      - "8001:8001"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  attendance-service:
+    profiles: ["hr"]
+    build: ./services/attendance-service
+    container_name: hrms-attendance
+    <<: *api-limits
+    env_file: ./services/attendance-service/.env.docker
+    ports:
+      - "8002:8002"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  leave-service:
+    profiles: ["hr"]
+    build: ./services/leave-service
+    container_name: hrms-leave
+    <<: *api-limits
+    env_file: ./services/leave-service/.env
+    ports:
+      - "8004:8004"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ─────────────── STUDENT MODULE ───────────────
+
+  students-service:
+    profiles: ["student"]
+    build: ./services/students-service
+    container_name: hrms-students
+    <<: *api-limits
+    env_file: ./services/students-service/.env.docker
+    ports:
+      - "8003:8003"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 
-# ─────────────── VOLUMES ───────────────
+# ─────────────── VOLUMES & NETWORKS ───────────────
 volumes:
   hrms-db-data:
   rabbitmq-data:
   redis-data:
 
-# ─────────────── NETWORK ───────────────
 networks:
   hrms-network:
     driver: bridge

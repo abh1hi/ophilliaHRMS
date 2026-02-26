@@ -18,6 +18,7 @@ class TokenPayload(BaseModel):
     sub: str
     role: str
     email: str
+    company_id: str
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
@@ -31,9 +32,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
         email: str = payload.get("email")
-        if not user_id or not role:
+        company_id: str = payload.get("company_id")
+        if not user_id or not role or not company_id:
             raise credentials_exception
-        return TokenPayload(sub=user_id, role=role, email=email or "")
+        return TokenPayload(
+            sub=user_id, 
+            role=role, 
+            email=email or "", 
+            company_id=company_id
+        )
     except ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

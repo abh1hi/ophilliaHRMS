@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.core.security import get_current_user, require_role, TokenPayload
+from app.api.v1.dependencies import (
+    get_current_user,
+    require_role,
+    TokenPayload,
+    get_db_with_tenant
+)
 from app.core.constants import UserRole
 from app.services.department_service import DepartmentService
 from app.schemas.department import (
@@ -17,7 +22,7 @@ from app.schemas.department import (
 router = APIRouter(prefix="/departments", tags=["departments"])
 
 
-def _get_service(db: AsyncSession = Depends(get_db)) -> DepartmentService:
+def _get_service(db: AsyncSession = Depends(get_db_with_tenant)) -> DepartmentService:
     return DepartmentService(db)
 
 

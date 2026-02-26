@@ -8,7 +8,12 @@ from uuid import UUID
 from app.db.session import get_db
 from app.models.leave import LeaveRequest
 from app.schemas.leave import LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate
-from app.api.v1.dependencies import get_current_user, require_role, TokenPayload
+from app.api.v1.dependencies import (
+    get_current_user,
+    require_role,
+    TokenPayload,
+    get_db_with_tenant
+)
 from app.core.constants import UserRole
 from app.services import leave_service
 
@@ -17,7 +22,7 @@ router = APIRouter()
 @router.post("/", response_model=LeaveRequestResponse, status_code=status.HTTP_201_CREATED)
 async def apply_for_leave(
     *,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     request_in: LeaveRequestCreate,
     current_user: TokenPayload = Depends(get_current_user)
 ):
@@ -35,7 +40,7 @@ async def apply_for_leave(
 
 @router.get("/", response_model=List[LeaveRequestResponse])
 async def list_leave_requests(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     current_user: TokenPayload = Depends(get_current_user)
 ):
     query = select(LeaveRequest).options(selectinload(LeaveRequest.leave_type))
@@ -49,7 +54,7 @@ async def list_leave_requests(
 @router.put("/{request_id}/status", response_model=LeaveRequestResponse)
 async def update_leave_status(
     *,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_with_tenant),
     request_id: UUID,
     status_in: LeaveRequestUpdate,
     current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN))

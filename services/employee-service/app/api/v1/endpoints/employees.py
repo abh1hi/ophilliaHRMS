@@ -5,7 +5,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.core.security import get_current_user, require_role, verify_service_token, TokenPayload
+from app.api.v1.dependencies import (
+    get_current_user,
+    require_role,
+    verify_service_token,
+    TokenPayload,
+    get_db_with_tenant
+)
 from app.core.constants import UserRole
 from app.services.employee_service import EmployeeService
 from app.schemas.employee import (
@@ -19,7 +25,7 @@ from app.utils.pagination import PaginationParams
 router = APIRouter(prefix="/employees", tags=["employees"])
 
 
-def _get_service(db: AsyncSession = Depends(get_db)) -> EmployeeService:
+def _get_service(db: AsyncSession = Depends(get_db_with_tenant)) -> EmployeeService:
     # Event publisher injected at app level — not here for simplicity.
     # For production, inject via app.state.event_publisher.
     return EmployeeService(db)

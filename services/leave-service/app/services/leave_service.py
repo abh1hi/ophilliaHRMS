@@ -88,17 +88,18 @@ async def apply_leave(db: AsyncSession, obj_in: LeaveRequestCreate):
     await db.refresh(db_obj)
 
     # Publish Event
+    company_id = db.info.get("company_id")
     event_payload = {
+        "company_id": str(company_id) if company_id else None,
         "leave_request_id": str(db_obj.id),
         "employee_id": str(db_obj.employee_id),
-        "start_date": str(db_obj.start_date),
-        "end_date": str(db_obj.end_date),
+        "start_date": db_obj.start_date.isoformat() if hasattr(db_obj.start_date, 'isoformat') else str(db_obj.start_date),
+        "end_date": db_obj.end_date.isoformat() if hasattr(db_obj.end_date, 'isoformat') else str(db_obj.end_date),
         "status": db_obj.status
     }
+    
+    # We must commit first so the consumer can find the record if it needs it (though payload is rich enough)
     await publish_event("leave.requested", event_payload)
-
-    if db_obj.status == LeaveStatus.APPROVED.value:
-        await publish_event("leave.approved", event_payload)
 
     return db_obj
 
@@ -121,18 +122,33 @@ async def update_leave_status(db: AsyncSession, request_id: UUID, obj_in: LeaveR
     leave_req.manager_notes = obj_in.manager_notes
     leave_req.approved_by_id = manager_id
 
+    db.add(leave_req)
+    
+    company_id = db.info.get("company_id")
+    event_payload = {
+        "company_id": str(company_id) if company_id else None,
+        "leave_request_id": str(leave_req.id),
+        "employee_id": str(leave_req.employee_id),
+        "status": obj_in.status.value
+    }
+    
+    event_name = ""
+
     if obj_in.status == LeaveStatus.APPROVED:
         balance.pending_days -= leave_req.total_days
         balance.used_days += leave_req.total_days
-        await publish_event("leave.approved", {"leave_request_id": str(leave_req.id), "status": "APPROVED"})
+        db.add(balance)
+        event_name = "leave.approved"
     elif obj_in.status in [LeaveStatus.REJECTED, LeaveStatus.CANCELLED]:
         balance.pending_days -= leave_req.total_days
+        db.add(balance)
         event_name = "leave.rejected" if obj_in.status == LeaveStatus.REJECTED else "leave.cancelled"
-        await publish_event(event_name, {"leave_request_id": str(leave_req.id), "status": obj_in.status.value})
 
-    db.add(leave_req)
-    db.add(balance)
+
     await db.commit()
     await db.refresh(leave_req)
+    
+    if event_name:
+        await publish_event(event_name, event_payload)
     
     return leave_req

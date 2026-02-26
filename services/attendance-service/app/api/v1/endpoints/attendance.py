@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.core.security import get_current_user, require_role, TokenPayload
+from app.api.v1.dependencies import get_db_with_tenant
 from app.core.constants import UserRole
 from app.services.attendance_service import AttendanceService, GeofenceService, PolicyService
 from app.schemas.attendance import (
@@ -29,15 +30,15 @@ from app.utils.pagination import PaginationParams
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
 
-def _get_service(db: AsyncSession = Depends(get_db)) -> AttendanceService:
+def _get_service(db: AsyncSession = Depends(get_db_with_tenant)) -> AttendanceService:
     return AttendanceService(db)
 
 
-def _get_geofence_service(db: AsyncSession = Depends(get_db)) -> GeofenceService:
+def _get_geofence_service(db: AsyncSession = Depends(get_db_with_tenant)) -> GeofenceService:
     return GeofenceService(db)
 
 
-def _get_policy_service(db: AsyncSession = Depends(get_db)) -> PolicyService:
+def _get_policy_service(db: AsyncSession = Depends(get_db_with_tenant)) -> PolicyService:
     return PolicyService(db)
 
 

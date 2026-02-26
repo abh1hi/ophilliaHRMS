@@ -22,10 +22,19 @@ async def test_school_mode_api_rbac(monkeypatch):
     from app.core.security import get_current_user, TokenPayload
     
     async def mock_get_current_user():
-        return TokenPayload(sub=str(uuid4()), role="employee", email="test@emp.com")
+        return TokenPayload(sub=str(uuid4()), role="employee", email="test@emp.com", company_id=str(uuid4()))
     
     app.dependency_overrides[get_current_user] = mock_get_current_user
     
+    async def mock_get_db_with_tenant():
+        class MockSession:
+            info = {"company_id": str(uuid4())}
+            async def close(self): pass
+        yield MockSession()
+        
+    from app.api.v1.dependencies import get_db_with_tenant
+    app.dependency_overrides[get_db_with_tenant] = mock_get_db_with_tenant
+
     async with AsyncClient(app=app, base_url="http://testServer") as ac:
         response = await ac.post("/api/v1/attendance/school-mode", json={
             "employee_id": str(uuid4()),
@@ -51,10 +60,19 @@ async def test_clock_in_api(monkeypatch):
     
     async def mock_get_current_user():
         from app.core.security import TokenPayload
-        return TokenPayload(sub=str(mock_emp_id), role="employee", email="emp@test.com")
+        return TokenPayload(sub=str(mock_emp_id), role="employee", email="emp@test.com", company_id=str(uuid4()))
         
     app.dependency_overrides[get_current_user] = mock_get_current_user
-    
+
+    async def mock_get_db_with_tenant():
+        class MockSession:
+            info = {"company_id": str(uuid4())}
+            async def close(self): pass
+        yield MockSession()
+        
+    from app.api.v1.dependencies import get_db_with_tenant
+    app.dependency_overrides[get_db_with_tenant] = mock_get_db_with_tenant
+
     async def mock_clock_in(*args, **kwargs):
         return AttendanceResponse(
             id=uuid4(),

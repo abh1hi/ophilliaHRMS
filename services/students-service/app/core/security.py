@@ -29,7 +29,13 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict:
     """FastAPI dependency — returns decoded token payload."""
-    return _decode_token(credentials.credentials)
+    payload = _decode_token(credentials.credentials)
+    if "company_id" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing company isolation context",
+        )
+    return payload
 
 
 def require_roles(allowed_roles: List[str]):

@@ -37,8 +37,10 @@ async def handle_leave_event(db: AsyncSession, routing_key: str, payload: dict):
     employee_id = payload.get("employee_id")
     status = payload.get("status")
     leave_id = payload.get("leave_request_id")
+    company_id = payload.get("company_id")
     
-    if not employee_id:
+    if not employee_id or not company_id:
+        logger.warning(f"Missing employee_id or company_id in payload: {payload}")
         return
         
     subject = f"Leave Request Update - {status}"
@@ -50,6 +52,7 @@ async def handle_leave_event(db: AsyncSession, routing_key: str, payload: dict):
         body = f"You have submitted a leave request ({leave_id}). Currently pending approval."
 
     log_obj = NotificationLogCreate(
+        company_id=company_id,
         user_id=employee_id,
         type=NotificationType.EMAIL,
         subject=subject,
@@ -61,10 +64,17 @@ async def handle_leave_event(db: AsyncSession, routing_key: str, payload: dict):
 
 async def handle_employee_created(db: AsyncSession, payload: dict):
     user_id = payload.get("user_id")
+    company_id = payload.get("company_id")
+    
+    if not user_id or not company_id:
+        logger.warning(f"Missing user_id or company_id in payload: {payload}")
+        return
+        
     subject = "Welcome to Ophillia HRMS"
     body = "Your employee profile has been created."
     
     log_obj = NotificationLogCreate(
+        company_id=company_id,
         user_id=user_id,
         type=NotificationType.EMAIL,
         subject=subject,

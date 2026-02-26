@@ -26,6 +26,7 @@ class PreferenceResponse(PreferenceBase):
 
 # Log Schemas
 class NotificationLogBase(BaseModel):
+    company_id: UUID
     user_id: UUID
     type: NotificationType
     subject: Optional[str] = None
