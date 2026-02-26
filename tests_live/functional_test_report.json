@@ -1,0 +1,17 @@
+[
+  {
+    "step": "Register Company",
+    "status": 500,
+    "response": "Internal Server Error"
+  },
+  {
+    "step": "Register User",
+    "status": 500,
+    "response": "Internal Server Error"
+  },
+  {
+    "step": "Login",
+    "status": 500,
+    "response": "Internal Server Error"
+  }
+]

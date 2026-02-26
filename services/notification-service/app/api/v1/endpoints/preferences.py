@@ -9,6 +9,7 @@ from app.api.v1.dependencies import (
     get_db_with_tenant
 )
 from app.services import notification_service
+from app.schemas.notification import PreferenceResponse, PreferenceUpdate
 
 router = APIRouter()
 

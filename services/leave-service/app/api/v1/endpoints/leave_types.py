@@ -12,6 +12,8 @@ from app.api.v1.dependencies import (
     get_db_with_tenant
 )
 from app.core.constants import UserRole
+from app.schemas.leave import LeaveTypeCreate, LeaveTypeResponse
+from app.models.leave import LeaveType
 
 router = APIRouter()
 

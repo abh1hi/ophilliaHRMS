@@ -20,6 +20,11 @@ from app.services.student_service import StudentService
 
 router = APIRouter()
 
+def get_event_publisher(request: Request) -> EventPublisher:
+    """Dependency to retrieve the global event publisher from app lifespan."""
+    import main # Avoid circular import by accessing global late
+    return main.event_publisher
+
 @router.post(
     "/",
     response_model=StudentResponse,
@@ -66,12 +71,6 @@ async def get_student(
     """Get student profile. Allowed: Admin, HR, Teacher."""
     service = StudentService(db, None)  # type: ignore
     return await service.get_student(student_id)
-
-
-def get_event_publisher(request: Request) -> EventPublisher:
-    """Dependency to retrieve the global event publisher from app lifespan."""
-    import main # Avoid circular import by accessing global late
-    return main.event_publisher
 
 
 @router.put(
