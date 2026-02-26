@@ -1,0 +1,2 @@
+[38;5;160m2026-02-26 12:28:45.091486+00:00 [error] <0.234.0> This release series has reached end of life and is no longer supported. Please visit https://rabbitmq.com/versions.html to learn more and upgrade[0m
+[38;5;160m2026-02-26 12:39:14.517832+00:00 [error] <0.234.0> This release series has reached end of life and is no longer supported. Please visit https://rabbitmq.com/versions.html to learn more and upgrade[0m
