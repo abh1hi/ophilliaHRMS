@@ -6,6 +6,10 @@ from datetime import datetime, timezone
 from app.db.base import Base
 
 
+def naive_utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class AttendanceRecord(Base):
     __tablename__ = "attendance_records"
 
@@ -30,11 +34,11 @@ class AttendanceRecord(Base):
     notes = Column(String(500), nullable=True)
     date = Column(Date, nullable=False, index=True)
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=naive_utcnow,
+        onupdate=naive_utcnow,
         nullable=False,
     )
 

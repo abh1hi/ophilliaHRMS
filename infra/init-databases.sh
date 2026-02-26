@@ -18,7 +18,10 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
 
     SELECT 'CREATE DATABASE attendance_db'
     WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'attendance_db')\gexec
+
+    SELECT 'CREATE DATABASE students_db'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'students_db')\gexec
 EOSQL
 
 echo "Databases created successfully:"
-psql -U "$POSTGRES_USER" -lqt | cut -d \| -f 1 | grep -w -E "auth_db|employee_db|attendance_db"
+psql -U "$POSTGRES_USER" -lqt | cut -d \| -f 1 | grep -w -E "auth_db|employee_db|attendance_db|students_db"

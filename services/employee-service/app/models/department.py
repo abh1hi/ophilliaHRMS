@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from app.db.base import Base
 
 
+def naive_utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class Department(Base):
     __tablename__ = "departments"
 
@@ -15,12 +19,12 @@ class Department(Base):
     description = Column(String(500), nullable=True)
     manager_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime, default=naive_utcnow, nullable=False
     )
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=naive_utcnow,
+        onupdate=naive_utcnow,
         nullable=False,
     )
 

@@ -6,6 +6,10 @@ from datetime import datetime, timezone
 from app.db.base import Base
 
 
+def naive_utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class GeofenceLocation(Base):
     """Office/site locations for geofence-based attendance."""
     __tablename__ = "geofence_locations"
@@ -17,11 +21,11 @@ class GeofenceLocation(Base):
     radius_meters = Column(Integer, nullable=False, default=200)
     is_active = Column(Boolean, default=True, nullable=False)
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=naive_utcnow,
+        onupdate=naive_utcnow,
         nullable=False,
     )
 

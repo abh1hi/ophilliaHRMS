@@ -8,6 +8,15 @@ from app.db.base import Base
 from app.core.constants import EmploymentStatus, Gender
 
 
+def naive_utcnow():
+    """Return current UTC time as a timezone-naive datetime.
+
+    SQLAlchemy DateTime (without timezone=True) requires tz-naive datetimes.
+    Using tz-aware datetimes causes: can't subtract offset-naive and offset-aware.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class Employee(Base):
     __tablename__ = "employees"
 
@@ -35,12 +44,12 @@ class Employee(Base):
     )
     address = Column(String(500), nullable=True)
     created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime, default=naive_utcnow, nullable=False
     )
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=naive_utcnow,
+        onupdate=naive_utcnow,
         nullable=False,
     )
 

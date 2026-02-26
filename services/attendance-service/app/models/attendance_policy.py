@@ -7,6 +7,10 @@ from datetime import datetime, time, timezone
 from app.db.base import Base
 
 
+def naive_utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class AttendancePolicy(Base):
     """Admin-assigned attendance method per department or per employee.
 
@@ -37,11 +41,11 @@ class AttendancePolicy(Base):
     work_start_time = Column(Time, nullable=True, default=time(9, 0))
     work_hours_per_day = Column(Float, nullable=False, default=8.0)
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=naive_utcnow,
+        onupdate=naive_utcnow,
         nullable=False,
     )
 

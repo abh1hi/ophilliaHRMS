@@ -24,6 +24,8 @@ services:
         condition: service_healthy
       attendance-service:
         condition: service_healthy
+      students-service:
+        condition: service_healthy
     networks:
       - hrms-network
     restart: unless-stopped
@@ -113,6 +115,28 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ─────────────── STUDENTS SERVICE ───────────────
+  students-service:
+    build: ./services/students-service
+    container_name: hrms-students
+    env_file: ./services/students-service/.env.docker
+    ports:
+      - "8003:8003"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
