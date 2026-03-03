@@ -1,65 +1,127 @@
+"""Notification Service — Wires real email delivery + preference enforcement.
+
+ALWAYS checks NotificationPreference before sending.
+Uses Jinja2 templates for email body.
+Falls back to logging when SMTP is not configured.
+"""
 import logging
+import os
+from datetime import datetime, timezone
 from uuid import UUID
+from typing import Optional
+
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.models.notification import NotificationPreference, NotificationLog
 from app.schemas.notification import NotificationLogCreate, PreferenceCreate, PreferenceUpdate
-from app.core.constants import NotificationStatus
+from app.core.constants import NotificationStatus, NotificationType
+from app.services.email_service import send_email
 
 logger = logging.getLogger(__name__)
+
+# Jinja2 template engine
+_template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+_jinja_env = Environment(loader=FileSystemLoader(_template_dir), autoescape=True)
+
+
+def render_template(template_name: str, **context) -> str:
+    """Render an HTML email template with the given context."""
+    try:
+        template = _jinja_env.get_template(template_name)
+        return template.render(**context)
+    except Exception as exc:
+        logger.warning(f"Template {template_name} not found, using plain text: {exc}")
+        return context.get("message", "")
+
 
 async def get_or_create_preference(db: AsyncSession, user_id: UUID) -> NotificationPreference:
     result = await db.execute(select(NotificationPreference).filter(NotificationPreference.user_id == user_id))
     pref = result.scalars().first()
-    
     if not pref:
         pref = NotificationPreference(user_id=user_id, email_enabled=1, sms_enabled=1)
         db.add(pref)
         await db.commit()
         await db.refresh(pref)
-        
     return pref
+
 
 async def update_preference(db: AsyncSession, user_id: UUID, pref_update: PreferenceUpdate) -> NotificationPreference:
     pref = await get_or_create_preference(db, user_id)
-    
     pref.email_enabled = 1 if pref_update.email_enabled else 0
     pref.sms_enabled = 1 if pref_update.sms_enabled else 0
-    
     db.add(pref)
     await db.commit()
     await db.refresh(pref)
-    
     return pref
 
-async def compile_and_send_notification(db: AsyncSession, log_create: NotificationLogCreate):
-    """
-    Simulates sending an Email/SMS by checking preferences and saving a log.
-    If the format is EMAIL, and the user hasn't opted out of email, it succeeds.
+
+async def compile_and_send_notification(
+    db: AsyncSession,
+    log_create: NotificationLogCreate,
+    template_name: Optional[str] = None,
+    template_context: Optional[dict] = None,
+):
+    """Check preferences → render template → send email → log result.
+
+    PREFERENCE ENFORCEMENT: Always checks user opt-in before sending.
     """
     pref = await get_or_create_preference(db, log_create.user_id)
-    
-    # Check bounds
+
+    # Preference enforcement
     should_send = False
-    if log_create.type == "EMAIL" and pref.email_enabled:
+    if log_create.type == NotificationType.EMAIL and pref.email_enabled:
         should_send = True
-    elif log_create.type == "SMS" and pref.sms_enabled:
+    elif log_create.type == NotificationType.SMS and pref.sms_enabled:
         should_send = True
-        
-    if should_send:
-        logger.info(f"Simulating sending {log_create.type} to {log_create.user_id}: {log_create.subject}")
-        # In a real environment, you trigger SendGrid, Twilio, etc.
-        # Once it succeeds:
-        log_create.status = NotificationStatus.SENT
+
+    status = NotificationStatus.PENDING
+    error_message = None
+    sent_at = None
+
+    if not should_send:
+        status = NotificationStatus.FAILED
+        error_message = f"User has disabled {log_create.type.value} notifications"
+        logger.info(f"User {log_create.user_id} opted out of {log_create.type.value}")
     else:
-        logger.info(f"User {log_create.user_id} opted out of {log_create.type} notifications.")
-        log_create.status = NotificationStatus.FAILED
-        log_create.error_message = f"User has disabled {log_create.type} notifications"
-        
-    db_obj = NotificationLog(**log_create.model_dump())
+        # Render template if provided
+        html_body = log_create.message
+        if template_name and template_context:
+            html_body = render_template(template_name, **template_context)
+
+        if log_create.type == NotificationType.EMAIL:
+            # TODO: need a way to get user email; for now we log
+            success = await send_email(
+                to_email=f"user-{log_create.user_id}@ophillia.com",  # Placeholder
+                subject=log_create.subject or "Ophillia HRMS Notification",
+                html_body=html_body,
+            )
+            if success:
+                status = NotificationStatus.SENT
+                sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            else:
+                status = NotificationStatus.FAILED
+                error_message = "SMTP delivery failed after retries"
+        else:
+            # SMS/Push — simulate for now
+            logger.info(f"Simulating {log_create.type.value} to {log_create.user_id}")
+            status = NotificationStatus.SENT
+            sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Log to database
+    db_obj = NotificationLog(
+        user_id=log_create.user_id,
+        type=log_create.type.value,
+        subject=log_create.subject,
+        message=log_create.message,
+        status=status.value,
+        error_message=error_message,
+        sent_at=sent_at,
+    )
+    if hasattr(log_create, "company_id") and log_create.company_id:
+        db_obj.company_id = log_create.company_id
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)
     return db_obj
-

@@ -1,3 +1,7 @@
+"""RabbitMQ consumer — handles leave.*, employee.created, payroll.run, salary.processed events.
+
+Includes DLQ setup, preference enforcement via service layer, and Jinja2 template rendering.
+"""
 import asyncio
 import json
 import logging
@@ -11,95 +15,121 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
+
 async def process_event(message: IncomingMessage):
-    async with message.process():
-        body = message.body.decode('utf-8')
+    async with message.process(ignore_processed=True):
         try:
+            body = message.body.decode("utf-8")
             event_data = json.loads(body)
-            routing_key = message.routing_key
+            routing_key = message.routing_key or event_data.get("event_type", "")
+            payload = event_data.get("payload", event_data)
+
             logger.info(f"Received event {routing_key}")
-            
+
             async with AsyncSessionLocal() as db:
                 if routing_key.startswith("leave."):
-                    await handle_leave_event(db, routing_key, event_data["payload"])
+                    await handle_leave_event(db, routing_key, payload)
                 elif routing_key == "employee.created":
-                    await handle_employee_created(db, event_data["payload"])
+                    await handle_employee_created(db, payload)
+                elif routing_key == "payroll.run":
+                    await handle_payroll_run(db, payload)
+                elif routing_key == "salary.processed":
+                    await handle_salary_processed(db, payload)
                 else:
-                    logger.warning(f"Unhandled routing key: {routing_key}")
+                    logger.debug(f"Ignoring unhandled event: {routing_key}")
+
+            await message.ack()
         except json.JSONDecodeError:
-            logger.error("Failed to decode JSON from message body.")
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
+            logger.error("Failed to decode JSON — rejecting to DLQ")
+            await message.reject(requeue=False)
+        except Exception as exc:
+            logger.error(f"Error processing message: {exc}")
+            await message.reject(requeue=False)
+
 
 async def handle_leave_event(db: AsyncSession, routing_key: str, payload: dict):
-    # Depending on status (requested, approved, rejected, cancelled) 
-    # Determine subject and body. Notice we need `employee_id` to fetch their emails.
     employee_id = payload.get("employee_id")
-    status = payload.get("status")
-    leave_id = payload.get("leave_request_id")
+    status = payload.get("status", "")
+    leave_id = payload.get("leave_request_id", "")
     company_id = payload.get("company_id")
-    
+
     if not employee_id or not company_id:
-        logger.warning(f"Missing employee_id or company_id in payload: {payload}")
+        logger.warning(f"Missing employee_id or company_id in leave event")
         return
-        
-    subject = f"Leave Request Update - {status}"
+
+    subject = f"Leave Request {status}"
     body = f"Your leave request ({leave_id}) has been marked as {status}."
-    
+
     if routing_key == "leave.requested":
-        # HR/Managers get notified too (for this demo, we'll just notify employee to simulate system)
-        subject = f"Leave Request Submitted"
+        subject = "Leave Request Submitted"
         body = f"You have submitted a leave request ({leave_id}). Currently pending approval."
 
-    log_obj = NotificationLogCreate(
-        company_id=company_id,
-        user_id=employee_id,
-        type=NotificationType.EMAIL,
-        subject=subject,
-        message=body
-    )
-    
-    await compile_and_send_notification(db, log_obj)
+    log_obj = NotificationLogCreate(company_id=company_id, user_id=employee_id, type=NotificationType.EMAIL, subject=subject, message=body)
+    await compile_and_send_notification(db, log_obj, template_name="leave_update.html", template_context={"status": status, "leave_request_id": leave_id})
 
 
 async def handle_employee_created(db: AsyncSession, payload: dict):
-    user_id = payload.get("user_id")
+    user_id = payload.get("user_id") or payload.get("employee_id")
     company_id = payload.get("company_id")
-    
+
     if not user_id or not company_id:
-        logger.warning(f"Missing user_id or company_id in payload: {payload}")
+        logger.warning("Missing user_id or company_id in employee.created")
         return
-        
-    subject = "Welcome to Ophillia HRMS"
-    body = "Your employee profile has been created."
-    
-    log_obj = NotificationLogCreate(
-        company_id=company_id,
-        user_id=user_id,
-        type=NotificationType.EMAIL,
-        subject=subject,
-        message=body
-    )
-    await compile_and_send_notification(db, log_obj)
+
+    log_obj = NotificationLogCreate(company_id=company_id, user_id=user_id, type=NotificationType.EMAIL, subject="Welcome to Ophillia HRMS", message="Your employee profile has been created.")
+    await compile_and_send_notification(db, log_obj, template_name="employee_created.html", template_context={})
+
+
+async def handle_payroll_run(db: AsyncSession, payload: dict):
+    company_id = payload.get("company_id")
+    period_start = payload.get("period_start", "")
+    period_end = payload.get("period_end", "")
+
+    if not company_id:
+        return
+
+    # This would ideally notify all employees — for now logs the event
+    logger.info(f"Payroll run event: {period_start} to {period_end} for company {company_id}")
+
+
+async def handle_salary_processed(db: AsyncSession, payload: dict):
+    employee_id = payload.get("employee_id")
+    company_id = payload.get("company_id")
+    period_start = payload.get("period_start", "")
+    period_end = payload.get("period_end", "")
+
+    if not employee_id or not company_id:
+        return
+
+    log_obj = NotificationLogCreate(company_id=company_id, user_id=employee_id, type=NotificationType.EMAIL, subject="Your Payslip is Ready", message=f"Payroll for {period_start} to {period_end} has been processed.")
+    await compile_and_send_notification(db, log_obj, template_name="payroll_processed.html", template_context={"period_start": period_start, "period_end": period_end})
 
 
 async def start_consumers():
     try:
         connection = await connect_robust(settings.RABBITMQ_URL)
         channel = await connection.channel()
-        await channel.set_qos(prefetch_count=10)
+        await channel.set_qos(prefetch_count=20)
 
-        exchange = await channel.declare_exchange(
-            "hrms_events", ExchangeType.TOPIC, durable=True
+        exchange = await channel.declare_exchange("hrms_events", ExchangeType.TOPIC, durable=True)
+
+        # DLQ setup
+        dlq_exchange = await channel.declare_exchange("notification_dlq_exchange", ExchangeType.DIRECT, durable=True)
+        dlq_queue = await channel.declare_queue("notification_dlq", durable=True)
+        await dlq_queue.bind(dlq_exchange, routing_key="notification_dlq")
+
+        queue = await channel.declare_queue(
+            "notification_queue", durable=True,
+            arguments={"x-dead-letter-exchange": "notification_dlq_exchange", "x-dead-letter-routing-key": "notification_dlq"},
         )
 
-        queue = await channel.declare_queue("notification_queue", durable=True)
+        # Bind to all relevant events
         await queue.bind(exchange, routing_key="leave.*")
         await queue.bind(exchange, routing_key="employee.created")
+        await queue.bind(exchange, routing_key="payroll.run")
+        await queue.bind(exchange, routing_key="salary.processed")
 
-        logger.info("Notification Service is now listening for events...")
+        logger.info("Notification consumer started — listening for leave.*, employee.created, payroll.run, salary.processed")
         await queue.consume(process_event)
-        
-        # Keep connection open. (Since it's tied to FastAPI lifespan it runs until shutdown)
-    except Exception as e:
-        logger.error(f"Failed to start RabbitMQ consumers: {e}")
+    except Exception as exc:
+        logger.error(f"Failed to start RabbitMQ consumers: {exc}")

@@ -8,6 +8,7 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.token_repository import TokenRepository
 from app.repositories.magic_token_repository import MagicTokenRepository
 from app.schemas.request_response_models import UserCreate, UserLogin, Token, CompanyCreate
+from app.services.email_service import EmailService
 from app.core.security import (
     get_password_hash,
     verify_password,

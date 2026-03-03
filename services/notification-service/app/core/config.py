@@ -14,16 +14,25 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "notification_db"
     DATABASE_URL: str = "postgresql+asyncpg://postgres:changeme@notification-db:5432/notification_db"
 
-    # Security — JWT validation (shared with auth-service)
+    # Security — JWT validation
     SECRET_KEY: str = "CHANGE_THIS_TO_A_RANDOM_64_CHAR_SECRET_IN_PRODUCTION"
     ALGORITHM: str = "HS256"
 
-    # Auth Service (service-to-service)
+    # Auth Service
     AUTH_SERVICE_URL: str = "http://auth-service:8000"
     INTERNAL_SERVICE_TOKEN: str = "CHANGE_THIS_INTERNAL_TOKEN_IN_PRODUCTION"
 
     # RabbitMQ
     RABBITMQ_URL: str = "amqp://guest:guest@rabbitmq:5672/"
+
+    # SMTP — Real email delivery
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@ophillia.com"
+    SMTP_FROM_NAME: str = "Ophillia HRMS"
+    SMTP_USE_TLS: bool = True
 
     # CORS
     ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost:3000"]
