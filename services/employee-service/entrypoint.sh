@@ -2,6 +2,9 @@
 set -e
 
 echo "=== Employee Service Startup ==="
+echo "Waiting for database to be fully ready..."
+sleep 5
+
 echo "Running Alembic migrations..."
 alembic upgrade head
 echo "Migrations complete. Starting server..."

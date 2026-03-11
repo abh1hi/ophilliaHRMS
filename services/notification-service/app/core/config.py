@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "changeme"
     POSTGRES_DB: str = "notification_db"
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:changeme@notification-db:5432/notification_db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:changeme@hrms-db:5432/notification_db"
 
     # Security — JWT validation
     SECRET_KEY: str = "CHANGE_THIS_TO_A_RANDOM_64_CHAR_SECRET_IN_PRODUCTION"

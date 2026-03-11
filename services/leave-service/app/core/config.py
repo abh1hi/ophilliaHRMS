@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "changeme"
     POSTGRES_DB: str = "leave_db"
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:changeme@leave-db:5432/leave_db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:changeme@hrms-db:5432/leave_db"
 
     # Security — JWT validation (shared with auth-service)
     SECRET_KEY: str = "CHANGE_THIS_TO_A_RANDOM_64_CHAR_SECRET_IN_PRODUCTION"

@@ -10,8 +10,10 @@ SERVICES = {
     "employee-service": "http://localhost:8001",
     "attendance-service": "http://localhost:8002",
     "students-service": "http://localhost:8003",
-    "leave-service": "http://localhost:8004",
-    "notification-service": "http://localhost:8005",
+    "payroll-service": "http://localhost:8004",
+    "leave-service": "http://localhost:8005",
+    "audit-service": "http://localhost:8006",
+    "notification-service": "http://localhost:8007",
 }
 
 ENDPOINTS_TO_TEST = [

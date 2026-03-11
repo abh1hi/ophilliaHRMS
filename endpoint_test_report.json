@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-02-26T19:03:52.910795",
+  "timestamp": "2026-03-03T18:29:03.909829",
   "results": [
     {
       "service": "auth-service",
       "endpoint": "http://localhost:8000/health",
-      "duration": 0.085,
+      "duration": 0.112,
       "status_code": 200,
       "response": {
         "status": "healthy",
@@ -16,7 +16,7 @@
     {
       "service": "employee-service",
       "endpoint": "http://localhost:8001/health",
-      "duration": 0.011,
+      "duration": 0.012,
       "status_code": 200,
       "response": {
         "status": "healthy",
@@ -28,7 +28,7 @@
     {
       "service": "attendance-service",
       "endpoint": "http://localhost:8002/health",
-      "duration": 0.008,
+      "duration": 0.033,
       "status_code": 200,
       "response": {
         "status": "healthy",
@@ -40,7 +40,7 @@
     {
       "service": "students-service",
       "endpoint": "http://localhost:8003/health",
-      "duration": 0.01,
+      "duration": 0.023,
       "status_code": 200,
       "response": {
         "status": "healthy",
@@ -50,20 +50,36 @@
       "error": null
     },
     {
-      "service": "leave-service",
+      "service": "payroll-service",
       "endpoint": "http://localhost:8004/health",
-      "duration": 0.021,
+      "duration": 0.01,
       "status_code": null,
       "response": null,
-      "error": "[WinError 10053] An established connection was aborted by the software in your host machine"
+      "error": "Remote end closed connection without response"
+    },
+    {
+      "service": "leave-service",
+      "endpoint": "http://localhost:8005/health",
+      "duration": 0.006,
+      "status_code": null,
+      "response": null,
+      "error": "Remote end closed connection without response"
+    },
+    {
+      "service": "audit-service",
+      "endpoint": "http://localhost:8006/health",
+      "duration": 0.01,
+      "status_code": null,
+      "response": null,
+      "error": "Remote end closed connection without response"
     },
     {
       "service": "notification-service",
-      "endpoint": "http://localhost:8005/health",
-      "duration": 0.014,
+      "endpoint": "http://localhost:8007/health",
+      "duration": 0.02,
       "status_code": null,
       "response": null,
-      "error": "[WinError 10053] An established connection was aborted by the software in your host machine"
+      "error": "Remote end closed connection without response"
     }
   ]
 }

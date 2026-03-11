@@ -53,44 +53,34 @@ def upgrade() -> None:
     op.create_index("idx_company_event_type", "audit_logs", ["company_id", "event_type"])
     op.create_index("idx_company_user", "audit_logs", ["company_id", "user_id"])
 
-    # Partial index — recent 90 days (most audit queries are recent)
-    op.execute(
-        """
-        CREATE INDEX idx_recent_logs ON audit_logs (timestamp)
-        WHERE timestamp > now() - interval '90 days'
-        """
-    )
+    # Note: Partial index on recent logs removed — now() is not IMMUTABLE.
+    # The composite index idx_company_timestamp handles recent audit queries efficiently.
 
     # Read-only role for audit readers (SELECT only)
-    op.execute(
-        """
+    op.execute("""
         DO $$
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'audit_reader') THEN
                 CREATE ROLE audit_reader;
             END IF;
-        END $$;
-        GRANT SELECT ON audit_logs TO audit_reader;
-        """
-    )
+        END $$
+    """)
+    op.execute("GRANT SELECT ON audit_logs TO audit_reader")
 
     # Write-only role for audit writers (INSERT only — no UPDATE/DELETE)
-    op.execute(
-        """
+    op.execute("""
         DO $$
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'audit_writer') THEN
                 CREATE ROLE audit_writer;
             END IF;
-        END $$;
-        GRANT INSERT ON audit_logs TO audit_writer;
-        """
-    )
+        END $$
+    """)
+    op.execute("GRANT INSERT ON audit_logs TO audit_writer")
 
 
 def downgrade() -> None:
     op.execute("REVOKE ALL ON audit_logs FROM audit_reader, audit_writer")
-    op.drop_index("idx_recent_logs", table_name="audit_logs")
     op.drop_index("idx_company_user", table_name="audit_logs")
     op.drop_index("idx_company_event_type", table_name="audit_logs")
     op.drop_index("idx_company_timestamp", table_name="audit_logs")
