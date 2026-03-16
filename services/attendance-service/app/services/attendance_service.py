@@ -12,6 +12,7 @@ from app.models.attendance_policy import AttendancePolicy
 from app.repositories.attendance_repository import AttendanceRepository
 from app.repositories.geofence_repository import GeofenceRepository
 from app.repositories.policy_repository import PolicyRepository
+from app.repositories.task_repository import TaskRepository
 from app.schemas.attendance import (
     ClockInRequest,
     ClockOutRequest,
@@ -20,6 +21,10 @@ from app.schemas.attendance import (
     GeofenceCreate,
     PolicyCreate,
     SchoolModeAttendanceCreate,
+    ProductivityReportItem,
+    ProductivityReportResponse,
+    AlertsResponse,
+    MissedPunchOutItem,
 )
 from app.events.publisher import EventPublisher
 from app.utils.geofence import is_within_geofence
@@ -35,6 +40,7 @@ class AttendanceService:
         self.attendance_repo = AttendanceRepository(db)
         self.geofence_repo = GeofenceRepository(db)
         self.policy_repo = PolicyRepository(db)
+        self.task_repo = TaskRepository(db)
         self.event_publisher = event_publisher
 
     # ──────────── POLICY RESOLUTION ────────────
@@ -132,6 +138,7 @@ class AttendanceService:
             clock_in=now,
             clock_in_lat=data.latitude,
             clock_in_lng=data.longitude,
+            clock_in_location_name=data.location_name,
             status=attendance_status,
             method=method if method != "both" else "geofence" if data.latitude else "manual",
             notes=data.notes,
@@ -197,12 +204,25 @@ class AttendanceService:
             "clock_out": now,
             "clock_out_lat": data.latitude,
             "clock_out_lng": data.longitude,
+            "clock_out_location_name": data.location_name,
             "work_hours": total_hours,
             "overtime_hours": overtime,
             "status": current_status,
             "notes": data.notes if data.notes else record.notes,
+            "day_rating": data.day_rating,
         }
         record = await self.attendance_repo.update(record, update_data)
+
+        # Process task completions supplied inline with punch-out
+        if data.task_completions:
+            for item in data.task_completions:
+                task = await self.task_repo.get_by_id(item.task_id)
+                if task and task.employee_id == employee_id:
+                    await self.task_repo.update(task, {
+                        "status": item.status,
+                        "completion_notes": item.completion_notes,
+                        "actual_expenses": item.actual_expenses,
+                    })
 
         # Publish event
         if self.event_publisher:
@@ -210,11 +230,12 @@ class AttendanceService:
                 "employee_id": str(employee_id),
                 "work_hours": total_hours,
                 "overtime_hours": overtime,
+                "day_rating": data.day_rating,
                 "timestamp": now.isoformat(),
             })
 
         logger.info(
-            f"Clock-out: employee={employee_id}, hours={total_hours}, overtime={overtime}",
+            f"Clock-out: employee={employee_id}, hours={total_hours}, overtime={overtime}, rating={data.day_rating}",
             extra={"user_id": str(employee_id), "service_task": "clock_out"},
         )
         return record
@@ -357,6 +378,42 @@ class AttendanceService:
             })
 
         return record
+
+
+    # ──────────── ALERTS (Admin) ────────────
+
+    async def get_alerts(self) -> AlertsResponse:
+        """Return today's late punch-in count and employees with missed punch-out."""
+        missed = await self.attendance_repo.get_missed_punchout_today()
+        late_count = await self.attendance_repo.get_late_count_today()
+        missed_items = [
+            MissedPunchOutItem(
+                employee_id=r.employee_id,
+                record_id=r.id,
+                clock_in=r.clock_in,
+                clock_in_location_name=r.clock_in_location_name,
+            )
+            for r in missed
+        ]
+        return AlertsResponse(
+            date=date.today(),
+            late_count=late_count,
+            missed_punch_out_count=len(missed_items),
+            missed_punch_outs=missed_items,
+        )
+
+    # ──────────── PRODUCTIVITY REPORT (Admin) ────────────
+
+    async def get_productivity_report(
+        self,
+        year: int,
+        month: int,
+        employee_id: Optional[UUID] = None,
+    ) -> ProductivityReportResponse:
+        """Return per-employee productivity stats for a given month."""
+        rows = await self.attendance_repo.get_productivity_data(year, month, employee_id)
+        items = [ProductivityReportItem(**row) for row in rows]
+        return ProductivityReportResponse(month=month, year=year, items=items)
 
 
 class GeofenceService:

@@ -29,7 +29,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
     if algorithm == "RS256" and settings.JWT_PUBLIC_KEY:
         key = settings.JWT_PUBLIC_KEY
     else:
-        key = settings.SECRET_KEY
+        key = settings.JWT_PUBLIC_KEY
         algorithm = "HS256"
 
     try:

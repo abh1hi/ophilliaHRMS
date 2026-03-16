@@ -10,6 +10,7 @@ from app.core.security import get_current_user, require_role, TokenPayload
 from app.api.v1.dependencies import get_db_with_tenant
 from app.core.constants import UserRole
 from app.services.attendance_service import AttendanceService, GeofenceService, PolicyService
+from app.services.task_service import TaskService
 from app.schemas.attendance import (
     ClockInRequest,
     ClockOutRequest,
@@ -24,11 +25,21 @@ from app.schemas.attendance import (
     PolicyCreate,
     PolicyResponse,
     PolicyListResponse,
+    TaskCreate,
+    TaskUpdate,
+    TaskCompleteUpdate,
+    TaskResponse,
+    TaskListResponse,
+    TaskAssignRequest,
+    ProductivityReportResponse,
+    AlertsResponse,
 )
 from app.utils.pagination import PaginationParams
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
+
+# ── Dependency helpers ───────────────────────────────────────────────────────
 
 def _get_service(db: AsyncSession = Depends(get_db_with_tenant)) -> AttendanceService:
     return AttendanceService(db)
@@ -42,6 +53,10 @@ def _get_policy_service(db: AsyncSession = Depends(get_db_with_tenant)) -> Polic
     return PolicyService(db)
 
 
+def _get_task_service(db: AsyncSession = Depends(get_db_with_tenant)) -> TaskService:
+    return TaskService(db)
+
+
 # ──────────────────── ATTENDANCE RECORDS ────────────────────
 
 @router.post("/clock-in", response_model=AttendanceResponse, status_code=201)
@@ -50,7 +65,9 @@ async def clock_in(
     current_user: TokenPayload = Depends(get_current_user),
     service: AttendanceService = Depends(_get_service),
 ):
-    """Clock in for today. Validates geofence if required by policy."""
+    """Punch in for today. Validates geofence if required by policy.
+    Saves GPS coordinates and optional human-readable location name.
+    """
     return await service.clock_in(
         employee_id=UUID(current_user.sub),
         data=data,
@@ -63,7 +80,10 @@ async def clock_out(
     current_user: TokenPayload = Depends(get_current_user),
     service: AttendanceService = Depends(_get_service),
 ):
-    """Clock out for today. Auto-computes work hours and overtime."""
+    """Punch out for today.
+    Accepts day_rating (1-5) and optional inline task_completions list.
+    Auto-computes work hours and overtime.
+    """
     return await service.clock_out(
         employee_id=UUID(current_user.sub),
         data=data,
@@ -75,7 +95,7 @@ async def get_my_today(
     current_user: TokenPayload = Depends(get_current_user),
     service: AttendanceService = Depends(_get_service),
 ):
-    """Get today's attendance record for the authenticated user."""
+    """Get today's attendance record (with tasks) for the authenticated user."""
     record = await service.get_today_record(UUID(current_user.sub))
     if not record:
         return None
@@ -176,6 +196,145 @@ async def school_mode_entry(
 ):
     """Mark an employee's attendance on their behalf. HR/Super Admin only."""
     return await service.mark_school_mode_attendance(data, created_by=current_user.sub)
+
+
+# ──────────────────── TASKS ────────────────────
+
+@router.post("/tasks", response_model=TaskResponse, status_code=201)
+async def add_task(
+    data: TaskCreate,
+    record_id: UUID = Query(..., description="The attendance record to attach this task to"),
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskService = Depends(_get_task_service),
+):
+    """Add a daily task to today's attendance record.
+
+    - Employees add tasks to their own record.
+    - Managers / Admins can attach tasks to any employee's record (pass record_id + data).
+    """
+    employee_uuid = UUID(current_user.sub)
+    assigned_by: Optional[UUID] = None
+
+    if current_user.role in (UserRole.HR.value, UserRole.SUPER_ADMIN.value, UserRole.MANAGER.value):
+        # HR/Admin/Manager can assign tasks; the task employee_id is inferred from the record
+        assigned_by = employee_uuid
+
+    return await service.add_task(
+        record_id=record_id,
+        employee_id=employee_uuid,
+        data=data,
+        assigned_by=assigned_by,
+    )
+
+
+@router.get("/tasks/today", response_model=TaskListResponse)
+async def get_today_tasks(
+    current_user: TokenPayload = Depends(get_current_user),
+    attendance_service: AttendanceService = Depends(_get_service),
+    task_service: TaskService = Depends(_get_task_service),
+):
+    """Get all tasks for the authenticated employee's today's record."""
+    record = await attendance_service.get_today_record(UUID(current_user.sub))
+    if not record:
+        return TaskListResponse(total=0, tasks=[])
+    tasks = await task_service.list_tasks_for_record(record.id)
+    return TaskListResponse(total=len(tasks), tasks=tasks)
+
+
+@router.patch("/tasks/{task_id}", response_model=TaskResponse)
+async def update_task(
+    task_id: UUID,
+    data: TaskUpdate,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskService = Depends(_get_task_service),
+):
+    """Edit a task's pre-completion details (title, description, expenses)."""
+    return await service.update_task(
+        task_id=task_id,
+        employee_id=UUID(current_user.sub),
+        data=data,
+    )
+
+
+@router.delete("/tasks/{task_id}", status_code=204)
+async def delete_task(
+    task_id: UUID,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskService = Depends(_get_task_service),
+):
+    """Delete a task.  Employees can only delete their own tasks."""
+    await service.delete_task(
+        task_id=task_id,
+        employee_id=UUID(current_user.sub),
+    )
+
+
+@router.patch("/tasks/{task_id}/complete", response_model=TaskResponse)
+async def complete_task(
+    task_id: UUID,
+    data: TaskCompleteUpdate,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskService = Depends(_get_task_service),
+):
+    """Mark a task's completion at punch-out.
+    Sets status (completed / partially_completed / not_completed), notes, actual expenses.
+    """
+    return await service.complete_task(
+        task_id=task_id,
+        employee_id=UUID(current_user.sub),
+        data=data,
+    )
+
+
+@router.post("/tasks/assign", response_model=TaskResponse, status_code=201)
+async def assign_task_to_employee(
+    data: TaskAssignRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskService = Depends(_get_task_service),
+):
+    """Assign a task to another employee's today attendance record.
+
+    Any authenticated user (employee, manager, super admin) can assign tasks
+    to a colleague who is already clocked in today.
+    """
+    return await service.assign_task_to_employee(
+        data=data,
+        assigned_by=UUID(current_user.sub),
+    )
+
+
+# ──────────────────── REPORTS ────────────────────
+
+@router.get("/reports/productivity", response_model=ProductivityReportResponse)
+async def productivity_report(
+    year: int = Query(..., description="Year, e.g. 2026"),
+    month: int = Query(..., ge=1, le=12, description="Month 1–12"),
+    employee_id: Optional[UUID] = Query(None, description="Filter to single employee"),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.MANAGER)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Monthly task productivity report per employee.
+    Shows task completion rates, daily ratings, and expenses.
+    HR / Manager / Super Admin only.
+    """
+    return await service.get_productivity_report(year=year, month=month, employee_id=employee_id)
+
+
+# ──────────────────── ALERTS ────────────────────
+
+@router.get("/alerts", response_model=AlertsResponse)
+async def get_alerts(
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.MANAGER)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Today's attendance alerts: late punch-ins and employees who haven't punched out.
+    HR / Manager / Super Admin only.
+    """
+    return await service.get_alerts()
 
 
 # ──────────────────── GEOFENCES ────────────────────

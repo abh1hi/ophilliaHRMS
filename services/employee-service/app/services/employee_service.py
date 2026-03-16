@@ -40,16 +40,61 @@ class EmployeeService:
 
         employee = Employee(
             user_id=data.user_id,
+            # Personal
             first_name=data.first_name,
             last_name=data.last_name,
-            email=data.email,
-            phone=data.phone,
             gender=data.gender.value if data.gender else None,
             date_of_birth=data.date_of_birth,
+            # Address
+            door_no=data.door_no,
+            street=data.street,
+            village_town=data.village_town,
+            pin_code=data.pin_code,
+            # Contact
+            phone=data.phone,
+            phone_2=data.phone_2,
+            personal_email=data.personal_email,
+            email=data.email,
+            # Government IDs
+            driving_license_number=data.driving_license_number,
+            aadhaar_number=data.aadhaar_number,
+            uan_number=data.uan_number,
+            esi_number=data.esi_number,
+            pan_number=data.pan_number,
+            # Banking
+            bank_account_number=data.bank_account_number,
+            bank_name=data.bank_name,
+            bank_branch=data.bank_branch,
+            ifsc_code=data.ifsc_code,
+            # Emergency contact
+            emergency_contact_name=data.emergency_contact_name,
+            emergency_contact_number=data.emergency_contact_number,
+            emergency_contact_relation=data.emergency_contact_relation,
+            # Education
+            highest_qualification=data.highest_qualification,
+            year_of_passing=data.year_of_passing,
+            percentage=data.percentage,
+            institute_name=data.institute_name,
+            # Work history
+            last_firm_name=data.last_firm_name,
+            years_of_experience=data.years_of_experience,
+            last_designation=data.last_designation,
+            last_drawn_salary=data.last_drawn_salary,
+            reason_to_quit=data.reason_to_quit,
+            referred_by=data.referred_by,
+            # Health
+            health_issues=data.health_issues,
+            allergies=data.allergies,
+            # Job info
             date_joined=data.date_joined,
             department_id=data.department_id,
             designation=data.designation,
-            address=data.address,
+            project=data.project,
+            joining_salary=data.joining_salary,
+            role=data.role,
+            # Files
+            staff_photo_url=data.staff_photo_url,
+            staff_documents_urls=data.staff_documents_urls,
         )
         employee = await self.repo.create(employee)
 

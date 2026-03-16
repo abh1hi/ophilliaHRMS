@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.repositories.user_repository import UserRepository
 from app.models.user import User
 from app.core.constants import UserRole
+from app.core.token_blacklist import is_blacklisted
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -22,9 +23,12 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_PUBLIC_KEY, algorithms=[settings.ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
+            raise credentials_exception
+        jti: str | None = payload.get("jti")
+        if jti and await is_blacklisted(jti):
             raise credentials_exception
     except JWTError:
         raise credentials_exception

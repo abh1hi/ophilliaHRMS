@@ -13,19 +13,20 @@ from app.api.v1.dependencies import (
 )
 from app.core.constants import UserRole
 from app.schemas.leave import LeaveTypeCreate, LeaveTypeResponse
+from app.schemas.response import APIResponse
 from app.models.leave import LeaveType
 
 router = APIRouter()
 
-@router.get("/", response_model=List[LeaveTypeResponse])
+@router.get("/", response_model=APIResponse[List[LeaveTypeResponse]])
 async def list_leave_types(
     db: AsyncSession = Depends(get_db_with_tenant),
     current_user: TokenPayload = Depends(get_current_user)
 ):
     result = await db.execute(select(LeaveType).filter(LeaveType.is_active == 1))
-    return result.scalars().all()
+    return APIResponse(success=True, data=result.scalars().all())
 
-@router.post("/", response_model=LeaveTypeResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=APIResponse[LeaveTypeResponse], status_code=status.HTTP_201_CREATED)
 async def create_leave_type(
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -41,4 +42,4 @@ async def create_leave_type(
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)
-    return db_obj
+    return APIResponse(success=True, data=db_obj)

@@ -21,6 +21,7 @@ from slowapi.util import get_remote_address
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.core.exception_handlers import register_exception_handlers
 from app.middleware.request_id import request_id_middleware
 from app.db.session import check_db_connectivity, AsyncSessionLocal
 from app.events.consumer import AuditEventConsumer
@@ -90,6 +91,9 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc",
     lifespan=lifespan,
 )
+
+# Generic error envelope handlers (must be registered before rate-limit handler)
+register_exception_handlers(app)
 
 # Rate limiting
 app.state.limiter = limiter

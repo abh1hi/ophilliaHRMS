@@ -3,7 +3,7 @@ from typing import Optional, List
 from uuid import UUID
 from datetime import date, datetime
 
-from app.core.constants import LeaveStatus
+from app.core.constants import LeaveStatus, DurationType
 
 
 # Shared properties
@@ -53,12 +53,17 @@ class LeaveRequestBase(BaseModel):
     leave_type_id: UUID
     start_date: date
     end_date: date
-    reason: Optional[str] = None
+    duration_type: DurationType = Field(default=DurationType.FULL_DAY)
+    is_emergency: bool = Field(default=False)
+    reason: str = Field(..., min_length=10, max_length=1000, description="Detailed reason for the leave (min 10 chars)")
+    supporting_document: Optional[str] = None
 
     @model_validator(mode='after')
     def validate_dates(self) -> 'LeaveRequestBase':
         if self.end_date < self.start_date:
             raise ValueError('end_date must be after or equal to start_date')
+        if self.duration_type == DurationType.HALF_DAY and self.start_date != self.end_date:
+            raise ValueError("Half day leave must have the same start and end date")
         return self
 
 

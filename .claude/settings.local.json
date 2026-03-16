@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from passlib.context import CryptContext; ctx = CryptContext\\(schemes=[''argon2''], deprecated=''auto''\\); print\\(ctx.hash\\(''Admin@123''\\)\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(docker ps:*)",
+      "Bash(find c:/Users/abhin/Desktop/ophilliaHRMS/employee-app-ophilliahrms -name .env* -o -name *.env*)"
+    ]
+  }
+}

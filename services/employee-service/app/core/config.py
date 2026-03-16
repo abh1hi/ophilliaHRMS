@@ -14,9 +14,15 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "employee_db"
     DATABASE_URL: str = "postgresql+asyncpg://postgres:changeme@employee-db:5432/employee_db"
 
-    # Security — JWT validation (shared with auth-service)
-    SECRET_KEY: str = "CHANGE_THIS_TO_A_RANDOM_64_CHAR_SECRET_IN_PRODUCTION"
-    ALGORITHM: str = "HS256"
+    # Security — JWT validation (shared with auth-service); key must be supplied via env
+    JWT_PUBLIC_KEY: str
+    ALGORITHM: str = "RS256"
+
+    # PII encryption — 64 hex chars = 32 bytes AES-256 key; must be supplied via env
+    PII_ENCRYPTION_KEY: str
+
+    # Debug — disables Swagger UI when False
+    DEBUG: bool = False
 
     # Auth Service (service-to-service)
     AUTH_SERVICE_URL: str = "http://auth-service:8000"
@@ -27,6 +33,12 @@ class Settings(BaseSettings):
 
     # CORS
     ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost:3000"]
+
+    @field_validator("JWT_PUBLIC_KEY", mode="before")
+    @classmethod
+    def unescape_pem(cls, v: str) -> str:
+        """Allow PEM key stored as single-line string with literal \\n."""
+        return v.replace("\\n", "\n") if isinstance(v, str) else v
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod

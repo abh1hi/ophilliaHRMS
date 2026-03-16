@@ -2,22 +2,111 @@ from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from app.core.constants import AttendanceStatus, AttendanceMethod
+
+
+# ──────────── TASK SCHEMAS ────────────
+
+class TaskCreate(BaseModel):
+    title: str
+    details: Optional[str] = None
+    estimated_finish_time: Optional[str] = None   # e.g. "6:30 PM"
+    expected_expenses: Optional[Decimal] = None
+
+    @field_validator("title")
+    @classmethod
+    def title_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Task title must not be empty")
+        return v.strip()
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    details: Optional[str] = None
+    estimated_finish_time: Optional[str] = None
+    expected_expenses: Optional[Decimal] = None
+
+
+class TaskCompleteUpdate(BaseModel):
+    """Payload sent at punch-out time to mark each task's outcome."""
+    status: str  # completed | partially_completed | not_completed
+    completion_notes: Optional[str] = None
+    actual_expenses: Optional[Decimal] = None
+
+    @field_validator("status")
+    @classmethod
+    def valid_status(cls, v: str) -> str:
+        allowed = {"completed", "partially_completed", "not_completed"}
+        if v not in allowed:
+            raise ValueError(f"status must be one of {allowed}")
+        return v
+
+
+class TaskResponse(BaseModel):
+    id: UUID
+    attendance_record_id: UUID
+    employee_id: UUID
+    assigned_by: Optional[UUID] = None
+    title: str
+    details: Optional[str] = None
+    estimated_finish_time: Optional[str] = None
+    expected_expenses: Optional[Decimal] = None
+    status: str
+    completion_notes: Optional[str] = None
+    actual_expenses: Optional[Decimal] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TaskListResponse(BaseModel):
+    total: int
+    tasks: List[TaskResponse]
 
 
 # ──────────── CLOCK IN ────────────
 class ClockInRequest(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    location_name: Optional[str] = None   # human-readable (village/town)
     notes: Optional[str] = None
 
 
 # ──────────── CLOCK OUT ────────────
+class TaskCompletionItem(BaseModel):
+    """Inline task completion — used inside ClockOutRequest."""
+    task_id: UUID
+    status: str  # completed | partially_completed | not_completed
+    completion_notes: Optional[str] = None
+    actual_expenses: Optional[Decimal] = None
+
+    @field_validator("status")
+    @classmethod
+    def valid_status(cls, v: str) -> str:
+        allowed = {"completed", "partially_completed", "not_completed"}
+        if v not in allowed:
+            raise ValueError(f"status must be one of {allowed}")
+        return v
+
+
 class ClockOutRequest(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    location_name: Optional[str] = None   # human-readable (village/town)
     notes: Optional[str] = None
+    day_rating: Optional[int] = None      # 1-5 stars
+    task_completions: Optional[List[TaskCompletionItem]] = None
+
+    @field_validator("day_rating")
+    @classmethod
+    def valid_rating(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v not in range(1, 6):
+            raise ValueError("day_rating must be between 1 and 5")
+        return v
 
 
 # ──────────── MANUAL ENTRY (Admin) ────────────
@@ -55,12 +144,16 @@ class AttendanceResponse(BaseModel):
     clock_in_lng: Optional[float] = None
     clock_out_lat: Optional[float] = None
     clock_out_lng: Optional[float] = None
+    clock_in_location_name: Optional[str] = None
+    clock_out_location_name: Optional[str] = None
     work_hours: Optional[float] = None
     overtime_hours: float = 0.0
+    day_rating: Optional[int] = None
     status: str
     method: str
     notes: Optional[str] = None
     date: date
+    tasks: List[TaskResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -73,6 +166,68 @@ class AttendanceListResponse(BaseModel):
     skip: int
     limit: int
     records: List[AttendanceResponse]
+
+
+# ──────────── TASK ASSIGN (any user → any employee's today record) ────────────
+class TaskAssignRequest(BaseModel):
+    """Any authenticated user can assign a task to another employee's today record."""
+    target_employee_id: UUID
+    title: str
+    details: Optional[str] = None
+    estimated_finish_time: Optional[str] = None
+    expected_expenses: Optional[Decimal] = None
+
+    @field_validator("title")
+    @classmethod
+    def title_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Task title must not be empty")
+        return v.strip()
+
+
+# ──────────── PRODUCTIVITY REPORT ────────────
+class ProductivityReportItem(BaseModel):
+    employee_id: UUID
+    month: int
+    year: int
+    total_days: int
+    present_days: int
+    late_days: int
+    half_days: int
+    total_tasks: int
+    completed_tasks: int
+    partial_tasks: int
+    not_completed_tasks: int
+    pending_tasks: int
+    completion_rate: float
+    avg_rating: Optional[float] = None
+    total_expected_expenses: Optional[Decimal] = None
+    total_actual_expenses: Optional[Decimal] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ProductivityReportResponse(BaseModel):
+    month: int
+    year: int
+    items: List[ProductivityReportItem]
+
+
+# ──────────── ALERTS ────────────
+class MissedPunchOutItem(BaseModel):
+    employee_id: UUID
+    record_id: UUID
+    clock_in: datetime
+    clock_in_location_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AlertsResponse(BaseModel):
+    date: date
+    late_count: int
+    missed_punch_out_count: int
+    missed_punch_outs: List[MissedPunchOutItem]
 
 
 # ──────────── GEOFENCE ────────────

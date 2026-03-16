@@ -16,11 +16,12 @@ from app.api.v1.dependencies import (
 from app.core.constants import UserRole
 from app.services import leave_service
 from app.schemas.leave import LeaveBalanceCreate, LeaveBalanceResponse
+from app.schemas.response import APIResponse
 from app.models.leave import LeaveBalance
 
 router = APIRouter()
 
-@router.get("/{employee_id}", response_model=List[LeaveBalanceResponse])
+@router.get("/{employee_id}", response_model=APIResponse[List[LeaveBalanceResponse]])
 async def get_leave_balances(
     employee_id: UUID,
     year: int = datetime.utcnow().year,
@@ -35,9 +36,9 @@ async def get_leave_balances(
         .options(selectinload(LeaveBalance.leave_type))
         .filter(LeaveBalance.employee_id == employee_id, LeaveBalance.year == year)
     )
-    return result.scalars().all()
+    return APIResponse(success=True, data=result.scalars().all())
 
-@router.post("/", response_model=LeaveBalanceResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=APIResponse[LeaveBalanceResponse], status_code=status.HTTP_201_CREATED)
 async def create_leave_balance(
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -52,4 +53,4 @@ async def create_leave_balance(
         .options(selectinload(LeaveBalance.leave_type))
         .filter(LeaveBalance.id == db_obj.id)
     )
-    return result.scalars().first()
+    return APIResponse(success=True, data=result.scalars().first())

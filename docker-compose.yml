@@ -127,12 +127,16 @@ services:
 
   # ─────────────── CORE SERVICES ───────────────
 
-  # Profile: CORE 
+  # Profile: CORE
   auth-service:
     profiles: ["core"]
     build: ./services/auth-service
     container_name: hrms-auth
-    <<: *api-limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 400M
     env_file: ./services/auth-service/.env.docker
     ports:
       - "8000:8000"

@@ -118,10 +118,29 @@ async def start_consumers():
         dlq_queue = await channel.declare_queue("notification_dlq", durable=True)
         await dlq_queue.bind(dlq_exchange, routing_key="notification_dlq")
 
-        queue = await channel.declare_queue(
-            "notification_queue", durable=True,
-            arguments={"x-dead-letter-exchange": "notification_dlq_exchange", "x-dead-letter-routing-key": "notification_dlq"},
-        )
+        # Declare main queue with DLX args.
+        # If notification_queue already exists without DLX args (arg mismatch), RabbitMQ closes
+        # the channel with precondition_failed. We catch that, open a fresh channel, delete the
+        # stale queue, and redeclare with the correct configuration.
+        _dlx_args = {
+            "x-dead-letter-exchange": "notification_dlq_exchange",
+            "x-dead-letter-routing-key": "notification_dlq",
+        }
+        try:
+            queue = await channel.declare_queue("notification_queue", durable=True, arguments=_dlx_args)
+        except Exception:
+            logger.warning(
+                "notification_queue exists with incompatible args (missing DLX) — "
+                "deleting stale queue and recreating with DLX configuration"
+            )
+            # Channel is closed by RabbitMQ after a precondition_failed exception.
+            # Open a fresh channel to delete and redeclare the queue.
+            channel = await connection.channel()
+            await channel.set_qos(prefetch_count=20)
+            await channel.queue_delete("notification_queue")
+            # Re-obtain exchange reference on the new channel (durable, so broker still has it).
+            exchange = await channel.declare_exchange("hrms_events", ExchangeType.TOPIC, durable=True)
+            queue = await channel.declare_queue("notification_queue", durable=True, arguments=_dlx_args)
 
         # Bind to all relevant events
         await queue.bind(exchange, routing_key="leave.*")

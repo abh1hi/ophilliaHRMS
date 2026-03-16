@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, Float, Date, DateTime, Index, UniqueConstraint
+from sqlalchemy import Column, String, Float, Date, DateTime, Integer, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime, timezone
 
@@ -24,9 +25,16 @@ class AttendanceRecord(Base):
     clock_out_lat = Column(Float, nullable=True)
     clock_out_lng = Column(Float, nullable=True)
 
+    # Human-readable location names (reverse-geocoded or provided)
+    clock_in_location_name = Column(String(200), nullable=True)
+    clock_out_location_name = Column(String(200), nullable=True)
+
     # Computed fields
     work_hours = Column(Float, nullable=True)
     overtime_hours = Column(Float, default=0.0)
+
+    # Day rating: 1-5 stars entered at punch-out
+    day_rating = Column(Integer, nullable=True)
 
     # Metadata
     status = Column(String(20), nullable=False, default="present", index=True)
@@ -41,6 +49,9 @@ class AttendanceRecord(Base):
         onupdate=naive_utcnow,
         nullable=False,
     )
+
+    # Relationship to daily tasks
+    tasks = relationship("AttendanceTask", back_populates="attendance_record", lazy="selectin", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("employee_id", "date", name="uq_employee_date"),

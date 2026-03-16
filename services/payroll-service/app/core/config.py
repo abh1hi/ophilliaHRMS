@@ -17,7 +17,15 @@ class Settings(BaseSettings):
     # Security — RS256 local JWT validation
     SECRET_KEY: str = "CHANGE_THIS_TO_A_RANDOM_64_CHAR_SECRET_IN_PRODUCTION"
     ALGORITHM: str = "RS256"
-    JWT_PUBLIC_KEY: str = ""
+    JWT_PUBLIC_KEY: str = """-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkHp7+dBXMZc8rNzUUdy+
+5RJzhGEs2oMjZ1O3B2XzXcgLrm+3N6GTvB/jg8SMSicTmABn27hrwabpR+81yHJs
+FSDwCyhDHLxFoofWMfzwmt2DWB6Ky5o9qC86U2fxzFNWlnhkzTDZpHI97LhHZw10
+jvKcML8A0H0unUZKk9rwcbTuoRnk1O7KXaYvr1K4K4W8WTzjLdA0ljXOAu00Z5FY
+jT80OSNdWOfTE81prfRXMf9FnI8y4BaQsl2rExC/Y1ipGxZfgTGsYZtvX18p2Mz2
+Z8tXeQep4DBeYIuzue20ivYB35xBP5GplYLaol7S+UQwRVxGGJ+cDpfq76u+FyXz
+OwIDAQAB
+-----END PUBLIC KEY-----"""
     INTERNAL_SERVICE_TOKEN: str = "CHANGE_THIS_INTERNAL_TOKEN_IN_PRODUCTION"
 
     # Auth Service (health reference only)
@@ -31,6 +39,11 @@ class Settings(BaseSettings):
 
     # CORS
     ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost:3000"]
+
+    @field_validator("JWT_PUBLIC_KEY", mode="before")
+    @classmethod
+    def unescape_pem(cls, v: str) -> str:
+        return v.replace("\\n", "\n") if isinstance(v, str) else v
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod

@@ -1,0 +1,17 @@
+.env
+.env.docker
+.env.*
+keys.txt
+rsa_keys*
+*.pem
+*.key
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+tests/
+.coverage
+htmlcov/
+*.egg-info/
+.git/

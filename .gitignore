@@ -105,3 +105,10 @@ docker-compose.override.yml
 # Project Specific
 .agents/
 .gemini/
+
+# Keys / secrets
+keys.txt
+rsa_keys*
+*.pem
+*.key
+generate_keys.py

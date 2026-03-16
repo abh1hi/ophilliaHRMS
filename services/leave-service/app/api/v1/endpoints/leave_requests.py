@@ -8,6 +8,7 @@ from uuid import UUID
 from app.db.session import get_db
 from app.models.leave import LeaveRequest
 from app.schemas.leave import LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate
+from app.schemas.response import APIResponse, PaginatedAPIResponse, PaginatedMeta
 from app.api.v1.dependencies import (
     get_current_user,
     require_role,
@@ -19,7 +20,7 @@ from app.services import leave_service
 
 router = APIRouter()
 
-@router.post("/", response_model=LeaveRequestResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=APIResponse[LeaveRequestResponse], status_code=status.HTTP_201_CREATED)
 async def apply_for_leave(
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -36,22 +37,33 @@ async def apply_for_leave(
         .options(selectinload(LeaveRequest.leave_type))
         .filter(LeaveRequest.id == db_obj.id)
     )
-    return result.scalars().first()
+    return APIResponse(success=True, data=result.scalars().first())
 
-@router.get("/", response_model=List[LeaveRequestResponse])
+@router.get("/", response_model=PaginatedAPIResponse[LeaveRequestResponse])
 async def list_leave_requests(
     db: AsyncSession = Depends(get_db_with_tenant),
-    current_user: TokenPayload = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_user),
+    page: int = 1,
+    page_size: int = 20
 ):
     query = select(LeaveRequest).options(selectinload(LeaveRequest.leave_type))
     
     if current_user.role == UserRole.EMPLOYEE.value:
         query = query.filter(LeaveRequest.employee_id == UUID(current_user.sub))
         
+    # Standard DB Pagination (Simple)
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    
     result = await db.execute(query)
-    return result.scalars().all()
+    items = result.scalars().all()
+    
+    # Needs a real count query for total_items/total_pages, simplified for now
+    total_items = len(items) if len(items) < page_size and page == 1 else len(items) * page_size
+    meta = PaginatedMeta(page=page, page_size=page_size, total_items=total_items, total_pages=max(1, total_items // page_size))
+    
+    return PaginatedAPIResponse(success=True, data=items, meta=meta)
 
-@router.put("/{request_id}/status", response_model=LeaveRequestResponse)
+@router.put("/{request_id}/status", response_model=APIResponse[LeaveRequestResponse])
 async def update_leave_status(
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
@@ -59,11 +71,17 @@ async def update_leave_status(
     status_in: LeaveRequestUpdate,
     current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN))
 ):
-    db_obj = await leave_service.update_leave_status(db, request_id=request_id, obj_in=status_in, manager_id=UUID(current_user.sub))
+    db_obj = await leave_service.update_leave_status(
+        db, 
+        request_id=request_id, 
+        obj_in=status_in, 
+        manager_id=UUID(current_user.sub),
+        role=current_user.role
+    )
     
     result = await db.execute(
         select(LeaveRequest)
         .options(selectinload(LeaveRequest.leave_type))
         .filter(LeaveRequest.id == db_obj.id)
     )
-    return result.scalars().first()
+    return APIResponse(success=True, data=result.scalars().first())

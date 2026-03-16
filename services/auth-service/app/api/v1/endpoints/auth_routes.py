@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+from jose import jwt, JWTError
 
 from app.db.session import get_db
 from app.schemas.request_response_models import (
@@ -15,9 +16,12 @@ from app.schemas.request_response_models import (
 )
 from app.services.auth_service import AuthService
 from app.core.rate_limit import limiter
-from app.api.v1.dependencies import get_current_user, require_role
+from app.api.v1.dependencies import get_current_user, require_role, oauth2_scheme
 from app.models.user import User
 from app.core.constants import UserRole
+from app.core.config import settings
+from app.core.token_blacklist import blacklist_token
+from app.repositories.token_repository import TokenRepository
 
 router = APIRouter()
 
@@ -54,6 +58,27 @@ async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
 async def read_me(current_user: User = Depends(get_current_user)):
     """Get the current authenticated user's profile."""
     return current_user
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Invalidate the current access token and revoke all refresh tokens."""
+    try:
+        payload = jwt.decode(token, settings.JWT_PUBLIC_KEY, algorithms=[settings.ALGORITHM])
+        jti: str | None = payload.get("jti")
+        exp: int | None = payload.get("exp")
+        if jti and exp:
+            await blacklist_token(jti, exp)
+    except JWTError:
+        pass  # Token already invalid — still revoke refresh tokens below
+
+    repo = TokenRepository(db)
+    await repo.revoke_all_user_tokens(current_user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/magic-link")

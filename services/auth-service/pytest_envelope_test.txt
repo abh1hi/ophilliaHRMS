@@ -1,0 +1,298 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-7.4.4, pluggy-1.6.0 -- C:\Users\abhin\Desktop\ophilliaHRMS\services\auth-service\venv\Scripts\python.exe
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.10', 'Platform': 'Windows-11-10.0.26200-SP0', 'Packages': {'pytest': '7.4.4', 'pluggy': '1.6.0'}, 'Plugins': {'anyio': '4.12.1', 'asyncio': '0.23.3', 'html': '4.1.1', 'metadata': '3.1.1'}, 'JAVA_HOME': 'C:\\Program Files\\Java\\jdk-21'}
+rootdir: C:\Users\abhin\Desktop\ophilliaHRMS\services\auth-service
+plugins: anyio-4.12.1, asyncio-0.23.3, html-4.1.1, metadata-3.1.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 10 items
+
+tests/unit/test_auth_service.py::TestAuthService::test_register_user_success PASSED [ 10%]
+tests/unit/test_auth_service.py::TestAuthService::test_register_user_duplicate_email PASSED [ 20%]
+tests/unit/test_auth_service.py::TestAuthService::test_authenticate_user_invalid_credentials PASSED [ 30%]
+tests/unit/test_auth_service.py::TestAuthService::test_authenticate_user_inactive PASSED [ 40%]
+tests/integration/test_auth_api.py::test_auth_status_endpoint FAILED     [ 50%]
+tests/integration/test_auth_api.py::test_register_api FAILED             [ 60%]
+tests/integration/test_auth_api.py::test_login_api FAILED                [ 70%]
+tests/integration/test_auth_api.py::test_validation_error_returns_envelope FAILED [ 80%]
+tests/integration/test_auth_api.py::test_not_found_returns_envelope FAILED [ 90%]
+tests/integration/test_auth_api.py::test_unauthorized_returns_envelope FAILED [100%]
+
+================================== FAILURES ===================================
+__________________________ test_auth_status_endpoint __________________________
+
+    @pytest.mark.asyncio
+    async def test_auth_status_endpoint():
+        # As an initial check we will create a direct test against the actual FastAPI app
+>       from app.main import app
+
+tests\integration\test_auth_api.py:19: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    
+    from app.api.v1.router import api_router
+    from app.core.config import settings
+    from app.core.rate_limit import limiter
+    from app.core.logging import configure_logging
+    from app.core.exception_handlers import register_exception_handlers
+    from app.middleware.request_id import request_id_middleware
+>   from app.tasks.scheduled_jobs import create_scheduler
+
+app\main.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+______________________________ test_register_api ______________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001F0B0ED7F80>
+
+    @pytest.mark.asyncio
+    async def test_register_api(monkeypatch):
+        """Integration style test for POST /register bypassing actual DB to allow CI/CD pure logic execution."""
+>       from app.main import app
+
+tests\integration\test_auth_api.py:28: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    
+    from app.api.v1.router import api_router
+    from app.core.config import settings
+    from app.core.rate_limit import limiter
+    from app.core.logging import configure_logging
+    from app.core.exception_handlers import register_exception_handlers
+    from app.middleware.request_id import request_id_middleware
+>   from app.tasks.scheduled_jobs import create_scheduler
+
+app\main.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+_______________________________ test_login_api ________________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001F0B0F867E0>
+
+    @pytest.mark.asyncio
+    async def test_login_api(monkeypatch):
+>       from app.main import app
+
+tests\integration\test_auth_api.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    
+    from app.api.v1.router import api_router
+    from app.core.config import settings
+    from app.core.rate_limit import limiter
+    from app.core.logging import configure_logging
+    from app.core.exception_handlers import register_exception_handlers
+    from app.middleware.request_id import request_id_middleware
+>   from app.tasks.scheduled_jobs import create_scheduler
+
+app\main.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+___________________ test_validation_error_returns_envelope ____________________
+
+    @pytest.mark.asyncio
+    async def test_validation_error_returns_envelope():
+        """POST /login with missing fields must return the standard error envelope."""
+>       from app.main import app
+
+tests\integration\test_auth_api.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    
+    from app.api.v1.router import api_router
+    from app.core.config import settings
+    from app.core.rate_limit import limiter
+    from app.core.logging import configure_logging
+    from app.core.exception_handlers import register_exception_handlers
+    from app.middleware.request_id import request_id_middleware
+>   from app.tasks.scheduled_jobs import create_scheduler
+
+app\main.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+_______________________ test_not_found_returns_envelope _______________________
+
+    @pytest.mark.asyncio
+    async def test_not_found_returns_envelope():
+        """GET on a non-existent route must return the standard error envelope."""
+>       from app.main import app
+
+tests\integration\test_auth_api.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    
+    from app.api.v1.router import api_router
+    from app.core.config import settings
+    from app.core.rate_limit import limiter
+    from app.core.logging import configure_logging
+    from app.core.exception_handlers import register_exception_handlers
+    from app.middleware.request_id import request_id_middleware
+>   from app.tasks.scheduled_jobs import create_scheduler
+
+app\main.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+_____________________ test_unauthorized_returns_envelope ______________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001F0B0F847A0>
+
+    @pytest.mark.asyncio
+    async def test_unauthorized_returns_envelope(monkeypatch):
+        """POST /login with wrong credentials must return the standard error envelope."""
+>       from app.main import app
+
+tests\integration\test_auth_api.py:116: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    
+    from app.api.v1.router import api_router
+    from app.core.config import settings
+    from app.core.rate_limit import limiter
+    from app.core.logging import configure_logging
+    from app.core.exception_handlers import register_exception_handlers
+    from app.middleware.request_id import request_id_middleware
+>   from app.tasks.scheduled_jobs import create_scheduler
+
+app\main.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """
+    Scheduled background tasks for the Auth Service.
+    
+    Jobs:
+    - purge_expired_tokens: Deletes expired/revoked refresh tokens (runs every hour)
+    - purge_expired_magic_tokens: Deletes expired/used magic tokens (runs every 6 hours)
+    - log_auth_health: Emits a periodic health log entry (runs every 15 minutes)
+    """
+    import logging
+    from datetime import datetime, timezone
+    
+>   from apscheduler.schedulers.asyncio import AsyncIOScheduler
+E   ModuleNotFoundError: No module named 'apscheduler'
+
+app\tasks\scheduled_jobs.py:12: ModuleNotFoundError
+============================== warnings summary ===============================
+tests/unit/test_auth_service.py::TestAuthService::test_register_user_success
+  C:\Users\abhin\Desktop\ophilliaHRMS\services\auth-service\venv\Lib\site-packages\passlib\handlers\argon2.py:716: DeprecationWarning: Accessing argon2.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for structlog's packaging metadata.
+    _argon2_cffi.__version__, max_version)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_auth_api.py::test_auth_status_endpoint - Module...
+FAILED tests/integration/test_auth_api.py::test_register_api - ModuleNotFound...
+FAILED tests/integration/test_auth_api.py::test_login_api - ModuleNotFoundErr...
+FAILED tests/integration/test_auth_api.py::test_validation_error_returns_envelope
+FAILED tests/integration/test_auth_api.py::test_not_found_returns_envelope - ...
+FAILED tests/integration/test_auth_api.py::test_unauthorized_returns_envelope
+=================== 6 failed, 4 passed, 1 warning in 2.94s ====================

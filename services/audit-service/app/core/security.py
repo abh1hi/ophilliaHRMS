@@ -20,7 +20,7 @@ def _decode_token(token: str) -> dict:
     if algorithm == "RS256" and settings.JWT_PUBLIC_KEY:
         key = settings.JWT_PUBLIC_KEY
     else:
-        key = settings.SECRET_KEY
+        key = settings.JWT_PUBLIC_KEY
         algorithm = "HS256"
 
     try:

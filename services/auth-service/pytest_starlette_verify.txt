@@ -1,0 +1,27 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-7.4.4, pluggy-1.6.0 -- C:\Users\abhin\Desktop\ophilliaHRMS\services\auth-service\venv\Scripts\python.exe
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.10', 'Platform': 'Windows-11-10.0.26200-SP0', 'Packages': {'pytest': '7.4.4', 'pluggy': '1.6.0'}, 'Plugins': {'anyio': '4.12.1', 'asyncio': '0.23.3', 'html': '4.1.1', 'metadata': '3.1.1'}, 'JAVA_HOME': 'C:\\Program Files\\Java\\jdk-21'}
+rootdir: C:\Users\abhin\Desktop\ophilliaHRMS\services\auth-service
+plugins: anyio-4.12.1, asyncio-0.23.3, html-4.1.1, metadata-3.1.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 10 items
+
+tests/unit/test_auth_service.py::TestAuthService::test_register_user_success PASSED [ 10%]
+tests/unit/test_auth_service.py::TestAuthService::test_register_user_duplicate_email PASSED [ 20%]
+tests/unit/test_auth_service.py::TestAuthService::test_authenticate_user_invalid_credentials PASSED [ 30%]
+tests/unit/test_auth_service.py::TestAuthService::test_authenticate_user_inactive PASSED [ 40%]
+tests/integration/test_auth_api.py::test_auth_status_endpoint PASSED     [ 50%]
+tests/integration/test_auth_api.py::test_register_api PASSED             [ 60%]
+tests/integration/test_auth_api.py::test_login_api PASSED                [ 70%]
+tests/integration/test_auth_api.py::test_validation_error_returns_envelope PASSED [ 80%]
+tests/integration/test_auth_api.py::test_not_found_returns_envelope PASSED [ 90%]
+tests/integration/test_auth_api.py::test_unauthorized_returns_envelope PASSED [100%]
+
+============================== warnings summary ===============================
+tests/unit/test_auth_service.py::TestAuthService::test_register_user_success
+  C:\Users\abhin\Desktop\ophilliaHRMS\services\auth-service\venv\Lib\site-packages\passlib\handlers\argon2.py:716: DeprecationWarning: Accessing argon2.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for structlog's packaging metadata.
+    _argon2_cffi.__version__, max_version)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 10 passed, 1 warning in 1.60s ========================

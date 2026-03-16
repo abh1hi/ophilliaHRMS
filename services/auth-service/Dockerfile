@@ -19,8 +19,8 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install libpq for asyncpg
-RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev && rm -rf /var/lib/apt/lists/*
+# Install libpq for asyncpg + netcat for DB readiness check in entrypoint
+RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev netcat-openbsd && rm -rf /var/lib/apt/lists/*
 
 # Non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser

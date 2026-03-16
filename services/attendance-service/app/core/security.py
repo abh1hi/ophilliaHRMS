@@ -28,7 +28,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_PUBLIC_KEY, algorithms=[settings.ALGORITHM])
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
         email: str = payload.get("email")
