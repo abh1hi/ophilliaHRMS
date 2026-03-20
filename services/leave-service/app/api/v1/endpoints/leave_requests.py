@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -54,12 +55,17 @@ async def list_leave_requests(
     # Standard DB Pagination (Simple)
     query = query.offset((page - 1) * page_size).limit(page_size)
     
+    # Count query for accurate pagination
+    count_query = select(func.count(LeaveRequest.id))
+    if current_user.role == UserRole.EMPLOYEE.value:
+        count_query = count_query.filter(LeaveRequest.employee_id == UUID(current_user.sub))
+    count_result = await db.execute(count_query)
+    total_items = count_result.scalar()
+
     result = await db.execute(query)
     items = result.scalars().all()
-    
-    # Needs a real count query for total_items/total_pages, simplified for now
-    total_items = len(items) if len(items) < page_size and page == 1 else len(items) * page_size
-    meta = PaginatedMeta(page=page, page_size=page_size, total_items=total_items, total_pages=max(1, total_items // page_size))
+
+    meta = PaginatedMeta(page=page, page_size=page_size, total_items=total_items, total_pages=max(1, (total_items + page_size - 1) // page_size))
     
     return PaginatedAPIResponse(success=True, data=items, meta=meta)
 

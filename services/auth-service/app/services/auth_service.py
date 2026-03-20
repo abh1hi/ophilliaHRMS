@@ -30,18 +30,25 @@ class AuthService:
     async def register_company(self, company_in: CompanyCreate):
         from app.models.user import Company
         from sqlalchemy.future import select
-        
+
         # Check if domain exists
         if company_in.domain:
             res = await self.db.execute(select(Company).filter(Company.domain == company_in.domain))
             if res.scalars().first():
                 raise HTTPException(status_code=400, detail="Domain already registered")
-                
+
         new_co = Company(name=company_in.name, domain=company_in.domain)
         self.db.add(new_co)
         await self.db.commit()
         await self.db.refresh(new_co)
         return new_co
+
+    async def list_companies(self) -> list:
+        from app.models.user import Company
+        from sqlalchemy.future import select
+
+        result = await self.db.execute(select(Company).order_by(Company.created_at.desc()))
+        return result.scalars().all()
 
     async def register_user(self, user_in: UserCreate):
         existing_user = await self.user_repository.get_by_email(user_in.email)

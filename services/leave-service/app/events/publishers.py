@@ -1,11 +1,15 @@
+import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from aio_pika import connect_robust, Message, DeliveryMode
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+
 
 async def get_rabbitmq_connection():
     try:
@@ -15,33 +19,39 @@ async def get_rabbitmq_connection():
         logger.error(f"RabbitMQ connection failed: {e}")
         return None
 
-async def publish_event(event_type: str, payload: dict):
-    connection = await get_rabbitmq_connection()
-    if not connection:
-        logger.warning("RabbitMQ is down, skipping event publishing.")
-        return
 
-    async with connection:
-        channel = await connection.channel()
-        exchange_name = "hrms_events"
-        
-        # Declare exchange (fanout or topic depending on how other services listen)
-        exchange = await channel.declare_exchange(exchange_name, type="topic", durable=True)
-        
-        event_message = {
-            "event_id": str(uuid.uuid4()),
-            "event_type": event_type,
-            "service_source": "leave-service",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "payload": payload
-        }
-        
-        message = Message(
-            json.dumps(event_message).encode('utf-8'),
-            delivery_mode=DeliveryMode.PERSISTENT,
-            content_type='application/json'
-        )
-        
-        routing_key = event_type
-        await exchange.publish(message, routing_key=routing_key)
-        logger.info(f"Published event {event_type} with ID {event_message['event_id']}")
+async def publish_event(event_type: str, payload: dict):
+    event_message = {
+        "event_id": str(uuid.uuid4()),
+        "event_type": event_type,
+        "service_source": "leave-service",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "payload": payload,
+    }
+
+    for attempt in range(MAX_RETRIES):
+        connection = await get_rabbitmq_connection()
+        if not connection:
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(2 ** attempt)
+            continue
+
+        try:
+            async with connection:
+                channel = await connection.channel()
+                exchange = await channel.declare_exchange("hrms_events", type="topic", durable=True)
+
+                message = Message(
+                    json.dumps(event_message).encode("utf-8"),
+                    delivery_mode=DeliveryMode.PERSISTENT,
+                    content_type="application/json",
+                )
+                await exchange.publish(message, routing_key=event_type)
+                logger.info(f"Published event {event_type} with ID {event_message['event_id']}")
+                return
+        except Exception as e:
+            logger.warning(f"Publish attempt {attempt + 1}/{MAX_RETRIES} failed for {event_type}: {e}")
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(2 ** attempt)
+
+    logger.error(f"Failed to publish event {event_type} after {MAX_RETRIES} attempts")

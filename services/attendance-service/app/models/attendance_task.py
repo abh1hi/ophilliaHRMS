@@ -25,6 +25,9 @@ class AttendanceTask(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
+    # Multi-tenancy
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+
     # Parent attendance record
     attendance_record_id = Column(
         UUID(as_uuid=True),

@@ -34,6 +34,7 @@ def upgrade() -> None:
     op.create_table(
         "attendance_tasks",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column("company_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             "attendance_record_id",
             postgresql.UUID(as_uuid=True),

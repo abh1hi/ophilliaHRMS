@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,11 @@ async def lifespan(app: FastAPI):
     await event_publisher.connect()
     logger.info("Students service started", extra={"service_task": "startup"})
     yield
+
+    # Graceful shutdown: allow in-flight requests to complete
+    logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
+    await asyncio.sleep(5)
+
     await event_publisher.close()
     logger.info("Students service stopped", extra={"service_task": "shutdown"})
 
@@ -38,9 +44,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version="1.0.0",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url=f"{settings.API_V1_STR}/docs",
-    redoc_url=f"{settings.API_V1_STR}/redoc",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DEBUG else None,
+    docs_url=f"{settings.API_V1_STR}/docs" if settings.DEBUG else None,
+    redoc_url=None,
     lifespan=lifespan,
 )
 
@@ -53,8 +59,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
 
 # Request ID / structured logging middleware

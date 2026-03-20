@@ -3,7 +3,15 @@
     "allow": [
       "Bash(find /c/Users/abhin/Desktop/ophilliaHRMS/services -type f -name rate_limit* -o -name *circuit* -o -name *monitoring* -not -path */venv/*)",
       "Bash(grep -r \"prometheus\\\\|Prometheus\\\\|metrics\" /c/Users/abhin/Desktop/ophilliaHRMS/services --include=*.py)",
-      "Bash(grep -r \"CHANGE_THIS\\\\|changeme\\\\|secret\" /c/Users/abhin/Desktop/ophilliaHRMS/.env* /c/Users/abhin/Desktop/ophilliaHRMS/services/*/.env*)"
+      "Bash(grep -r \"CHANGE_THIS\\\\|changeme\\\\|secret\" /c/Users/abhin/Desktop/ophilliaHRMS/.env* /c/Users/abhin/Desktop/ophilliaHRMS/services/*/.env*)",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/services/auth-service/app/schemas/**)",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/services/auth-service/app/api/v1/**)",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/services/auth-service/app/repositories/**)",
+      "Bash(npm run:*)",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\abhin\\Desktop\\ophilliaHRMS"
     ]
   }
 }

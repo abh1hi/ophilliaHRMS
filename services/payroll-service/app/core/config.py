@@ -7,6 +7,7 @@ import json
 class Settings(BaseSettings):
     PROJECT_NAME: str = "HRMS Payroll Service"
     API_V1_STR: str = "/api/v1"
+    DEBUG: bool = False
 
     # Database
     POSTGRES_USER: str = "postgres"

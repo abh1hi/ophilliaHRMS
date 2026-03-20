@@ -1,4 +1,5 @@
 """Event publisher for payroll service — emits salary.processed and payroll.run events."""
+import asyncio
 import json
 import logging
 import uuid
@@ -9,38 +10,51 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+MAX_RETRIES = 3
+
 
 async def publish_event(event_type: str, payload: dict) -> None:
-    """Publish a standardized HRMS event to RabbitMQ.
+    """Publish a standardized HRMS event to RabbitMQ with retry.
 
     Event format matches cross-service standard:
     {event_id, event_type, event_version, timestamp, company_id, user_id,
      correlation_id, service_source, payload}
     """
-    try:
-        connection = await connect_robust(settings.RABBITMQ_URL)
-    except Exception as exc:
-        logger.warning(f"RabbitMQ unavailable, skipping event: {exc}")
-        return
+    event = {
+        "event_id": str(uuid.uuid4()),
+        "event_type": event_type,
+        "event_version": 1,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service_source": "payroll-service",
+        "company_id": payload.get("company_id"),
+        "user_id": payload.get("user_id"),
+        "correlation_id": payload.get("correlation_id"),
+        "payload": payload,
+    }
 
-    async with connection:
-        channel = await connection.channel()
-        exchange = await channel.declare_exchange("hrms_events", type="topic", durable=True)
+    for attempt in range(MAX_RETRIES):
+        try:
+            connection = await connect_robust(settings.RABBITMQ_URL)
+        except Exception as exc:
+            logger.warning(f"RabbitMQ connection attempt {attempt + 1}/{MAX_RETRIES} failed: {exc}")
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(2 ** attempt)
+            continue
 
-        event = {
-            "event_id": str(uuid.uuid4()),
-            "event_type": event_type,
-            "event_version": 1,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "service_source": "payroll-service",
-            "company_id": payload.get("company_id"),
-            "user_id": payload.get("user_id"),
-            "correlation_id": payload.get("correlation_id"),
-            "payload": payload,
-        }
+        try:
+            async with connection:
+                channel = await connection.channel()
+                exchange = await channel.declare_exchange("hrms_events", type="topic", durable=True)
 
-        message = Message(
-            json.dumps(event).encode(), delivery_mode=DeliveryMode.PERSISTENT, content_type="application/json"
-        )
-        await exchange.publish(message, routing_key=event_type)
-        logger.info(f"Published {event_type}", extra={"service_task": "event_publish", "event_id": event["event_id"]})
+                message = Message(
+                    json.dumps(event).encode(), delivery_mode=DeliveryMode.PERSISTENT, content_type="application/json"
+                )
+                await exchange.publish(message, routing_key=event_type)
+                logger.info(f"Published {event_type}", extra={"service_task": "event_publish", "event_id": event["event_id"]})
+                return
+        except Exception as exc:
+            logger.warning(f"Publish attempt {attempt + 1}/{MAX_RETRIES} failed for {event_type}: {exc}")
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(2 ** attempt)
+
+    logger.error(f"Failed to publish event {event_type} after {MAX_RETRIES} attempts")

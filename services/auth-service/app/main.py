@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +37,10 @@ async def lifespan(app: FastAPI):
     logger.info("Background scheduler started", extra={"service_task": "startup"})
 
     yield
+
+    # Graceful shutdown: allow in-flight requests to complete
+    logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
+    await asyncio.sleep(5)
 
     scheduler.shutdown(wait=False)
     logger.info("Background scheduler stopped", extra={"service_task": "shutdown"})

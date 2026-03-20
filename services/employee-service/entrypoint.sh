@@ -16,8 +16,8 @@ echo "Migrations complete. Starting server..."
 
 exec gunicorn app.main:app \
   -k uvicorn.workers.UvicornWorker \
-  -w 2 \
+  -w 1 \
   --bind 0.0.0.0:8001 \
-  --timeout 30 \
-  --graceful-timeout 10 \
+  --timeout 60 \
+  --graceful-timeout 15 \
   --log-level warning

@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +36,11 @@ async def lifespan(app: FastAPI):
     await event_publisher.connect()
     logger.info("Employee service started", extra={"service_task": "startup"})
     yield
+
+    # Graceful shutdown: allow in-flight requests to complete
+    logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
+    await asyncio.sleep(5)
+
     await event_publisher.close()
     logger.info("Employee service stopped", extra={"service_task": "shutdown"})
 

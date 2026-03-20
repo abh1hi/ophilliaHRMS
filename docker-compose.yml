@@ -14,8 +14,8 @@ x-resource-limits-api: &api-limits
   deploy:
     resources:
       limits:
-        cpus: '0.2'
-        memory: 200M
+        cpus: '0.5'
+        memory: 512M
 
 x-resource-limits-db: &db-limits
   deploy:
@@ -38,7 +38,35 @@ x-resource-limits-cache: &cache-limits
         cpus: '0.1'
         memory: 100M
 
+x-resource-limits-frontend: &frontend-limits
+  deploy:
+    resources:
+      limits:
+        cpus: '0.2'
+        memory: 256M
+
 services:
+  # ─────────────── FRONTEND (Vue 3) ───────────────
+  # Profile: CORE
+  frontend:
+    profiles: ["core", "hr", "payroll", "student"]
+    build: ./frontend-tailless-ophillia-hrms-vue
+    container_name: hrms-frontend
+    <<: *frontend-limits
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
   # ─────────────── API GATEWAY ───────────────
   # Profile: CORE
   gateway:

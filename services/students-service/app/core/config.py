@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
-from typing import List
+from typing import List, Union
+import json
 
 
 class Settings(BaseSettings):
@@ -32,7 +33,7 @@ OwIDAQAB
     REDIS_URL: str = "redis://redis:6379/2"
 
     # ── CORS ─────────────────────────────────────────────
-    ALLOWED_ORIGINS: List[str] = ["http://localhost", "http://localhost:3000"]
+    ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost", "http://localhost:3000"]
 
     # ── Pagination ───────────────────────────────────────
     DEFAULT_PAGE_SIZE: int = 20
@@ -42,6 +43,16 @@ OwIDAQAB
     @classmethod
     def unescape_pem(cls, v: str) -> str:
         return v.replace("\\n", "\n") if isinstance(v, str) else v
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_origins(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [o.strip() for o in v.split(",")]
+        return v
 
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 

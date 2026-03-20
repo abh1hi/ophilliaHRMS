@@ -12,7 +12,8 @@ from app.schemas.request_response_models import (
     PasswordResetConfirm,
     RoleUpdateRequest,
     CompanyCreate,
-    CompanyResponse
+    CompanyResponse,
+    CompanyListResponse
 )
 from app.services.auth_service import AuthService
 from app.core.rate_limit import limiter
@@ -30,6 +31,18 @@ async def register_company(company_in: CompanyCreate, db: AsyncSession = Depends
     """Register a new Company (Tenant) for SaaS mode."""
     auth_service = AuthService(db)
     return await auth_service.register_company(company_in)
+
+
+@router.get("/companies", response_model=CompanyListResponse, status_code=status.HTTP_200_OK)
+async def get_companies(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_role(UserRole.SUPER_ADMIN)),
+):
+    """List all registered companies. Restricted to Super Admin."""
+    auth_service = AuthService(db)
+    companies = await auth_service.list_companies()
+    return CompanyListResponse(total=len(companies), companies=companies)
+
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
