@@ -12,15 +12,28 @@ class ClassRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
+    @property
+    def db(self) -> AsyncSession:
+        return self._db
+
+    def _get_company_id(self) -> uuid.UUID:
+        raw = self._db.info.get("company_id")
+        return uuid.UUID(raw) if isinstance(raw, str) else raw
+
     async def create(self, class_: Class) -> Class:
+        class_.company_id = self._get_company_id()
         self._db.add(class_)
         await self._db.flush()
         await self._db.refresh(class_)
         return class_
 
     async def get_by_id(self, class_id: uuid.UUID) -> Optional[Class]:
+        company_id = self._get_company_id()
         result = await self._db.execute(
-            select(Class).where(Class.id == class_id)
+            select(Class).where(
+                Class.id == class_id,
+                Class.company_id == company_id,
+            )
         )
         return result.scalar_one_or_none()
 
@@ -31,7 +44,8 @@ class ClassRepository:
         academic_year: Optional[str] = None,
         grade_level: Optional[int] = None,
     ) -> tuple[Sequence[Class], int]:
-        query = select(Class)
+        company_id = self._get_company_id()
+        query = select(Class).where(Class.company_id == company_id)
         if academic_year:
             query = query.where(Class.academic_year == academic_year)
         if grade_level:

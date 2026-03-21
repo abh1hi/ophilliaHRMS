@@ -23,5 +23,6 @@ class LeaveApprovalResponse(LeaveApprovalBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    company_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime

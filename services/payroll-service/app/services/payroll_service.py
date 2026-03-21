@@ -16,12 +16,13 @@ from app.core.constants import PayrollStatus
 from app.models.payroll import PayrollRun, Payslip, EmployeeSalary, SalaryStructure
 from app.repositories.payroll_repository import PayrollRepository
 from app.schemas.payroll import (
-    SalaryStructureCreate, SalaryStructureResponse,
+    SalaryStructureCreate, SalaryStructureUpdate, SalaryStructureResponse,
     EmployeeSalaryCreate, EmployeeSalaryResponse,
     PayrollRunCreate, PayrollRunResponse,
     PayslipResponse,
 )
 from app.services.calculators.base import BaseSalaryCalculator
+from app.core.employee_validator import validate_employee_tenant
 
 logger = logging.getLogger(__name__)
 calculator = BaseSalaryCalculator()
@@ -39,17 +40,40 @@ class PayrollService:
         obj = await self.repo.create_salary_structure(data.model_dump())
         return SalaryStructureResponse.model_validate(obj)
 
-    async def list_structures(self) -> List[SalaryStructureResponse]:
-        items = await self.repo.list_salary_structures()
+    async def list_structures(self, skip: int = 0, limit: int = 100, include_inactive: bool = False) -> List[SalaryStructureResponse]:
+        items = await self.repo.list_salary_structures(skip=skip, limit=limit, include_inactive=include_inactive)
         return [SalaryStructureResponse.model_validate(i) for i in items]
 
     async def get_structure(self, sid: UUID) -> Optional[SalaryStructureResponse]:
         obj = await self.repo.get_salary_structure(sid)
         return SalaryStructureResponse.model_validate(obj) if obj else None
 
+    async def update_structure(self, sid: UUID, data: SalaryStructureUpdate) -> Optional[SalaryStructureResponse]:
+        obj = await self.repo.get_salary_structure(sid)
+        if not obj:
+            return None
+        updates = data.model_dump(exclude_unset=True)
+        for field, value in updates.items():
+            setattr(obj, field, value)
+        obj = await self.repo.update_salary_structure(obj)
+        return SalaryStructureResponse.model_validate(obj)
+
+    async def soft_delete_structure(self, sid: UUID) -> Optional[SalaryStructureResponse]:
+        obj = await self.repo.get_salary_structure(sid)
+        if not obj:
+            return None
+        obj.is_active = 0
+        obj = await self.repo.update_salary_structure(obj)
+        return SalaryStructureResponse.model_validate(obj)
+
     # ── Employee Salary ──────────────────────────────────────────────────
 
     async def assign_salary(self, data: EmployeeSalaryCreate) -> EmployeeSalaryResponse:
+        # Validate employee belongs to current tenant
+        company_id = self.db.info.get("company_id")
+        if company_id:
+            await validate_employee_tenant(data.employee_id, company_id)
+
         # Deactivate any existing active salary for this employee
         existing = await self.repo.get_active_salary(data.employee_id)
         if existing:
@@ -63,6 +87,10 @@ class PayrollService:
     async def get_employee_salary(self, employee_id: UUID) -> Optional[EmployeeSalaryResponse]:
         obj = await self.repo.get_active_salary(employee_id)
         return EmployeeSalaryResponse.model_validate(obj) if obj else None
+
+    async def get_employee_salary_history(self, employee_id: UUID) -> List[EmployeeSalaryResponse]:
+        items = await self.repo.get_employee_salary_history(employee_id)
+        return [EmployeeSalaryResponse.model_validate(i) for i in items]
 
     # ── Payroll Run ──────────────────────────────────────────────────────
 
@@ -190,8 +218,8 @@ class PayrollService:
         obj = await self.repo.get_payroll_run(run_id)
         return PayrollRunResponse.model_validate(obj) if obj else None
 
-    async def list_payroll_runs(self) -> List[PayrollRunResponse]:
-        items = await self.repo.list_payroll_runs()
+    async def list_payroll_runs(self, skip: int = 0, limit: int = 100) -> List[PayrollRunResponse]:
+        items = await self.repo.list_payroll_runs(skip=skip, limit=limit)
         return [PayrollRunResponse.model_validate(i) for i in items]
 
     async def get_payslips(self, run_id: UUID) -> List[PayslipResponse]:

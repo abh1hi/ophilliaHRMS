@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -20,9 +20,11 @@ from app.schemas.attendance import (
     AttendanceResponse,
     AttendanceListResponse,
     GeofenceCreate,
+    GeofenceUpdate,
     GeofenceResponse,
     GeofenceListResponse,
     PolicyCreate,
+    PolicyUpdate,
     PolicyResponse,
     PolicyListResponse,
     TaskCreate,
@@ -33,8 +35,12 @@ from app.schemas.attendance import (
     TaskAssignRequest,
     ProductivityReportResponse,
     AlertsResponse,
+    BulkSchoolModeRequest,
+    BulkSchoolModeResponse,
+    BulkSchoolModeResult,
 )
 from app.utils.pagination import PaginationParams
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
@@ -60,7 +66,9 @@ def _get_task_service(db: AsyncSession = Depends(get_db_with_tenant)) -> TaskSer
 # ──────────────────── ATTENDANCE RECORDS ────────────────────
 
 @router.post("/clock-in", response_model=AttendanceResponse, status_code=201)
+@limiter.limit("5/minute")
 async def clock_in(
+    request: Request,
     data: ClockInRequest,
     current_user: TokenPayload = Depends(get_current_user),
     service: AttendanceService = Depends(_get_service),
@@ -75,7 +83,9 @@ async def clock_in(
 
 
 @router.post("/clock-out", response_model=AttendanceResponse)
+@limiter.limit("5/minute")
 async def clock_out(
+    request: Request,
     data: ClockOutRequest,
     current_user: TokenPayload = Depends(get_current_user),
     service: AttendanceService = Depends(_get_service),
@@ -196,6 +206,41 @@ async def school_mode_entry(
 ):
     """Mark an employee's attendance on their behalf. HR/Super Admin only."""
     return await service.mark_school_mode_attendance(data, created_by=current_user.sub)
+
+
+# ──────────── POST /attendance/school-mode/bulk ────────────
+@router.post("/school-mode/bulk", response_model=BulkSchoolModeResponse)
+async def bulk_school_mode_entry(
+    data: BulkSchoolModeRequest,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Mark attendance for multiple employees at once. HR/Super Admin only.
+    Partial failures do not roll back successful rows.
+    """
+    results = []
+    for idx, item in enumerate(data.items):
+        try:
+            entry = SchoolModeAttendanceCreate(
+                employee_id=item.employee_id,
+                status=item.status,
+                notes=item.notes,
+            )
+            await service.mark_school_mode_attendance(entry, created_by=current_user.sub)
+            results.append(BulkSchoolModeResult(
+                index=idx, employee_id=item.employee_id, success=True
+            ))
+        except Exception as e:
+            error_msg = e.detail if hasattr(e, "detail") else str(e)
+            results.append(BulkSchoolModeResult(
+                index=idx, employee_id=item.employee_id, success=False, error=error_msg
+            ))
+    succeeded = sum(1 for r in results if r.success)
+    return BulkSchoolModeResponse(
+        total=len(results), succeeded=succeeded, failed=len(results) - succeeded, results=results,
+    )
 
 
 # ──────────────────── TASKS ────────────────────
@@ -353,14 +398,42 @@ async def create_geofence(
 
 @router.get("/geofences", response_model=GeofenceListResponse)
 async def list_geofences(
+    skip: int = 0,
+    limit: int = 100,
+    include_inactive: bool = Query(False, description="Include soft-deleted geofences"),
     current_user: TokenPayload = Depends(
         require_role(UserRole.HR, UserRole.SUPER_ADMIN)
     ),
     service: GeofenceService = Depends(_get_geofence_service),
 ):
-    """List all active geofence locations."""
-    geofences, total = await service.list_geofences()
+    """List geofence locations. By default only active ones."""
+    geofences, total = await service.list_geofences(skip=skip, limit=limit, include_inactive=include_inactive)
     return GeofenceListResponse(total=total, geofences=geofences)
+
+
+@router.patch("/geofences/{geofence_id}", response_model=GeofenceResponse)
+async def update_geofence(
+    geofence_id: UUID,
+    data: GeofenceUpdate,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+    ),
+    service: GeofenceService = Depends(_get_geofence_service),
+):
+    """Update a geofence's name, coordinates, or radius. HR/Super Admin only."""
+    return await service.update_geofence(geofence_id, data)
+
+
+@router.delete("/geofences/{geofence_id}", response_model=GeofenceResponse)
+async def delete_geofence(
+    geofence_id: UUID,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+    ),
+    service: GeofenceService = Depends(_get_geofence_service),
+):
+    """Soft-delete a geofence (set is_active = false). HR/Super Admin only."""
+    return await service.soft_delete_geofence(geofence_id)
 
 
 # ──────────────────── ATTENDANCE POLICIES ────────────────────
@@ -379,11 +452,38 @@ async def create_policy(
 
 @router.get("/policies", response_model=PolicyListResponse)
 async def list_policies(
+    skip: int = 0,
+    limit: int = 100,
     current_user: TokenPayload = Depends(
         require_role(UserRole.HR, UserRole.SUPER_ADMIN)
     ),
     service: PolicyService = Depends(_get_policy_service),
 ):
     """List all attendance policies."""
-    policies, total = await service.list_policies()
+    policies, total = await service.list_policies(skip=skip, limit=limit)
     return PolicyListResponse(total=total, policies=policies)
+
+
+@router.patch("/policies/{policy_id}", response_model=PolicyResponse)
+async def update_policy(
+    policy_id: UUID,
+    data: PolicyUpdate,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+    ),
+    service: PolicyService = Depends(_get_policy_service),
+):
+    """Update an attendance policy's method, times, or scope. HR/Super Admin only."""
+    return await service.update_policy(policy_id, data)
+
+
+@router.delete("/policies/{policy_id}", status_code=204)
+async def delete_policy(
+    policy_id: UUID,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+    ),
+    service: PolicyService = Depends(_get_policy_service),
+):
+    """Hard-delete an attendance policy (config, not data). HR/Super Admin only."""
+    await service.delete_policy(policy_id)

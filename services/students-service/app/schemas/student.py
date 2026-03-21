@@ -50,6 +50,7 @@ class StudentStatusUpdate(BaseModel):
 
 class StudentResponse(BaseModel):
     id: uuid.UUID
+    company_id: Optional[uuid.UUID] = None
     student_number: str
     first_name: str
     last_name: str

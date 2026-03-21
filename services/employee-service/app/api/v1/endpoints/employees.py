@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -19,8 +19,11 @@ from app.schemas.employee import (
     EmployeeUpdate,
     EmployeeResponse,
     EmployeeListResponse,
+    BulkEmployeeResponse,
+    BulkEmployeeResult,
 )
 from app.utils.pagination import PaginationParams
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -43,13 +46,38 @@ async def get_my_profile(
 
 # ──────────── POST /employees ────────────
 @router.post("", response_model=EmployeeResponse, status_code=201)
+@limiter.limit("30/minute")
 async def create_employee(
+    request: Request,
     data: EmployeeCreate,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
     service: EmployeeService = Depends(_get_service),
 ):
     """Create a new employee profile. Requires HR or Super Admin role."""
     return await service.create_employee(data)
+
+
+# ──────────── POST /employees/bulk ────────────
+@router.post("/bulk", response_model=BulkEmployeeResponse, status_code=200)
+@limiter.limit("10/minute")
+async def bulk_create_employees(
+    request: Request,
+    employees: List[EmployeeCreate],
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    service: EmployeeService = Depends(_get_service),
+):
+    """Bulk import employees from JSON array. Returns per-row results.
+    Partial failures do not roll back successful rows.
+    """
+    raw_results = await service.bulk_create_employees(employees)
+    results = [BulkEmployeeResult(**r) for r in raw_results]
+    succeeded = sum(1 for r in results if r.success)
+    return BulkEmployeeResponse(
+        total=len(results),
+        succeeded=succeeded,
+        failed=len(results) - succeeded,
+        results=results,
+    )
 
 
 # ──────────── GET /employees ────────────
@@ -93,10 +121,12 @@ async def get_employee(
 
 # ──────────── PATCH /employees/{id} ────────────
 @router.patch("/{employee_id}", response_model=EmployeeResponse)
+@limiter.limit("30/minute")
 async def update_employee(
+    request: Request,
     employee_id: UUID,
     data: EmployeeUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
     service: EmployeeService = Depends(_get_service),
 ):
     """Update an employee's profile. Requires HR or Super Admin role."""
@@ -105,12 +135,14 @@ async def update_employee(
 
 # ──────────── DELETE /employees/{id} ────────────
 @router.delete("/{employee_id}", response_model=EmployeeResponse)
+@limiter.limit("30/minute")
 async def deactivate_employee(
+    request: Request,
     employee_id: UUID,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
     service: EmployeeService = Depends(_get_service),
 ):
-    """Deactivate (soft-delete) an employee. Requires Super Admin role."""
+    """Deactivate (soft-delete) an employee. Requires HR or Super Admin role."""
     return await service.deactivate_employee(employee_id)
 
 

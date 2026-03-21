@@ -52,6 +52,13 @@ class CompanyBase(BaseModel):
 class CompanyCreate(CompanyBase):
     pass
 
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    domain: Optional[str] = None
+
+class SelectCompanyRequest(BaseModel):
+    company_id: UUID
+
 class CompanyResponse(CompanyBase):
     id: UUID
     is_active: bool
@@ -91,6 +98,13 @@ class PasswordResetConfirm(BaseModel):
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters long")
         return v
+
+
+class PostLoginContext(BaseModel):
+    role: str
+    companies: Optional[list[CompanyResponse]] = None
+    next_action: str  # "CREATE_COMPANY" | "SELECT_COMPANY" | "ENTER_DASHBOARD"
+    selected_company: Optional[str] = None
 
 
 class RoleUpdateRequest(BaseModel):

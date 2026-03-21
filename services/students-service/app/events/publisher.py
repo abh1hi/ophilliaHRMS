@@ -61,6 +61,7 @@ class EventPublisher:
             "event_type": event_type,
             "service_source": "students-service",
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "company_id": payload.get("company_id"),
             "payload": payload,
         }
 

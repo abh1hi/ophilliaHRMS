@@ -19,14 +19,19 @@ class LeaveTypeCreate(LeaveTypeBase):
     pass
 
 
-class LeaveTypeUpdate(LeaveTypeBase):
-    pass
+class LeaveTypeUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = Field(None, max_length=255)
+    days_allowed: Optional[int] = Field(None, ge=0)
+    requires_approval: Optional[bool] = None
+    is_active: Optional[bool] = None
 
 
 class LeaveTypeResponse(LeaveTypeBase):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
+    company_id: Optional[UUID] = None
 
 
 class LeaveBalanceBase(BaseModel):
@@ -42,11 +47,43 @@ class LeaveBalanceCreate(LeaveBalanceBase):
     pass
 
 
+class LeaveBalanceUpdate(BaseModel):
+    total_days: Optional[int] = Field(None, ge=0)
+    used_days: Optional[int] = Field(None, ge=0)
+    pending_days: Optional[int] = Field(None, ge=0)
+
+
 class LeaveBalanceResponse(LeaveBalanceBase):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
+    company_id: Optional[UUID] = None
     leave_type: LeaveTypeResponse
+
+
+class BulkLeaveBalanceItem(BaseModel):
+    employee_id: UUID
+    total_days: int = Field(..., ge=0)
+
+
+class BulkLeaveBalanceRequest(BaseModel):
+    leave_type_id: UUID
+    year: int
+    items: List[BulkLeaveBalanceItem]
+
+
+class BulkLeaveBalanceResult(BaseModel):
+    index: int
+    employee_id: UUID
+    success: bool
+    error: Optional[str] = None
+
+
+class BulkLeaveBalanceResponse(BaseModel):
+    total: int
+    succeeded: int
+    failed: int
+    results: List[BulkLeaveBalanceResult]
 
 
 class LeaveRequestBase(BaseModel):
@@ -78,9 +115,10 @@ class LeaveRequestUpdate(BaseModel):
 
 class LeaveRequestResponse(LeaveRequestBase):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     employee_id: UUID
+    company_id: Optional[UUID] = None
     total_days: int
     status: LeaveStatus
     approved_by_id: Optional[UUID] = None

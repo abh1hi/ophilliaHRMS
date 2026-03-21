@@ -30,7 +30,7 @@ OwIDAQAB
     RABBITMQ_URL: str = "amqp://guest:guest@rabbitmq:5672/"
 
     # ── Redis ────────────────────────────────────────────
-    REDIS_URL: str = "redis://redis:6379/2"
+    REDIS_URL: str = "redis://hrms-redis:6379/0"
 
     # ── CORS ─────────────────────────────────────────────
     ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost", "http://localhost:3000"]

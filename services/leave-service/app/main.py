@@ -6,9 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -19,11 +18,14 @@ from app.db.session import engine
 
 configure_logging()
 logger = logging.getLogger(__name__)
-limiter = Limiter(key_func=get_remote_address)
+from app.core.rate_limit import limiter
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import redis.asyncio as aioredis
+    from app.core.token_blacklist import set_redis
+
     # Verify DB connectivity
     from sqlalchemy import text
     try:
@@ -33,6 +35,8 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning(f"Database unreachable at startup: {exc}", extra={"service_task": "startup"})
 
+    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    set_redis(redis_client)
     logger.info("Leave service started", extra={"service_task": "startup"})
     yield
 
@@ -40,6 +44,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
     await asyncio.sleep(5)
 
+    await redis_client.aclose()
     logger.info("Leave service stopped", extra={"service_task": "shutdown"})
 
 
@@ -69,11 +74,21 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/health", include_in_schema=False)
 async def root_health():
+    """Healthcheck — verifies DB and Redis connectivity."""
     from sqlalchemy import text
+    from app.core.token_blacklist import _redis
+    checks = {}
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        db_ok = True
+        checks["database"] = "ok"
     except Exception:
-        db_ok = False
-    return {"status": "healthy" if db_ok else "degraded", "service": "leave-service", "version": "1.0.0"}
+        checks["database"] = "error"
+    try:
+        if _redis:
+            await _redis.ping()
+        checks["redis"] = "ok" if _redis else "error"
+    except Exception:
+        checks["redis"] = "error"
+    all_ok = all(v == "ok" for v in checks.values())
+    return {"status": "healthy" if all_ok else "degraded", "service": "leave-service", "version": "1.0.0", "checks": checks}

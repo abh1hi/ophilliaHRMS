@@ -19,6 +19,17 @@ class SalaryStructureCreate(BaseModel):
     professional_tax: Decimal = Field(200.0, ge=0)
 
 
+class SalaryStructureUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+    basic_pct: Optional[Decimal] = Field(None, ge=0, le=100)
+    hra_pct: Optional[Decimal] = Field(None, ge=0, le=100)
+    allowances_pct: Optional[Decimal] = Field(None, ge=0, le=100)
+    pf_pct: Optional[Decimal] = Field(None, ge=0, le=100)
+    esi_pct: Optional[Decimal] = Field(None, ge=0, le=100)
+    professional_tax: Optional[Decimal] = Field(None, ge=0)
+
+
 class SalaryStructureResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID

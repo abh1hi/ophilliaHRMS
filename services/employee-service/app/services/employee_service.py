@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -104,6 +104,7 @@ class EmployeeService:
                 "employee.created",
                 {
                     "employee_id": str(employee.id),
+                    "company_id": str(employee.company_id),
                     "user_id": str(employee.user_id),
                     "email": employee.email,
                     "first_name": employee.first_name,
@@ -211,3 +212,16 @@ class EmployeeService:
             extra={"user_id": str(employee.user_id), "service_task": "employee_deactivate"},
         )
         return employee
+
+    async def bulk_create_employees(self, employees_data: List[EmployeeCreate]) -> list[dict]:
+        """Create multiple employees. Returns per-row result with success/error."""
+        results = []
+        for idx, data in enumerate(employees_data):
+            try:
+                employee = await self.create_employee(data)
+                results.append({"index": idx, "success": True, "employee": employee, "error": None})
+            except HTTPException as e:
+                results.append({"index": idx, "success": False, "employee": None, "error": e.detail})
+            except Exception as e:
+                results.append({"index": idx, "success": False, "employee": None, "error": str(e)})
+        return results

@@ -44,10 +44,12 @@ async def run_payroll(
 
 @router.get("/runs", response_model=List[PayrollRunResponse])
 async def list_payroll_runs(
+    skip: int = 0,
+    limit: int = 100,
     _user: TokenPayload = Depends(require_hr_or_admin()),
     service: PayrollService = Depends(get_payroll_service),
 ):
-    return await service.list_payroll_runs()
+    return await service.list_payroll_runs(skip=skip, limit=limit)
 
 
 @router.get("/runs/{run_id}", response_model=PayrollRunResponse)

@@ -20,6 +20,7 @@ class SalaryStructure(Base):
     __tablename__ = "salary_structures"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     name = Column(String(100), nullable=False, index=True)
     description = Column(Text, nullable=True)
     basic_pct = Column(Numeric(5, 2), nullable=False, default=50.0)
@@ -38,6 +39,7 @@ class EmployeeSalary(Base):
     __tablename__ = "employee_salaries"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     employee_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     salary_structure_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     ctc = Column(Numeric(12, 2), nullable=False)
@@ -60,6 +62,7 @@ class PayrollRun(Base):
     __tablename__ = "payroll_runs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     period_start = Column(Date, nullable=False)
     period_end = Column(Date, nullable=False)
     status = Column(String(20), nullable=False, default=PayrollStatus.DRAFT.value, index=True)
@@ -86,6 +89,7 @@ class Payslip(Base):
     __tablename__ = "payslips"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     payroll_run_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     employee_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 

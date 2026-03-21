@@ -16,7 +16,8 @@ class LeaveType(Base):
     __tablename__ = "leave_types"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(100), unique=True, index=True, nullable=False)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    name = Column(String(100), index=True, nullable=False)
     description = Column(String(255), nullable=True)
     days_allowed = Column(Integer, nullable=False)
     requires_approval = Column(Integer, default=1, nullable=False) # 1=True, 0=False
@@ -30,6 +31,7 @@ class LeaveBalance(Base):
     __tablename__ = "leave_balances"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     employee_id = Column(UUID(as_uuid=True), index=True, nullable=False)
     leave_type_id = Column(UUID(as_uuid=True), ForeignKey("leave_types.id", ondelete="CASCADE"), nullable=False)
     total_days = Column(Integer, nullable=False, default=0)
@@ -48,6 +50,7 @@ class LeaveRequest(Base):
     __tablename__ = "leave_requests"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     employee_id = Column(UUID(as_uuid=True), index=True, nullable=False)
     leave_type_id = Column(UUID(as_uuid=True), ForeignKey("leave_types.id", ondelete="CASCADE"), nullable=False)
     start_date = Column(Date, nullable=False)
@@ -100,8 +103,9 @@ class Holiday(Base):
     __tablename__ = "holidays"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     name = Column(String(100), nullable=False)
-    date = Column(Date, unique=True, index=True, nullable=False)
+    date = Column(Date, index=True, nullable=False)
     description = Column(Text, nullable=True)
     is_active = Column(Integer, default=1, nullable=False) # 1=True, 0=False
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)

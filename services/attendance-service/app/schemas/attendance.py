@@ -49,6 +49,7 @@ class TaskResponse(BaseModel):
     id: UUID
     attendance_record_id: UUID
     employee_id: UUID
+    company_id: Optional[UUID] = None
     assigned_by: Optional[UUID] = None
     title: str
     details: Optional[str] = None
@@ -138,6 +139,7 @@ class AttendanceUpdate(BaseModel):
 class AttendanceResponse(BaseModel):
     id: UUID
     employee_id: UUID
+    company_id: Optional[UUID] = None
     clock_in: datetime
     clock_out: Optional[datetime] = None
     clock_in_lat: Optional[float] = None
@@ -188,6 +190,7 @@ class TaskAssignRequest(BaseModel):
 # ──────────── PRODUCTIVITY REPORT ────────────
 class ProductivityReportItem(BaseModel):
     employee_id: UUID
+    company_id: Optional[UUID] = None
     month: int
     year: int
     total_days: int
@@ -216,6 +219,7 @@ class ProductivityReportResponse(BaseModel):
 # ──────────── ALERTS ────────────
 class MissedPunchOutItem(BaseModel):
     employee_id: UUID
+    company_id: Optional[UUID] = None
     record_id: UUID
     clock_in: datetime
     clock_in_location_name: Optional[str] = None
@@ -252,8 +256,30 @@ class GeofenceCreate(BaseModel):
         return v
 
 
+class GeofenceUpdate(BaseModel):
+    name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    radius_meters: Optional[int] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("Name must not be empty")
+        return v.strip() if v else v
+
+    @field_validator("radius_meters")
+    @classmethod
+    def radius_positive(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v <= 0:
+            raise ValueError("Radius must be positive")
+        return v
+
+
 class GeofenceResponse(BaseModel):
     id: UUID
+    company_id: Optional[UUID] = None
     name: str
     latitude: float
     longitude: float
@@ -280,8 +306,18 @@ class PolicyCreate(BaseModel):
     work_hours_per_day: float = 8.0
 
 
+class PolicyUpdate(BaseModel):
+    department_id: Optional[UUID] = None
+    employee_id: Optional[UUID] = None
+    method: Optional[AttendanceMethod] = None
+    geofence_id: Optional[UUID] = None
+    work_start_time: Optional[time] = None
+    work_hours_per_day: Optional[float] = None
+
+
 class PolicyResponse(BaseModel):
     id: UUID
+    company_id: Optional[UUID] = None
     department_id: Optional[UUID] = None
     employee_id: Optional[UUID] = None
     method: str
@@ -297,3 +333,28 @@ class PolicyResponse(BaseModel):
 class PolicyListResponse(BaseModel):
     total: int
     policies: List[PolicyResponse]
+
+
+# ──────────── BULK SCHOOL-MODE ATTENDANCE ────────────
+class BulkSchoolModeItem(BaseModel):
+    employee_id: UUID
+    status: AttendanceStatus = AttendanceStatus.PRESENT
+    notes: Optional[str] = None
+
+
+class BulkSchoolModeRequest(BaseModel):
+    items: List[BulkSchoolModeItem]
+
+
+class BulkSchoolModeResult(BaseModel):
+    index: int
+    employee_id: UUID
+    success: bool
+    error: Optional[str] = None
+
+
+class BulkSchoolModeResponse(BaseModel):
+    total: int
+    succeeded: int
+    failed: int
+    results: List[BulkSchoolModeResult]

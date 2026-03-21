@@ -170,6 +170,7 @@ class EmployeeUpdate(BaseModel):
 # ──────────── RESPONSE ────────────
 class EmployeeResponse(BaseModel):
     id: UUID
+    company_id: UUID
     user_id: UUID
 
     # Personal
@@ -251,3 +252,18 @@ class EmployeeListResponse(BaseModel):
     skip: int
     limit: int
     employees: List[EmployeeResponse]
+
+
+# ──────────── BULK IMPORT ────────────
+class BulkEmployeeResult(BaseModel):
+    index: int
+    success: bool
+    employee: Optional[EmployeeResponse] = None
+    error: Optional[str] = None
+
+
+class BulkEmployeeResponse(BaseModel):
+    total: int
+    succeeded: int
+    failed: int
+    results: List[BulkEmployeeResult]

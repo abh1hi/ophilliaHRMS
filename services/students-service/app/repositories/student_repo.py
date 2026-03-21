@@ -12,21 +12,38 @@ class StudentRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
+    @property
+    def db(self) -> AsyncSession:
+        return self._db
+
+    def _get_company_id(self) -> uuid.UUID:
+        raw = self._db.info.get("company_id")
+        return uuid.UUID(raw) if isinstance(raw, str) else raw
+
     async def create(self, student: Student) -> Student:
+        student.company_id = self._get_company_id()
         self._db.add(student)
         await self._db.flush()
         await self._db.refresh(student)
         return student
 
     async def get_by_id(self, student_id: uuid.UUID) -> Optional[Student]:
+        company_id = self._get_company_id()
         result = await self._db.execute(
-            select(Student).where(Student.id == student_id)
+            select(Student).where(
+                Student.id == student_id,
+                Student.company_id == company_id,
+            )
         )
         return result.scalar_one_or_none()
 
     async def get_by_student_number(self, student_number: str) -> Optional[Student]:
+        company_id = self._get_company_id()
         result = await self._db.execute(
-            select(Student).where(Student.student_number == student_number)
+            select(Student).where(
+                Student.student_number == student_number,
+                Student.company_id == company_id,
+            )
         )
         return result.scalar_one_or_none()
 
@@ -37,7 +54,8 @@ class StudentRepository:
         status: Optional[StudentStatusEnum] = None,
         class_id: Optional[uuid.UUID] = None,
     ) -> tuple[Sequence[Student], int]:
-        query = select(Student)
+        company_id = self._get_company_id()
+        query = select(Student).where(Student.company_id == company_id)
         if status:
             query = query.where(Student.status == status)
         if class_id:

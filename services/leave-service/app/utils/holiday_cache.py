@@ -15,29 +15,32 @@ from app.models.leave import Holiday
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 300  # 5 minutes
-_cache: dict = {"holidays": None, "expires_at": 0}
+_cache: dict = {}  # keyed by company_id
 
 
 async def get_holidays_cached(db: AsyncSession) -> List[date]:
-    """Return list of holiday dates. Uses in-memory cache with 5-min TTL."""
-    now = time.time()
-    if _cache["holidays"] is not None and now < _cache["expires_at"]:
-        return _cache["holidays"]
+    """Return list of holiday dates. Uses per-tenant in-memory cache with 5-min TTL."""
+    company_id = db.info.get("company_id")
+    cache_key = str(company_id) if company_id else "__global__"
 
-    result = await db.execute(
-        select(Holiday.date).where(Holiday.is_active == 1)
-    )
+    now = time.time()
+    tenant_cache = _cache.get(cache_key)
+    if tenant_cache is not None and now < tenant_cache["expires_at"]:
+        return tenant_cache["holidays"]
+
+    query = select(Holiday.date).where(Holiday.is_active == 1)
+    if company_id:
+        query = query.where(Holiday.company_id == company_id)
+    result = await db.execute(query)
     holidays = [row[0] for row in result.all()]
-    _cache["holidays"] = holidays
-    _cache["expires_at"] = now + CACHE_TTL_SECONDS
-    logger.info(f"Holiday cache refreshed: {len(holidays)} holidays loaded")
+    _cache[cache_key] = {"holidays": holidays, "expires_at": now + CACHE_TTL_SECONDS}
+    logger.info(f"Holiday cache refreshed for tenant {cache_key}: {len(holidays)} holidays loaded")
     return holidays
 
 
 def invalidate_holiday_cache():
-    """Call after holiday CRUD operations."""
-    _cache["holidays"] = None
-    _cache["expires_at"] = 0
+    """Call after holiday CRUD operations. Clears all tenant caches."""
+    _cache.clear()
 
 
 def count_business_days(start: date, end: date, holidays: List[date]) -> int:

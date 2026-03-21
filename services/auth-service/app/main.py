@@ -82,9 +82,19 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/health", tags=["health"])
 async def health_check(db: AsyncSession = Depends(get_db)):
-    """Healthcheck endpoint — verifies DB connectivity."""
+    """Healthcheck — verifies DB and Redis connectivity."""
+    from app.core.token_blacklist import _redis
+    checks = {}
     try:
         await db.execute(text("SELECT 1"))
-        return {"status": "healthy", "service": "auth-service", "version": "1.0.0", "db": "ok"}
+        checks["database"] = "ok"
     except Exception:
-        raise HTTPException(status_code=503, detail="Database unavailable")
+        checks["database"] = "error"
+    try:
+        if _redis:
+            await _redis.ping()
+        checks["redis"] = "ok" if _redis else "error"
+    except Exception:
+        checks["redis"] = "error"
+    all_ok = all(v == "ok" for v in checks.values())
+    return {"status": "healthy" if all_ok else "degraded", "service": "auth-service", "version": "1.0.0", "checks": checks}

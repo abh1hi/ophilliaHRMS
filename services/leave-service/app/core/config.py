@@ -29,7 +29,11 @@ OwIDAQAB
 
     # Auth Service (service-to-service)
     AUTH_SERVICE_URL: str = "http://auth-service:8000"
+    EMPLOYEE_SERVICE_URL: str = "http://employee-service:8001"
     INTERNAL_SERVICE_TOKEN: str = "CHANGE_THIS_INTERNAL_TOKEN_IN_PRODUCTION"
+
+    # Redis (shared blacklist with auth-service)
+    REDIS_URL: str = "redis://hrms-redis:6379/0"
 
     # RabbitMQ
     RABBITMQ_URL: str = "amqp://guest:guest@rabbitmq:5672/"

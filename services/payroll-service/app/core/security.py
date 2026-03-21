@@ -23,7 +23,7 @@ class TokenPayload(BaseModel):
     company_id: str = ""
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
     """Decode JWT locally using RS256 public key (or HS256 fallback for dev)."""
     algorithm = settings.ALGORITHM
     if algorithm == "RS256" and settings.JWT_PUBLIC_KEY:
@@ -39,6 +39,17 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
         company_id = payload.get("company_id")
         if not user_id or not role or not company_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
+
+        jti = payload.get("jti")
+        if jti:
+            from app.core.token_blacklist import is_blacklisted
+            if await is_blacklisted(jti):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
         return TokenPayload(
             sub=user_id, role=role,
             email=payload.get("email", ""),

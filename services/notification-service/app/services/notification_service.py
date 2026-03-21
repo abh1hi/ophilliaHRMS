@@ -36,11 +36,22 @@ def render_template(template_name: str, **context) -> str:
         return context.get("message", "")
 
 
+def _get_company_id(db: AsyncSession) -> Optional[UUID]:
+    raw = db.info.get("company_id")
+    return UUID(raw) if isinstance(raw, str) else raw
+
+
 async def get_or_create_preference(db: AsyncSession, user_id: UUID) -> NotificationPreference:
-    result = await db.execute(select(NotificationPreference).filter(NotificationPreference.user_id == user_id))
+    company_id = _get_company_id(db)
+    query = select(NotificationPreference).filter(NotificationPreference.user_id == user_id)
+    if company_id:
+        query = query.filter(NotificationPreference.company_id == company_id)
+    result = await db.execute(query)
     pref = result.scalars().first()
     if not pref:
         pref = NotificationPreference(user_id=user_id, email_enabled=1, sms_enabled=1)
+        if company_id:
+            pref.company_id = company_id
         db.add(pref)
         await db.commit()
         await db.refresh(pref)
@@ -109,6 +120,13 @@ async def compile_and_send_notification(
             status = NotificationStatus.SENT
             sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
+    # Resolve company_id: prefer log_create, fall back to db.info (tenant context)
+    company_id = None
+    if hasattr(log_create, "company_id") and log_create.company_id:
+        company_id = log_create.company_id
+    else:
+        company_id = _get_company_id(db)
+
     # Log to database
     db_obj = NotificationLog(
         user_id=log_create.user_id,
@@ -119,8 +137,8 @@ async def compile_and_send_notification(
         error_message=error_message,
         sent_at=sent_at,
     )
-    if hasattr(log_create, "company_id") and log_create.company_id:
-        db_obj.company_id = log_create.company_id
+    if company_id:
+        db_obj.company_id = company_id
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)

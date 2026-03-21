@@ -14,6 +14,9 @@ class Class(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     grade_level: Mapped[int] = mapped_column(Integer, nullable=False)
     section: Mapped[str] = mapped_column(String(10), nullable=False)

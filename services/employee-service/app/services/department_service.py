@@ -50,9 +50,19 @@ class DepartmentService:
             )
         return department
 
-    async def list_departments(self) -> tuple[list[Department], int]:
-        """List all departments."""
-        return await self.repo.get_all()
+    async def list_departments(self, include_inactive: bool = False) -> tuple[list[Department], int]:
+        """List all departments. By default only active ones."""
+        return await self.repo.get_all(include_inactive=include_inactive)
+
+    async def soft_delete_department(self, department_id: UUID) -> Department:
+        """Soft delete a department by setting is_active = 0."""
+        department = await self.get_department(department_id)
+        department = await self.repo.update(department, {"is_active": 0})
+        logger.info(
+            f"Department soft-deleted: {department.id} ({department.name})",
+            extra={"service_task": "department_soft_delete"},
+        )
+        return department
 
     async def update_department(self, department_id: UUID, data: DepartmentUpdate) -> Department:
         """Update a department."""

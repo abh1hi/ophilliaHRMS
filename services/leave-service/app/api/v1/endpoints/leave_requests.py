@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -6,7 +6,6 @@ from sqlalchemy.orm import selectinload
 from typing import List
 from uuid import UUID
 
-from app.db.session import get_db
 from app.models.leave import LeaveRequest
 from app.schemas.leave import LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate
 from app.schemas.response import APIResponse, PaginatedAPIResponse, PaginatedMeta
@@ -18,11 +17,14 @@ from app.api.v1.dependencies import (
 )
 from app.core.constants import UserRole
 from app.services import leave_service
+from app.core.rate_limit import limiter
 
 router = APIRouter()
 
 @router.post("/", response_model=APIResponse[LeaveRequestResponse], status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def apply_for_leave(
+    request: Request,
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
     request_in: LeaveRequestCreate,
@@ -47,16 +49,19 @@ async def list_leave_requests(
     page: int = 1,
     page_size: int = 20
 ):
-    query = select(LeaveRequest).options(selectinload(LeaveRequest.leave_type))
-    
+    company_id = db.info.get("company_id")
+    query = select(LeaveRequest).options(selectinload(LeaveRequest.leave_type)).filter(
+        LeaveRequest.company_id == company_id
+    )
+
     if current_user.role == UserRole.EMPLOYEE.value:
         query = query.filter(LeaveRequest.employee_id == UUID(current_user.sub))
-        
+
     # Standard DB Pagination (Simple)
     query = query.offset((page - 1) * page_size).limit(page_size)
-    
+
     # Count query for accurate pagination
-    count_query = select(func.count(LeaveRequest.id))
+    count_query = select(func.count(LeaveRequest.id)).filter(LeaveRequest.company_id == company_id)
     if current_user.role == UserRole.EMPLOYEE.value:
         count_query = count_query.filter(LeaveRequest.employee_id == UUID(current_user.sub))
     count_result = await db.execute(count_query)

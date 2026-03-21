@@ -50,6 +50,82 @@ class AuthService:
         result = await self.db.execute(select(Company).order_by(Company.created_at.desc()))
         return result.scalars().all()
 
+    async def list_active_companies(self) -> list:
+        from app.models.user import Company
+        from sqlalchemy.future import select
+
+        result = await self.db.execute(
+            select(Company).filter(Company.is_active == True).order_by(Company.created_at.desc())
+        )
+        return result.scalars().all()
+
+    async def update_company(self, company_id, data):
+        from app.models.user import Company
+        from sqlalchemy.future import select
+
+        result = await self.db.execute(select(Company).filter(Company.id == company_id))
+        company = result.scalars().first()
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        if data.name is not None:
+            company.name = data.name
+        if data.domain is not None:
+            if data.domain:
+                dup = await self.db.execute(
+                    select(Company).filter(Company.domain == data.domain, Company.id != company_id)
+                )
+                if dup.scalars().first():
+                    raise HTTPException(status_code=400, detail="Domain already registered")
+            company.domain = data.domain
+
+        self.db.add(company)
+        await self.db.commit()
+        await self.db.refresh(company)
+        return company
+
+    async def deactivate_company(self, company_id):
+        from app.models.user import Company
+        from sqlalchemy.future import select
+
+        result = await self.db.execute(select(Company).filter(Company.id == company_id))
+        company = result.scalars().first()
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        company.is_active = False
+        self.db.add(company)
+        await self.db.commit()
+        await self.db.refresh(company)
+        return company
+
+    async def select_company(self, user, company_id):
+        from app.models.user import Company
+        from sqlalchemy.future import select
+
+        result = await self.db.execute(
+            select(Company).filter(Company.id == company_id, Company.is_active == True)
+        )
+        company = result.scalars().first()
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found or inactive")
+
+        user.company_id = company_id
+        self.db.add(user)
+        await self.db.commit()
+
+        access_token = create_access_token(
+            subject=user.id, role=user.role, email=user.email, company_id=str(company_id)
+        )
+        refresh_secret = create_refresh_token()
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        )
+        db_token = await self.token_repository.create(user.id, refresh_secret, expires_at)
+        client_refresh = f"{db_token.id}:{refresh_secret}"
+
+        return Token(access_token=access_token, refresh_token=client_refresh, token_type="bearer")
+
     async def register_user(self, user_in: UserCreate):
         existing_user = await self.user_repository.get_by_email(user_in.email)
         if existing_user:

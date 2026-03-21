@@ -6,7 +6,6 @@ from typing import List
 from datetime import date
 from pydantic import BaseModel
 
-from app.db.session import get_db
 from app.api.v1.dependencies import get_current_user, require_role, TokenPayload, get_db_with_tenant
 from app.core.constants import UserRole, LeaveStatus
 from app.models.leave import LeaveRequest
@@ -27,11 +26,13 @@ async def get_leave_calendar(
     db: AsyncSession = Depends(get_db_with_tenant),
     current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN))
 ):
-    # Fetch all APPROVED leaves in this range
+    # Fetch all APPROVED leaves in this range (tenant-scoped)
+    company_id = db.info.get("company_id")
     query = (
         select(LeaveRequest)
         .options(selectinload(LeaveRequest.leave_type))
         .filter(
+            LeaveRequest.company_id == company_id,
             LeaveRequest.status == LeaveStatus.APPROVED.value,
             LeaveRequest.start_date <= end_date,
             LeaveRequest.end_date >= start_date

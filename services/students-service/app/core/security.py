@@ -25,7 +25,7 @@ def _decode_token(token: str) -> dict:
         ) from exc
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict:
     """FastAPI dependency — returns decoded token payload."""
@@ -35,6 +35,17 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token missing company isolation context",
         )
+
+    jti = payload.get("jti")
+    if jti:
+        from app.core.token_blacklist import is_blacklisted
+        if await is_blacklisted(jti):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     return payload
 
 

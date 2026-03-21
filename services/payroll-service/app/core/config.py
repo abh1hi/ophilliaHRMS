@@ -35,6 +35,9 @@ OwIDAQAB
     # Employee Service (for employee verification)
     EMPLOYEE_SERVICE_URL: str = "http://employee-service:8001"
 
+    # Redis (shared blacklist with auth-service)
+    REDIS_URL: str = "redis://hrms-redis:6379/0"
+
     # RabbitMQ
     RABBITMQ_URL: str = "amqp://guest:guest@rabbitmq:5672/"
 

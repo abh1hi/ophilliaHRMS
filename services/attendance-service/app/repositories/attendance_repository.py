@@ -15,7 +15,18 @@ class AttendanceRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    @property
+    def _company_id(self) -> UUID:
+        cid = self.db.info.get("company_id")
+        if not cid:
+            raise RuntimeError("company_id not set on session — use get_db_with_tenant dependency")
+        return UUID(cid) if isinstance(cid, str) else cid
+
+    def _scoped(self, stmt):
+        return stmt.where(AttendanceRecord.company_id == self._company_id)
+
     async def create(self, record: AttendanceRecord) -> AttendanceRecord:
+        record.company_id = self._company_id
         self.db.add(record)
         await self.db.commit()
         await self.db.refresh(record)
@@ -23,7 +34,7 @@ class AttendanceRepository:
 
     async def get_by_id(self, record_id: UUID) -> Optional[AttendanceRecord]:
         result = await self.db.execute(
-            select(AttendanceRecord).where(AttendanceRecord.id == record_id)
+            self._scoped(select(AttendanceRecord)).where(AttendanceRecord.id == record_id)
         )
         return result.scalars().first()
 
@@ -31,7 +42,7 @@ class AttendanceRepository:
         self, employee_id: UUID, record_date: date
     ) -> Optional[AttendanceRecord]:
         result = await self.db.execute(
-            select(AttendanceRecord).where(
+            self._scoped(select(AttendanceRecord)).where(
                 and_(
                     AttendanceRecord.employee_id == employee_id,
                     AttendanceRecord.date == record_date,
@@ -48,10 +59,10 @@ class AttendanceRepository:
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
     ) -> tuple[List[AttendanceRecord], int]:
-        query = select(AttendanceRecord).where(
+        query = self._scoped(select(AttendanceRecord)).where(
             AttendanceRecord.employee_id == employee_id
         )
-        count_query = select(func.count(AttendanceRecord.id)).where(
+        count_query = self._scoped(select(func.count(AttendanceRecord.id))).where(
             AttendanceRecord.employee_id == employee_id
         )
 
@@ -78,8 +89,8 @@ class AttendanceRepository:
         date_to: Optional[date] = None,
         status: Optional[str] = None,
     ) -> tuple[List[AttendanceRecord], int]:
-        query = select(AttendanceRecord)
-        count_query = select(func.count(AttendanceRecord.id))
+        query = self._scoped(select(AttendanceRecord))
+        count_query = self._scoped(select(func.count(AttendanceRecord.id)))
 
         if employee_id:
             query = query.where(AttendanceRecord.employee_id == employee_id)
@@ -113,7 +124,7 @@ class AttendanceRepository:
         """Return attendance records for today that have no clock_out."""
         today = date.today()
         result = await self.db.execute(
-            select(AttendanceRecord).where(
+            self._scoped(select(AttendanceRecord)).where(
                 and_(
                     AttendanceRecord.date == today,
                     AttendanceRecord.clock_out.is_(None),
@@ -126,7 +137,7 @@ class AttendanceRepository:
         """Return count of late clock-ins for today."""
         today = date.today()
         result = await self.db.execute(
-            select(func.count(AttendanceRecord.id)).where(
+            self._scoped(select(func.count(AttendanceRecord.id))).where(
                 and_(
                     AttendanceRecord.date == today,
                     AttendanceRecord.status == "late",
@@ -147,7 +158,7 @@ class AttendanceRepository:
         """
         # Build attendance aggregation
         att_query = (
-            select(
+            self._scoped(select(
                 AttendanceRecord.employee_id,
                 func.count(AttendanceRecord.id).label("total_days"),
                 func.sum(
@@ -161,7 +172,7 @@ class AttendanceRepository:
                 ).label("half_days"),
                 func.avg(AttendanceRecord.day_rating).label("avg_rating"),
                 func.sum(AttendanceRecord.work_hours).label("total_work_hours"),
-            )
+            ))
             .where(
                 and_(
                     extract("year", AttendanceRecord.date) == year,
@@ -178,7 +189,7 @@ class AttendanceRepository:
 
         # Build task aggregation joined via attendance record
         task_query = (
-            select(
+            self._scoped(select(
                 AttendanceRecord.employee_id,
                 func.count(AttendanceTask.id).label("total_tasks"),
                 func.sum(
@@ -195,7 +206,7 @@ class AttendanceRepository:
                 ).label("pending_tasks"),
                 func.sum(AttendanceTask.expected_expenses).label("total_expected_expenses"),
                 func.sum(AttendanceTask.actual_expenses).label("total_actual_expenses"),
-            )
+            ))
             .join(AttendanceRecord, AttendanceTask.attendance_record_id == AttendanceRecord.id)
             .where(
                 and_(

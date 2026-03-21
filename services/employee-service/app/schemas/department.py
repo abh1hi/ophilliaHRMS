@@ -28,9 +28,11 @@ class DepartmentUpdate(BaseModel):
 # ──────────── RESPONSE ────────────
 class DepartmentResponse(BaseModel):
     id: UUID
+    company_id: UUID
     name: str
     description: Optional[str] = None
     manager_id: Optional[UUID] = None
+    is_active: int = 1
     created_at: datetime
     updated_at: datetime
 

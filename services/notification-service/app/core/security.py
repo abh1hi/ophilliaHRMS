@@ -20,7 +20,7 @@ class TokenPayload(BaseModel):
     company_id: str
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
     """Decode and validate JWT from Authorization header.
 
     Returns a TokenPayload with user_id, role, email, and company_id.
@@ -43,10 +43,20 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
         if not user_id or not role or not company_id:
             raise credentials_exception
 
+        jti = payload.get("jti")
+        if jti:
+            from app.core.token_blacklist import is_blacklisted
+            if await is_blacklisted(jti):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
         return TokenPayload(
-            sub=user_id, 
-            role=role, 
-            email=email or "", 
+            sub=user_id,
+            role=role,
+            email=email or "",
             company_id=company_id
         )
 

@@ -42,6 +42,7 @@ class ClassUpdate(BaseModel):
 
 class ClassResponse(BaseModel):
     id: uuid.UUID
+    company_id: Optional[uuid.UUID] = None
     name: str
     grade_level: int
     section: str

@@ -21,7 +21,7 @@ class TokenPayload(BaseModel):
     company_id: str
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or missing authentication token",
@@ -35,10 +35,21 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
         company_id: str = payload.get("company_id")
         if not user_id or not role or not company_id:
             raise credentials_exception
+
+        jti = payload.get("jti")
+        if jti:
+            from app.core.token_blacklist import is_blacklisted
+            if await is_blacklisted(jti):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
         return TokenPayload(
-            sub=user_id, 
-            role=role, 
-            email=email or "", 
+            sub=user_id,
+            role=role,
+            email=email or "",
             company_id=company_id
         )
     except ExpiredSignatureError:

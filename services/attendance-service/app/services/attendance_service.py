@@ -19,7 +19,9 @@ from app.schemas.attendance import (
     ManualAttendanceCreate,
     AttendanceUpdate,
     GeofenceCreate,
+    GeofenceUpdate,
     PolicyCreate,
+    PolicyUpdate,
     SchoolModeAttendanceCreate,
     ProductivityReportItem,
     ProductivityReportResponse,
@@ -29,6 +31,7 @@ from app.schemas.attendance import (
 from app.events.publisher import EventPublisher
 from app.utils.geofence import is_within_geofence
 from app.core.config import settings
+from app.core.employee_validator import validate_employee_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +122,11 @@ class AttendanceService:
                 detail="Already clocked in for today",
             )
 
+        # Validate employee belongs to current tenant
+        company_id = self.attendance_repo.db.info.get("company_id")
+        if company_id:
+            await validate_employee_tenant(employee_id, company_id)
+
         # Resolve policy and validate geofence
         method, geofence, work_hours, work_start = await self._resolve_policy(
             employee_id, department_id
@@ -148,7 +156,9 @@ class AttendanceService:
 
         # Publish event
         if self.event_publisher:
+            company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.clock_in", {
+                "company_id": str(company_id) if company_id else None,
                 "employee_id": str(employee_id),
                 "method": record.method,
                 "status": record.status,
@@ -226,7 +236,9 @@ class AttendanceService:
 
         # Publish event
         if self.event_publisher:
+            company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.clock_out", {
+                "company_id": str(company_id) if company_id else None,
                 "employee_id": str(employee_id),
                 "work_hours": total_hours,
                 "overtime_hours": overtime,
@@ -302,6 +314,11 @@ class AttendanceService:
     # ──────────── MANUAL ENTRY (Admin) ────────────
 
     async def manual_entry(self, data: ManualAttendanceCreate, created_by: str) -> AttendanceRecord:
+        # Validate employee belongs to current tenant
+        company_id = self.attendance_repo.db.info.get("company_id")
+        if company_id:
+            await validate_employee_tenant(data.employee_id, company_id)
+
         existing = await self.attendance_repo.get_by_employee_and_date(
             data.employee_id, data.date
         )
@@ -333,7 +350,9 @@ class AttendanceService:
         record = await self.attendance_repo.create(record)
 
         if self.event_publisher:
+            company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.manual_entry", {
+                "company_id": str(company_id) if company_id else None,
                 "employee_id": str(data.employee_id),
                 "date": str(data.date),
                 "created_by": created_by,
@@ -345,6 +364,11 @@ class AttendanceService:
     # ──────────── SCHOOL MODE (Admin/HR) ────────────
 
     async def mark_school_mode_attendance(self, data: "SchoolModeAttendanceCreate", created_by: str) -> AttendanceRecord:
+        # Validate employee belongs to current tenant
+        company_id = self.attendance_repo.db.info.get("company_id")
+        if company_id:
+            await validate_employee_tenant(data.employee_id, company_id)
+
         today = date.today()
         existing = await self.attendance_repo.get_by_employee_and_date(
             data.employee_id, today
@@ -370,7 +394,9 @@ class AttendanceService:
         record = await self.attendance_repo.create(record)
 
         if self.event_publisher:
+            company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.school_mode_entry", {
+                "company_id": str(company_id) if company_id else None,
                 "employee_id": str(data.employee_id),
                 "date": str(today),
                 "status": record.status,
@@ -437,8 +463,45 @@ class GeofenceService:
         )
         return await self.repo.create(geofence)
 
-    async def list_geofences(self) -> tuple[list, int]:
-        return await self.repo.get_all_active()
+    async def list_geofences(self, skip: int = 0, limit: int = 100, include_inactive: bool = False) -> tuple[list, int]:
+        return await self.repo.get_all_active(skip=skip, limit=limit, include_inactive=include_inactive)
+
+    async def update_geofence(self, geofence_id: UUID, data: GeofenceUpdate) -> GeofenceLocation:
+        geofence = await self.repo.get_by_id(geofence_id)
+        if not geofence:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Geofence not found",
+            )
+        updates = data.model_dump(exclude_unset=True)
+        if not updates:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields to update",
+            )
+        # Check name uniqueness if name is being changed
+        if "name" in updates and updates["name"] != geofence.name:
+            existing = await self.repo.get_by_name(updates["name"])
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Geofence '{updates['name']}' already exists",
+                )
+        return await self.repo.update(geofence, updates)
+
+    async def soft_delete_geofence(self, geofence_id: UUID) -> GeofenceLocation:
+        geofence = await self.repo.get_by_id(geofence_id)
+        if not geofence:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Geofence not found",
+            )
+        if not geofence.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Geofence is already deactivated",
+            )
+        return await self.repo.soft_delete(geofence)
 
 
 class PolicyService:
@@ -458,5 +521,32 @@ class PolicyService:
         )
         return await self.repo.create(policy)
 
-    async def list_policies(self) -> tuple[list, int]:
-        return await self.repo.get_all()
+    async def list_policies(self, skip: int = 0, limit: int = 100) -> tuple[list, int]:
+        return await self.repo.get_all(skip=skip, limit=limit)
+
+    async def update_policy(self, policy_id: UUID, data: PolicyUpdate) -> AttendancePolicy:
+        policy = await self.repo.get_by_id(policy_id)
+        if not policy:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Policy not found",
+            )
+        updates = data.model_dump(exclude_unset=True)
+        if not updates:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields to update",
+            )
+        # Convert enum to string value if method is present
+        if "method" in updates and updates["method"] is not None:
+            updates["method"] = updates["method"].value
+        return await self.repo.update(policy, updates)
+
+    async def delete_policy(self, policy_id: UUID) -> None:
+        policy = await self.repo.get_by_id(policy_id)
+        if not policy:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Policy not found",
+            )
+        await self.repo.delete(policy)

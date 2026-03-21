@@ -3,18 +3,30 @@ from uuid import UUID
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.employee import Employee
 
 
 class EmployeeRepository:
-    """Data access layer for employees — async CRUD."""
+    """Data access layer for employees — async CRUD with tenant isolation."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    @property
+    def _company_id(self) -> UUID:
+        """Extract the tenant company_id set by get_db_with_tenant dependency."""
+        cid = self.db.info.get("company_id")
+        if not cid:
+            raise RuntimeError("company_id not set on session — use get_db_with_tenant dependency")
+        return UUID(cid) if isinstance(cid, str) else cid
+
+    def _scoped(self, stmt):
+        """Apply tenant filter to a query."""
+        return stmt.where(Employee.company_id == self._company_id)
+
     async def create(self, employee: Employee) -> Employee:
+        employee.company_id = self._company_id
         self.db.add(employee)
         await self.db.commit()
         await self.db.refresh(employee)
@@ -22,19 +34,19 @@ class EmployeeRepository:
 
     async def get_by_id(self, employee_id: UUID) -> Optional[Employee]:
         result = await self.db.execute(
-            select(Employee).where(Employee.id == employee_id)
+            self._scoped(select(Employee).where(Employee.id == employee_id))
         )
         return result.scalars().first()
 
     async def get_by_user_id(self, user_id: UUID) -> Optional[Employee]:
         result = await self.db.execute(
-            select(Employee).where(Employee.user_id == user_id)
+            self._scoped(select(Employee).where(Employee.user_id == user_id))
         )
         return result.scalars().first()
 
     async def get_by_email(self, email: str) -> Optional[Employee]:
         result = await self.db.execute(
-            select(Employee).where(Employee.email == email)
+            self._scoped(select(Employee).where(Employee.email == email))
         )
         return result.scalars().first()
 
@@ -46,9 +58,9 @@ class EmployeeRepository:
         employment_status: Optional[str] = None,
         search: Optional[str] = None,
     ) -> tuple[List[Employee], int]:
-        """Return paginated employees with optional filters."""
-        query = select(Employee)
-        count_query = select(func.count(Employee.id))
+        """Return paginated employees with optional filters, scoped to tenant."""
+        query = self._scoped(select(Employee))
+        count_query = self._scoped(select(func.count(Employee.id)))
 
         if department_id:
             query = query.where(Employee.department_id == department_id)

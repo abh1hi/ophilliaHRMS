@@ -13,6 +13,7 @@ class NotificationLog(Base):
     __tablename__ = "notification_logs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     user_id = Column(UUID(as_uuid=True), index=True, nullable=False)
     type = Column(String(50), nullable=False) # EMAIL, SMS, PUSH
     subject = Column(String(255), nullable=True)
@@ -35,6 +36,7 @@ class NotificationPreference(Base):
     __tablename__ = "notification_preferences"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     user_id = Column(UUID(as_uuid=True), unique=True, index=True, nullable=False)
     email_enabled = Column(Integer, default=1, nullable=False) # 1=True, 0=False
     sms_enabled = Column(Integer, default=1, nullable=False) # 1=True, 0=False

@@ -26,6 +26,7 @@ async def publish_event(event_type: str, payload: dict):
         "event_type": event_type,
         "service_source": "leave-service",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "company_id": payload.get("company_id"),
         "payload": payload,
     }
 

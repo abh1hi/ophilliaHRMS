@@ -55,6 +55,7 @@ class EventPublisher:
             "event_type": event_type,
             "service_source": "attendance-service",
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "company_id": payload.get("company_id"),
             "payload": payload,
         }
         if not HAS_AIOPIKA:

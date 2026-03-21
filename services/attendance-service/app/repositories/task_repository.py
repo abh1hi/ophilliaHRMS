@@ -12,7 +12,18 @@ class TaskRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    @property
+    def _company_id(self) -> UUID:
+        cid = self.db.info.get("company_id")
+        if not cid:
+            raise RuntimeError("company_id not set on session — use get_db_with_tenant dependency")
+        return UUID(cid) if isinstance(cid, str) else cid
+
+    def _scoped(self, stmt):
+        return stmt.where(AttendanceTask.company_id == self._company_id)
+
     async def create(self, task: AttendanceTask) -> AttendanceTask:
+        task.company_id = self._company_id
         self.db.add(task)
         await self.db.commit()
         await self.db.refresh(task)
@@ -20,13 +31,13 @@ class TaskRepository:
 
     async def get_by_id(self, task_id: UUID) -> Optional[AttendanceTask]:
         result = await self.db.execute(
-            select(AttendanceTask).where(AttendanceTask.id == task_id)
+            self._scoped(select(AttendanceTask)).where(AttendanceTask.id == task_id)
         )
         return result.scalar_one_or_none()
 
     async def get_by_record(self, record_id: UUID) -> List[AttendanceTask]:
         result = await self.db.execute(
-            select(AttendanceTask)
+            self._scoped(select(AttendanceTask))
             .where(AttendanceTask.attendance_record_id == record_id)
             .order_by(AttendanceTask.created_at)
         )

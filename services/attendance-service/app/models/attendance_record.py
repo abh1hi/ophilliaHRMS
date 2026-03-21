@@ -15,6 +15,7 @@ class AttendanceRecord(Base):
     __tablename__ = "attendance_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     employee_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     clock_in = Column(DateTime(timezone=True), nullable=False)
     clock_out = Column(DateTime(timezone=True), nullable=True)

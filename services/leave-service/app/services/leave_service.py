@@ -18,17 +18,29 @@ from app.schemas.leave import LeaveTypeCreate, LeaveBalanceCreate, LeaveRequestC
 from app.events.publishers import publish_event
 from app.core.constants import LeaveStatus, DurationType, ApprovalLevel
 from app.utils.holiday_cache import get_holidays_cached, count_business_days
+from app.core.employee_validator import validate_employee_tenant
 
 logger = logging.getLogger(__name__)
 
 
+def _get_company_id(db: AsyncSession) -> UUID:
+    cid = db.info.get("company_id")
+    if not cid:
+        raise RuntimeError("company_id not set on session")
+    return UUID(cid) if isinstance(cid, str) else cid
+
+
 async def get_leave_type(db: AsyncSession, leave_type_id: UUID):
-    result = await db.execute(select(LeaveType).filter(LeaveType.id == leave_type_id))
+    company_id = _get_company_id(db)
+    result = await db.execute(
+        select(LeaveType).filter(LeaveType.id == leave_type_id, LeaveType.company_id == company_id)
+    )
     return result.scalars().first()
 
 
 async def create_leave_type(db: AsyncSession, obj_in: LeaveTypeCreate):
-    db_obj = LeaveType(**obj_in.model_dump())
+    company_id = _get_company_id(db)
+    db_obj = LeaveType(**obj_in.model_dump(), company_id=company_id)
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)
@@ -36,8 +48,10 @@ async def create_leave_type(db: AsyncSession, obj_in: LeaveTypeCreate):
 
 
 async def get_leave_balance(db: AsyncSession, employee_id: UUID, leave_type_id: UUID, year: int):
+    company_id = _get_company_id(db)
     result = await db.execute(
         select(LeaveBalance).filter(
+            LeaveBalance.company_id == company_id,
             LeaveBalance.employee_id == employee_id,
             LeaveBalance.leave_type_id == leave_type_id,
             LeaveBalance.year == year,
@@ -48,9 +62,11 @@ async def get_leave_balance(db: AsyncSession, employee_id: UUID, leave_type_id: 
 
 async def get_leave_balance_for_update(db: AsyncSession, employee_id: UUID, leave_type_id: UUID, year: int):
     """Acquire row-level lock (SELECT ... FOR UPDATE) to prevent concurrent balance corruption."""
+    company_id = _get_company_id(db)
     result = await db.execute(
         select(LeaveBalance)
         .filter(
+            LeaveBalance.company_id == company_id,
             LeaveBalance.employee_id == employee_id,
             LeaveBalance.leave_type_id == leave_type_id,
             LeaveBalance.year == year,
@@ -61,7 +77,8 @@ async def get_leave_balance_for_update(db: AsyncSession, employee_id: UUID, leav
 
 
 async def create_leave_balance(db: AsyncSession, obj_in: LeaveBalanceCreate):
-    db_obj = LeaveBalance(**obj_in.model_dump())
+    company_id = _get_company_id(db)
+    db_obj = LeaveBalance(**obj_in.model_dump(), company_id=company_id)
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)
@@ -70,8 +87,10 @@ async def create_leave_balance(db: AsyncSession, obj_in: LeaveBalanceCreate):
 
 async def _check_overlapping_leaves(db: AsyncSession, employee_id: UUID, start_date: date, end_date: date):
     """Prevent overlapping leaves: check for PENDING or APPROVED requests that overlap."""
+    company_id = _get_company_id(db)
     result = await db.execute(
         select(LeaveRequest).filter(
+            LeaveRequest.company_id == company_id,
             LeaveRequest.employee_id == employee_id,
             LeaveRequest.status.in_([LeaveStatus.PENDING.value, LeaveStatus.APPROVED.value]),
             start_date <= LeaveRequest.end_date,
@@ -89,6 +108,10 @@ async def _check_department_leave_limit(db: AsyncSession, employee_id: UUID, sta
     pass
 
 async def apply_leave(db: AsyncSession, obj_in: LeaveRequestCreate):
+    # Validate employee belongs to current tenant
+    company_id = _get_company_id(db)
+    await validate_employee_tenant(obj_in.employee_id, str(company_id))
+
     # Date range validation
     if obj_in.end_date < obj_in.start_date:
         raise HTTPException(status_code=400, detail="Invalid date range")
@@ -136,7 +159,8 @@ async def apply_leave(db: AsyncSession, obj_in: LeaveRequestCreate):
         raise HTTPException(status_code=400, detail="Insufficient leave balance")
 
     # Create Request
-    db_obj = LeaveRequest(**obj_in.model_dump(), total_days=days)
+    company_id = _get_company_id(db)
+    db_obj = LeaveRequest(**obj_in.model_dump(), total_days=days, company_id=company_id)
 
     if leave_type.requires_approval:
         db_obj.status = LeaveStatus.PENDING.value
@@ -183,7 +207,10 @@ async def apply_leave(db: AsyncSession, obj_in: LeaveRequestCreate):
 
 
 async def update_leave_status(db: AsyncSession, request_id: UUID, obj_in: LeaveRequestUpdate, manager_id: UUID, role: str):
-    result = await db.execute(select(LeaveRequest).filter(LeaveRequest.id == request_id))
+    company_id = _get_company_id(db)
+    result = await db.execute(
+        select(LeaveRequest).filter(LeaveRequest.id == request_id, LeaveRequest.company_id == company_id)
+    )
     leave_req = result.scalars().first()
 
     if not leave_req:
@@ -219,6 +246,7 @@ async def update_leave_status(db: AsyncSession, request_id: UUID, obj_in: LeaveR
         raise HTTPException(status_code=500, detail="Balance tracking error")
 
     event_payload = {
+        "company_id": str(company_id) if company_id else None,
         "leave_request_id": str(leave_req.id),
         "employee_id": str(leave_req.employee_id),
         "status": obj_in.status.value,

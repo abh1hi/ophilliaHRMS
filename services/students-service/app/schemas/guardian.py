@@ -33,6 +33,7 @@ class GuardianUpdate(BaseModel):
 
 class GuardianResponse(BaseModel):
     id: uuid.UUID
+    company_id: Optional[uuid.UUID] = None
     student_id: uuid.UUID
     first_name: str
     last_name: str
