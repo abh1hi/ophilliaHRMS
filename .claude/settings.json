@@ -10,7 +10,8 @@
       "Bash(npm run:*)",
       "Read(//c/Users/abhin/Desktop/ophilliaHRMS/**)",
       "Bash(wc -l c:/Users/abhin/Desktop/ophilliaHRMS/contracts/*/service_contract.md)",
-      "Bash(python tests_live/test_e2e_lifecycle.py)"
+      "Bash(python tests_live/test_e2e_lifecycle.py)",
+      "Bash(wc -l src/**/*.ts src/**/*.vue)"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS"

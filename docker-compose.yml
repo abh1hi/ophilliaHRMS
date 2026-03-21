@@ -6,7 +6,7 @@
 #  Deploy modular blocks (e.g. Core + HR only):
 #      docker compose --profile core --profile hr up --build -d
 #
-#  Hardware Target: 1 vCPU, 4GB RAM minimum.
+#  Hardware Target: 2+ vCPU, 8GB RAM recommended.
 # =============================================================
 
 
@@ -14,36 +14,36 @@ x-resource-limits-api: &api-limits
   deploy:
     resources:
       limits:
-        cpus: '0.5'
-        memory: 512M
+        cpus: '1.0'
+        memory: 768M
 
 x-resource-limits-db: &db-limits
   deploy:
     resources:
       limits:
-        cpus: '0.4'
-        memory: 600M
+        cpus: '1.0'
+        memory: 1024M
 
 x-resource-limits-broker: &broker-limits
   deploy:
     resources:
       limits:
-        cpus: '0.5'
-        memory: 500M
+        cpus: '1.0'
+        memory: 768M
 
 x-resource-limits-cache: &cache-limits
   deploy:
     resources:
       limits:
-        cpus: '0.1'
-        memory: 100M
+        cpus: '0.25'
+        memory: 200M
 
 x-resource-limits-frontend: &frontend-limits
   deploy:
     resources:
       limits:
-        cpus: '0.2'
-        memory: 256M
+        cpus: '0.5'
+        memory: 512M
 
 services:
   # ─────────────── FRONTEND (Vue 3) ───────────────
@@ -61,7 +61,7 @@ services:
       - hrms-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -89,7 +89,7 @@ services:
     <<: *db-limits
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_PASSWORD: 2UH_4IXf8-FPgG0yT3QM4tw_52hnDTaCMNZI4rS92HdQ
       POSTGRES_DB: postgres
     volumes:
       - hrms-db-data:/var/lib/postgresql/data
@@ -116,11 +116,12 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_ERLANG_COOKIE: "hrms-rabbitmq-cookie"
+    tmpfs:
+      - /var/lib/rabbitmq
     ports:
       - "5672:5672"     # AMQP
       - "15672:15672"   # Management UI
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
     networks:
       - hrms-network
     restart: unless-stopped
@@ -128,8 +129,8 @@ services:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 15s
       timeout: 10s
-      retries: 5
-      start_period: 120s
+      retries: 10
+      start_period: 180s
 
   # ─────────────── REDIS (Cache) ───────────────
   # Profile: CORE
@@ -163,8 +164,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 400M
+          cpus: '1.0'
+          memory: 768M
     env_file: ./services/auth-service/.env.docker
     ports:
       - "8000:8000"
@@ -354,7 +355,6 @@ services:
 # ─────────────── VOLUMES & NETWORKS ───────────────
 volumes:
   hrms-db-data:
-  rabbitmq-data:
   redis-data:
 
 networks:

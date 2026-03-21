@@ -22,6 +22,9 @@ httpx==0.26.0
 # Message Broker (RabbitMQ)
 aio-pika==9.3.1
 
+# Redis (JWT blacklist)
+redis>=5.0.0
+
 # Rate Limiting
 slowapi==0.1.9
 

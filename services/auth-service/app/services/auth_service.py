@@ -7,7 +7,7 @@ from uuid import UUID
 from app.repositories.user_repository import UserRepository
 from app.repositories.token_repository import TokenRepository
 from app.repositories.magic_token_repository import MagicTokenRepository
-from app.schemas.request_response_models import UserCreate, UserLogin, Token, CompanyCreate
+from app.schemas.request_response_models import UserCreate, AdminUserCreate, UserLogin, Token, CompanyCreate
 from app.services.email_service import EmailService
 from app.core.security import (
     get_password_hash,
@@ -127,6 +127,7 @@ class AuthService:
         return Token(access_token=access_token, refresh_token=client_refresh, token_type="bearer")
 
     async def register_user(self, user_in: UserCreate):
+        """Public self-registration — always creates an employee."""
         existing_user = await self.user_repository.get_by_email(user_in.email)
         if existing_user:
             raise HTTPException(
@@ -135,7 +136,34 @@ class AuthService:
             )
         hashed_password = get_password_hash(user_in.password)
         user = await self.user_repository.create(user_in, hashed_password)
-        logger.info("User registered", extra={"user_id": str(user.id)})
+        logger.info("User registered", extra={"user_id": str(user.id), "role": "employee"})
+        return user
+
+    async def admin_create_user(self, user_in: AdminUserCreate, acting_admin):
+        """Admin-only user creation with role assignment."""
+        existing_user = await self.user_repository.get_by_email(user_in.email)
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered",
+            )
+        # Enforce tenant isolation: admin can only create users in their own company
+        if user_in.company_id and str(user_in.company_id) != str(acting_admin.company_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot create users in a different company",
+            )
+        user_in.company_id = acting_admin.company_id
+        hashed_password = get_password_hash(user_in.password)
+        user = await self.user_repository.create_admin(user_in, hashed_password)
+        logger.info(
+            "Admin created user",
+            extra={
+                "user_id": str(user.id),
+                "role": user.role,
+                "created_by": str(acting_admin.id),
+            },
+        )
         return user
 
     async def authenticate_user(self, user_in: UserLogin) -> Token:

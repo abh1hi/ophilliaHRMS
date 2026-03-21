@@ -6,6 +6,7 @@ from app.db.session import get_db
 from uuid import UUID
 from app.schemas.request_response_models import (
     UserCreate,
+    AdminUserCreate,
     UserLogin,
     UserResponse,
     Token,
@@ -118,9 +119,20 @@ async def post_login_context(
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    """Register a new user. Rate limited to 5/min per IP."""
+    """Public self-registration. Always creates an EMPLOYEE — role cannot be chosen."""
     auth_service = AuthService(db)
     return await auth_service.register_user(user_in)
+
+
+@router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def admin_create_user(
+    user_in: AdminUserCreate,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.SUPER_ADMIN)),
+):
+    """Create a user with a specific role. Super Admin only. Tenant-isolated."""
+    auth_service = AuthService(db)
+    return await auth_service.admin_create_user(user_in, admin)
 
 
 @router.post("/login", response_model=Token)
@@ -198,13 +210,29 @@ async def update_user_role(
     user_id: str,
     payload: RoleUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    admin: User = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
 ):
-    """Update a user's RBAC role. Restricted to Super Admin and HR."""
+    """Update a user's RBAC role. Tenant-isolated with privilege-escalation guards."""
     from app.repositories.user_repository import UserRepository
     repo = UserRepository(db)
     user = await repo.get_by_id(user_id)
     if not user:
-        from fastapi import HTTPException
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # SECURITY: tenant isolation — can only modify users in your own company
+    if str(user.company_id) != str(admin.company_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify users in another company")
+
+    # SECURITY: only super_admin can promote TO super_admin
+    if payload.role == UserRole.SUPER_ADMIN and UserRole(admin.role) != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only super_admin can grant super_admin role")
+
+    # SECURITY: HR cannot demote a super_admin
+    if UserRole(user.role) == UserRole.SUPER_ADMIN and UserRole(admin.role) != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify a super_admin's role")
+
+    # SECURITY: cannot demote yourself (prevents locking out)
+    if str(user.id) == str(admin.id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change your own role")
+
     return await repo.update_role(user, payload.role)

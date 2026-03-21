@@ -10,19 +10,53 @@ class UserBase(BaseModel):
     email: EmailStr
 
 
+class _PasswordMixin:
+    """Shared password-strength rules (OWASP 2024 guidelines)."""
+
+    @staticmethod
+    def _validate_password(v: str) -> str:
+        if len(v) < 10:
+            raise ValueError("Password must be at least 10 characters long")
+        if len(v) > 100:
+            raise ValueError("Password must be at most 100 characters")
+        import re
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        if not re.search(r"[!@#$%^&*()_+\-=\[\]{}|;:'\",.<>?/\\`~]", v):
+            raise ValueError("Password must contain at least one special character")
+        return v
+
+
 class UserCreate(UserBase):
+    """Public self-registration — role is always forced to EMPLOYEE."""
     password: str
-    role: UserRole = UserRole.EMPLOYEE
-    company_id: Optional[UUID] = None # Explicitly passed in during SaaS onboarding, auto-injected for Single-Tenant
+    company_id: Optional[UUID] = None
 
     @field_validator("password")
     @classmethod
     def password_complexity(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        if len(v) > 100:
-            raise ValueError("Password must be less than 100 characters")
-        return v
+        return _PasswordMixin._validate_password(v)
+
+    @field_validator("email")
+    @classmethod
+    def email_normalization(cls, v: str) -> str:
+        return v.lower().strip()
+
+
+class AdminUserCreate(UserBase):
+    """Super-admin-only user creation — allows setting role."""
+    password: str
+    role: UserRole = UserRole.EMPLOYEE
+    company_id: Optional[UUID] = None
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _PasswordMixin._validate_password(v)
 
     @field_validator("email")
     @classmethod
@@ -95,9 +129,7 @@ class PasswordResetConfirm(BaseModel):
     @field_validator("new_password")
     @classmethod
     def password_complexity(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        return v
+        return _PasswordMixin._validate_password(v)
 
 
 class PostLoginContext(BaseModel):
