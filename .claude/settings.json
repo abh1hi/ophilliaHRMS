@@ -16,7 +16,8 @@
       "Bash(npx vite:*)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\abhin\\Desktop\\ophilliaHRMS"
+      "C:\\Users\\abhin\\Desktop\\ophilliaHRMS",
+      "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit"
     ]
   }
 }
