@@ -9,6 +9,9 @@
       "Bash(curl -s http://localhost/health)",
       "Bash(docker exec:*)",
       "Bash(curl -s http://localhost/api/v1/attendance/health)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit"
     ]
   }
 }

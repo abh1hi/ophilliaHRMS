@@ -11,7 +11,9 @@
       "Read(//c/Users/abhin/Desktop/ophilliaHRMS/**)",
       "Bash(wc -l c:/Users/abhin/Desktop/ophilliaHRMS/contracts/*/service_contract.md)",
       "Bash(python tests_live/test_e2e_lifecycle.py)",
-      "Bash(wc -l src/**/*.ts src/**/*.vue)"
+      "Bash(wc -l src/**/*.ts src/**/*.vue)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(npx vite:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS"
