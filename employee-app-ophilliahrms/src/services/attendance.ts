@@ -1,25 +1,15 @@
 // Attendance API service for employee-app
 // Base URL points at the gateway via env (defaults to localhost in dev)
 
-const API_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost') + '/api/v1'
+import { authHeaders } from './api'
 
-function getToken(): string {
-  return localStorage.getItem('access_token') ?? ''
-}
-
-function authHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${getToken()}`,
-  }
-}
+const API_BASE = '/api/v1'
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const body = await res.json()
   if (!res.ok) {
     throw new Error(body?.error?.message ?? body?.detail ?? `API error ${res.status}`)
   }
-  // Gateway may wrap in { success, data } envelope or return raw FastAPI body
   return (body?.data ?? body) as T
 }
 
