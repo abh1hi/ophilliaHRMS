@@ -1,0 +1,3 @@
+[submodule "employee-app-ophilliahrms"]
+	path = employee-app-ophilliahrms
+	url = https://github.com/abh1hi/employee-app-ophillia-hrms.git
