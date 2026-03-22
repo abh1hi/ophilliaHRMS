@@ -1,9 +1,10 @@
 # 🏗️ OphilliaHRMS — Complete System Design Document
 
-**Version:** 1.0
-**Last Updated:** 2026-03-19
+**Version:** 2.0
+**Last Updated:** 2026-03-22
 **Architecture Type:** Microservices (Database-per-Service)
-**Status:** Production-Ready
+**Status:** MVP Stage (Production Readiness Score: 58/100)
+**Audit Reference:** See `sdlc-audit/` directory for full SDLC audit (12 documents)
 
 ---
 
@@ -85,11 +86,11 @@ External World
 | **Responsibility** | User login, JWT token generation, credential validation, role assignment |
 | **Tech Stack** | FastAPI, Python 3.11, SQLAlchemy |
 | **Database** | PostgreSQL (`auth_db`) |
-| **Key Features** | JWT RS256 tokens, refresh token rotation, bcrypt password hashing |
-| **External Deps** | PostgreSQL, RabbitMQ (for user events) |
+| **Key Features** | JWT RS256 tokens (4096-bit RSA), refresh token rotation (bcrypt-hashed), Argon2id password hashing (19MB/2 iter), magic link auth, company registration, role management |
+| **External Deps** | PostgreSQL, Redis (token blacklist), RabbitMQ (event publishing — not yet implemented) |
 | **Scaling** | Horizontal (stateless) |
 | **Failure Impact** | **CRITICAL**: System becomes inaccessible without authentication |
-| **Key Endpoints** | `POST /auth/login`, `POST /auth/register`, `GET /auth/me`, `POST /auth/refresh` |
+| **Key Endpoints** | `POST /auth/companies`, `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, `PUT /auth/me`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `POST /auth/magic-link/request`, `POST /auth/magic-link/verify`, `GET /auth/users`, `PUT /auth/users/{id}/role`, `POST /auth/admin/create-admin` |
 
 #### **Employee Service** (employee-service:8001)
 | Aspect | Details |
@@ -97,11 +98,11 @@ External World
 | **Responsibility** | Employee profiles, departments, organizational structure |
 | **Tech Stack** | FastAPI, Python 3.11, SQLAlchemy |
 | **Database** | PostgreSQL (`employee_db`) |
-| **Key Features** | Department management, employee profiles, manager hierarchy |
-| **External Deps** | Auth Service (token validation), RabbitMQ (events) |
+| **Key Features** | Department management, employee profiles (52-column model), AES-256-GCM PII encryption (Aadhaar, PAN, bank details), bulk import, photo upload, manager hierarchy |
+| **External Deps** | Auth Service (token validation), RabbitMQ (publishes employee.created/updated/deactivated) |
 | **Scaling** | Horizontal (stateless) |
 | **Failure Impact** | **HIGH**: Breaks employee lookups, organizational queries |
-| **Key Endpoints** | `GET /employees/{id}`, `POST /employees`, `GET /departments`, `GET /employees/me` |
+| **Key Endpoints** | `POST /employees`, `GET /employees`, `GET /employees/me`, `GET /employees/{id}`, `PUT /employees/{id}`, `DELETE /employees/{id}`, `POST /employees/bulk`, `POST /employees/{id}/photo`, `GET /departments`, `POST /departments`, `PUT /departments/{id}`, `DELETE /departments/{id}`, `GET /internal/employees/{id}` |
 
 #### **Attendance Service** (attendance-service:8002)
 | Aspect | Details |
@@ -109,11 +110,11 @@ External World
 | **Responsibility** | Clock-in/out tracking, presence logs, daily attendance records |
 | **Tech Stack** | FastAPI, Python 3.11, SQLAlchemy |
 | **Database** | PostgreSQL (`attendance_db`) |
-| **Key Features** | Geolocation support, task management, rating system |
-| **External Deps** | Auth Service, Employee Service (REST), RabbitMQ |
+| **Key Features** | Geofence validation (Haversine distance), task management, day rating (1-5), school mode, attendance policies (employee/department/default scope), manual entry, overtime calculation |
+| **External Deps** | Auth Service, Employee Service (REST), RabbitMQ (publishes clock_in/clock_out/manual_entry/school_mode events) |
 | **Scaling** | Horizontal (stateless) |
 | **Failure Impact** | **HIGH**: Employees cannot log attendance |
-| **Key Endpoints** | `POST /attendance/clock-in`, `POST /attendance/clock-out`, `GET /attendance`, `POST /attendance/school-mode` |
+| **Key Endpoints** | `POST /attendance/clock-in`, `POST /attendance/clock-out`, `POST /attendance/manual`, `POST /attendance/school-mode`, `GET /attendance`, `GET /attendance/summary`, `GET /attendance/alerts`, `POST /attendance/tasks`, `GET /geofence-locations`, `POST /geofence-locations`, `GET /attendance-policies`, `POST /attendance-policies` |
 
 #### **Notification Service** (notification-service:8007)
 | Aspect | Details |
@@ -149,11 +150,11 @@ External World
 | **Responsibility** | Leave requests, approvals, balance tracking, holiday management |
 | **Tech Stack** | FastAPI, Python 3.11, SQLAlchemy |
 | **Database** | PostgreSQL (`leave_db`) |
-| **Key Features** | Leave types, balance calculation, approval workflows, holidays |
-| **External Deps** | Employee Service (REST), Auth Service, RabbitMQ |
+| **Key Features** | Leave types with configurable days, multi-level approval chain (PROJECT_IN_CHARGE → HR → SUPER_ADMIN), balance tracking (used+pending+remaining), overlap detection, 3-day intimation rule, emergency leave, business day calculation (excludes weekends/holidays), holiday management |
+| **External Deps** | Employee Service (REST), Auth Service, RabbitMQ (publishes leave.requested/approved/rejected/cancelled/emergency) |
 | **Scaling** | Horizontal (stateless) |
 | **Failure Impact** | **HIGH**: Cannot request/approve leaves |
-| **Key Endpoints** | `POST /leave-requests`, `PATCH /leave-requests/{id}/approve`, `GET /leave-balances`, `GET /leave-types` |
+| **Key Endpoints** | `POST /leave-requests`, `GET /leave-requests`, `GET /leave-requests/me`, `POST /leave-requests/{id}/approve`, `POST /leave-requests/{id}/reject`, `POST /leave-requests/{id}/cancel`, `GET /leave-balances`, `POST /leave-balances/initialize`, `GET /leave-types`, `POST /leave-types`, `GET /holidays`, `POST /holidays` |
 
 #### **Payroll Service** (payroll-service:8004)
 | Aspect | Details |
@@ -161,11 +162,11 @@ External World
 | **Responsibility** | Salary calculation, tax computation, payslip generation |
 | **Tech Stack** | FastAPI, Python 3.11, SQLAlchemy |
 | **Database** | PostgreSQL (`payroll_db`) |
-| **Key Features** | Payroll runs, salary slips, tax calculations, idempotency |
-| **External Deps** | Employee Service, Attendance Service (REST), RabbitMQ |
+| **Key Features** | India-standard payroll: PF (capped at ₹15K basic), ESI (gross ≤ ₹21K), Professional Tax; salary structures with component percentages; Strategy pattern calculator for regional variants; Decimal precision (ROUND_HALF_UP); idempotent payroll runs (DRAFT → PROCESSING → COMPLETED/FAILED); payslip snapshots |
+| **External Deps** | Employee Service (REST), RabbitMQ (publishes payroll.run event) |
 | **Scaling** | Vertical preferred (complex calculations) |
 | **Failure Impact** | **CRITICAL**: Cannot run payroll, salary processing blocked |
-| **Key Endpoints** | `POST /payroll/run`, `GET /payroll/payslips/{id}`, `GET /salary/structure` |
+| **Key Endpoints** | `POST /payroll/run`, `GET /payroll/runs`, `GET /payroll/payslips`, `GET /payroll/payslips/me`, `GET /payroll/payslips/{id}`, `POST /salary/structures`, `GET /salary/structures`, `POST /salary/assign`, `GET /salary/employee/{id}` |
 
 ---
 
@@ -202,7 +203,7 @@ External World
 | **Role** | Data persistence, database-per-service isolation |
 | **Databases** | 8 databases (auth_db, employee_db, attendance_db, leave_db, payroll_db, notification_db, audit_db, students_db) |
 | **Port** | 5432 |
-| **Resource Limits** | 600MB RAM, 0.4 vCPU (tunable) |
+| **Resource Limits** | 1024MB RAM, 1.0 vCPU |
 | **Scaling Strategy** | Replication to read replicas in prod, multi-region in future |
 
 #### **RabbitMQ (Event Broker)**
@@ -210,16 +211,17 @@ External World
 |-----------|---------|
 | **Role** | Asynchronous event publishing/consumption, event bus |
 | **Port** | 5672 (AMQP), 15672 (Management UI) |
-| **Exchanges** | (To be defined per event type) |
-| **Consumer Model** | Push-based, auto-ack with dead-letter queues |
-| **Persistence** | Durable queues for critical events |
+| **Exchanges** | `hrms_events` (topic exchange), `students_events` (topic exchange — separate for students service) |
+| **Consumer Model** | Push-based with manual ack, dead-letter queues (DLQ), 3 retries with exponential backoff |
+| **Persistence** | ⚠ **VOLATILE**: Uses tmpfs mount — messages lost on restart. Must migrate to Docker volume for production |
 
 #### **Redis (Cache Layer)**
 | Component | Details |
 |-----------|---------|
-| **Role** | Session caching, rate limit counters, temporary data |
+| **Role** | JWT token blacklist (revoked tokens), rate limit counters |
 | **Port** | 6379 |
 | **Memory Policy** | LRU eviction (100MB max) |
+| **Authentication** | ⚠ **NONE**: No AUTH password configured — must add `requirepass` for production |
 | **Persistence** | AOF enabled for durability |
 | **Scaling** | Single instance (can upgrade to Redis Cluster in prod) |
 
@@ -264,18 +266,16 @@ flowchart TD
     AuditDB ---|Single Instance| PG
     NotifDB ---|Single Instance| PG
 
-    Auth -->|Publish<br/>Events| RMQ["🐰 RabbitMQ:5672<br/>Event Broker"]
-    Emp -->|Publish<br/>Events| RMQ
+    Emp -->|Publish<br/>Events| RMQ["🐰 RabbitMQ:5672<br/>Event Broker"]
     Att -->|Publish<br/>Events| RMQ
     Pay -->|Publish<br/>Events| RMQ
     Leave -->|Publish<br/>Events| RMQ
+    Stud -->|Publish<br/>Events| RMQ
 
     RMQ -->|Subscribe<br/>Events| Audit
     RMQ -->|Subscribe<br/>Events| Notif
 
-    Auth -->|Cache<br/>Sessions| Redis["⚡ Redis:6379<br/>Cache"]
-    Emp -->|Cache| Redis
-    Att -->|Cache| Redis
+    Auth -->|Token<br/>Blacklist| Redis["⚡ Redis:6379<br/>Cache"]
 
     PG -->|Backup| Storage["💾 Volumes"]
     RMQ -->|Persist| Storage
@@ -329,42 +329,46 @@ graph LR
 ### **4.2 Asynchronous Communication (RabbitMQ)**
 
 ```
-Events Published:
-─────────────────
+Exchange: hrms_events (topic)
+═════════════════════════════
 
 [AUTH SERVICE]
-  ├── user.created → Audit, Notification
-  ├── user.login → Audit
-  └── user.password_reset → Notification
+  └── (No events published — planned: user.created, user.login, role.changed)
 
 [EMPLOYEE SERVICE]
   ├── employee.created → Audit, Notification
   ├── employee.updated → Audit
-  ├── department.created → Audit
-  └── department.updated → Audit
+  └── employee.deactivated → Audit, Notification
 
 [ATTENDANCE SERVICE]
-  ├── attendance.clock_in → Audit, Notification
+  ├── attendance.clock_in → Audit
   ├── attendance.clock_out → Audit
-  ├── attendance.marked → Audit, Notification
-  └── attendance.daily_summary → Payroll
+  ├── attendance.manual_entry → Audit
+  └── attendance.school_mode_entry → Audit
 
 [LEAVE SERVICE]
   ├── leave.requested → Audit, Notification
-  ├── leave.approved → Audit, Notification, Payroll
+  ├── leave.approved.{level} → Audit, Notification (per approval level)
+  ├── leave.approved → Audit, Notification (final approval)
   ├── leave.rejected → Audit, Notification
-  └── leave.balance_updated → Audit
+  ├── leave.cancelled → Audit
+  └── leave.emergency → Audit, Notification
 
 [PAYROLL SERVICE]
-  ├── payroll.run → Audit, Notification
-  ├── payslip.generated → Audit, Notification
-  └── salary.processed → Audit
+  └── payroll.run → Audit, Notification
+
+Exchange: students_events (topic) — ⚠ separate exchange, should unify with hrms_events
+═════════════════════════════════
+
+[STUDENTS SERVICE]
+  ├── student.enrolled → Audit
+  ├── student.status_changed → Audit
+  └── student.graduated → Audit
 
 [Consumers]
 ─────────
-AUDIT SERVICE: Listens to ALL events
-NOTIFICATION SERVICE: Listens to user.*, employee.*, leave.*, payroll.*, etc.
-PAYROLL SERVICE: Listens to attendance.daily_summary, leave.approved
+AUDIT SERVICE: Wildcard binding (#) on both exchanges — consumes ALL events
+NOTIFICATION SERVICE: Selective bindings on employee.*, leave.*, payroll.*
 ```
 
 ### **4.3 Communication Patterns**
@@ -397,18 +401,14 @@ sequenceDiagram
     AuthSvc->>AuthDB: Query user by email
     AuthDB-->>AuthSvc: User record
 
-    AuthSvc->>AuthSvc: Verify password (bcrypt)
-    AuthSvc->>AuthSvc: Generate JWT token<br/>(RS256, 15min expiry)
-    AuthSvc->>Redis: Store refresh token<br/>(30 days TTL)
-
-    AuthSvc->>RMQ: Publish 'user.login' event
-    RMQ-->>AuthSvc: Event queued
+    AuthSvc->>AuthSvc: Verify password (Argon2id)
+    AuthSvc->>AuthSvc: Generate JWT token<br/>(RS256 4096-bit, 15min expiry)
+    AuthSvc->>AuthDB: Store refresh token<br/>(bcrypt-hashed, 30 days)
 
     AuthSvc-->>Gateway: {access_token, refresh_token}
     Gateway-->>User: 200 OK + tokens
 
-    RMQ->>AuditSvc: Consume 'user.login'
-    RMQ->>NotifSvc: Consume 'user.login'
+    Note over RMQ: Auth service does NOT<br/>publish events yet (planned)
 ```
 
 ### **5.2 Employee Clock-In (Attendance)**
@@ -868,20 +868,20 @@ docker compose --profile core --profile hr --profile student up --build -d
 
 | Service | CPU | Memory | Notes |
 |---------|-----|--------|-------|
-| Frontend | 0.2 | 256MB | Vue3 development server |
-| Gateway | 0.5 | 512MB | Nginx reverse proxy |
-| Auth | 0.5 | 400MB | JWT, password hashing |
-| Employee | 0.5 | 512MB | Employee data |
+| Frontend | 0.5 | 512MB | Vue3 development server |
+| Gateway | 0.5 | 256MB | Nginx reverse proxy |
+| Auth | 0.5 | 512MB | JWT, Argon2id password hashing |
+| Employee | 0.5 | 512MB | Employee data, AES-256-GCM encryption |
 | Attendance | 0.5 | 512MB | High I/O for location data |
 | Leave | 0.5 | 512MB | Leave management |
-| Payroll | 0.5 | 512MB | Complex calculations |
+| Payroll | 1.0 | 512MB | Complex salary calculations |
 | Students | 0.5 | 512MB | Student records |
 | Notification | 0.5 | 512MB | Email queue worker |
 | Audit | 0.5 | 512MB | Event consumer |
-| PostgreSQL | 0.4 | 600MB | Single master (8 databases) |
-| RabbitMQ | 0.5 | 500MB | Message broker |
-| Redis | 0.1 | 100MB | Cache layer |
-| **TOTAL** | **~6.5** | **~7.8GB** | Requires 2 vCPU, 8GB RAM |
+| PostgreSQL | 1.0 | 1024MB | Single master (8 databases) |
+| RabbitMQ | 0.5 | 512MB | Message broker (⚠ tmpfs storage) |
+| Redis | 0.25 | 256MB | Token blacklist, rate limits |
+| **TOTAL** | **~7.25** | **~6.5GB** | Requires 4 vCPU, 8GB RAM recommended |
 
 ### **8.4 CI/CD Pipeline (Recommended: GitHub Actions)**
 
@@ -947,7 +947,7 @@ LOG_LEVEL=DEBUG
 ```mermaid
 graph TD
     User["User"] -->|1. Credentials| Auth["Auth Service"]
-    Auth -->|2. Validate<br/>bcrypt| DB["Database"]
+    Auth -->|2. Validate<br/>Argon2id| DB["Database"]
     DB -->|Record| Auth
     Auth -->|3. Generate JWT<br/>RS256| Auth
     Auth -->|4. Store Refresh Token<br/>TTL 30d| Redis["Redis"]
@@ -986,9 +986,9 @@ graph TD
     "email": "user@example.com",
     "role": "manager",
     "company_id": "company_uuid",
+    "jti": "token_id",
     "iat": 1710854400,
-    "exp": 1710855300,
-    "permissions": ["attendance.read", "leave.approve"]
+    "exp": 1710855300
   },
   "signature": "..."
 }
@@ -996,31 +996,47 @@ graph TD
 
 ### **9.4 Data Encryption**
 
-| Type | Method | Implementation |
-|------|--------|-----------------|
-| **In Transit** | TLS 1.3 | HTTPS everywhere, internal Docker DNS |
-| **At Rest** | AES-256 | PostgreSQL transparent encryption (future) |
-| **Passwords** | Bcrypt | Cost factor = 12 |
-| **Tokens** | RS256 | Asymmetric (public key on client) |
-| **Secrets** | Vault | AWS Secrets Manager (production) |
+| Type | Method | Implementation | Status |
+|------|--------|-----------------|--------|
+| **In Transit** | ⚠ **NONE** | No TLS configured — all traffic (client→gateway, gateway→services, services→DB/RabbitMQ/Redis) is plaintext | ❌ CRITICAL GAP |
+| **PII at Rest** | AES-256-GCM | Employee service encrypts Aadhaar, PAN, DL, bank details with per-field encryption | ✅ Implemented |
+| **Passwords** | Argon2id | 19MB memory cost, 2 iterations, 1 parallelism | ✅ Implemented |
+| **Refresh Tokens** | Bcrypt | One-way hashed, stored in DB with 30-day expiry | ✅ Implemented |
+| **Magic Link Tokens** | Bcrypt | One-way hashed, single-use, 15-min expiry | ✅ Implemented |
+| **JWT Signing** | RS256 | 4096-bit RSA asymmetric key pair | ✅ Implemented |
+| **Payroll Data** | ⚠ **NONE** | Salary data stored in plaintext | ❌ GAP |
+| **Secrets** | ⚠ `.env` files | Secrets currently in `.env.docker` files tracked in Git — must migrate to vault | ❌ CRITICAL GAP |
 
 ### **9.5 Security Hardening Checklist**
 
-- ✅ Rate limiting at gateway (10 req/sec per IP)
+**Implemented:**
+- ✅ Rate limiting at gateway (Nginx: 5 req/s login, 30 req/s general; slowapi per-endpoint limits)
 - ✅ Input validation via Pydantic schemas
 - ✅ SQL injection prevention (SQLAlchemy ORM, no string concatenation)
 - ✅ XSS prevention (JSON responses, no inline scripts)
 - ✅ CORS restriction (explicit method/header whitelists, configurable origins via env var)
-- ✅ CSRF tokens (for state-changing operations)
-- ✅ Secrets in environment variables (never hardcoded)
-- ✅ Database-per-service isolation
+- ✅ Database-per-service isolation (8 separate databases)
 - ✅ No cross-database queries
 - ✅ Audit trail for sensitive operations (with retry-based delivery guarantee)
-- ✅ Swagger/OpenAPI docs disabled in production (`DEBUG=False`)
+- ✅ Payload sanitization in audit logs (redacts passwords, tokens, secrets)
 - ✅ Database connection pooling (pool_size=20, max_overflow=40, pool_recycle=3600)
-- ✅ HTTP timeouts on inter-service calls (5s)
+- ✅ HTTP timeouts on inter-service calls (5s via httpx.AsyncClient)
 - ✅ Graceful shutdown handlers (5s grace period)
-- ⬚ mTLS between services (recommended for production)
+- ✅ Privilege escalation guards (cannot grant role above own, cannot change own role)
+- ✅ Enumeration protection (forgot-password returns same response always)
+- ✅ Multi-tenant row-level isolation (SQLAlchemy ORM event listeners: `do_orm_execute`, `before_flush`)
+
+**Not Implemented (Gaps):**
+- ❌ TLS/HTTPS — all traffic is plaintext (CRITICAL)
+- ❌ Secrets management — secrets in `.env.docker` files tracked in Git (CRITICAL)
+- ❌ Redis authentication — no AUTH password configured
+- ❌ RabbitMQ security — using default guest/guest credentials
+- ❌ 2FA/MFA — no multi-factor authentication
+- ❌ Login attempt tracking / account lockout
+- ❌ CSRF tokens — not implemented (stateless JWT API, lower risk)
+- ❌ Dependency vulnerability scanning (no safety/snyk in CI)
+- ❌ mTLS between services
+- ❌ Swagger/OpenAPI docs — accessible in all environments (should disable in production)
 
 ---
 
@@ -2079,67 +2095,81 @@ docker compose logs -f
 
 ## Summary Table: System Checklist
 
-| Component | Status | Critical | Notes |
-|-----------|--------|----------|-------|
-| **Frontend (Vue3)** | ✅ Ready | Yes | Port 3000, local development |
-| **API Gateway (Nginx)** | ✅ Ready | Yes | Single entry point, rate limiting |
-| **Auth Service** | ✅ Ready | **Critical** | JWT, RBAC, bcrypt |
-| **Employee Service** | ✅ Ready | High | Core HR data |
-| **Attendance Service** | ✅ Ready | High | Clock-in/out, location tracking |
-| **Leave Service** | ✅ Ready | High | Leave requests, approvals |
-| **Payroll Service** | ✅ Ready | **Critical** | Salary processing, idempotency |
-| **Notification Service** | ✅ Ready | Medium | Event-driven emails |
-| **Audit Service** | ✅ Ready | High | Compliance, immutable logs |
-| **Students Service** | ✅ Ready | Medium | Educational module |
-| **PostgreSQL** | ✅ Ready | **Critical** | 8 databases, single master |
-| **RabbitMQ** | ✅ Ready | High | Event broker, async processing |
-| **Redis** | ✅ Ready | Medium | Cache, sessions, rate limits |
+| Component | Status | Criticality | Gaps |
+|-----------|--------|-------------|------|
+| **Frontend (Vue3)** | ⚠ In Progress | Yes | Separate repo, under development |
+| **API Gateway (Nginx)** | ⚠ MVP | Yes | No TLS, no WAF, no IP filtering |
+| **Auth Service** | ⚠ MVP | **Critical** | JWT+RBAC+Argon2id working; missing 2FA, login lockout, event publishing |
+| **Employee Service** | ⚠ MVP | High | Core CRUD + PII encryption working; 52-col model needs splitting |
+| **Attendance Service** | ⚠ MVP | High | Clock-in/out + geofence working; missing shift management, overtime rules |
+| **Leave Service** | ⚠ MVP | High | Multi-level approval working; missing accrual cron, department limits |
+| **Payroll Service** | ⚠ MVP | **Critical** | India-standard calc working; missing income tax/TDS, PDF payslips |
+| **Notification Service** | ⚠ MVP | Medium | Event consumption working; email delivery not connected (no SMTP) |
+| **Audit Service** | ✅ Functional | High | Immutable logs, sanitization, DLQ — most complete service |
+| **Students Service** | ⚠ MVP | Medium | CRUD working; missing grades, academic records, capacity enforcement |
+| **PostgreSQL** | ⚠ Needs Hardening | **Critical** | 8 databases working; no TLS, no backup automation, single master |
+| **RabbitMQ** | ❌ Not Production-Ready | High | Events working; **tmpfs = volatile**, default credentials |
+| **Redis** | ⚠ Needs Hardening | Medium | Token blacklist working; no AUTH password, fail-open on outage |
 
 ---
 
-## 🎯 Next Steps
+## 🎯 Next Steps (Based on SDLC Audit — 2026-03-22)
 
-### Recently Completed (2026-03-19)
-- [x] Database connection pooling (all 8 services)
-- [x] CORS hardening (explicit method/header whitelists)
-- [x] Pagination bug fix (Leave Service)
-- [x] HTTP timeouts on inter-service calls (5s)
-- [x] Swagger/OpenAPI docs disabled in production
-- [x] RabbitMQ event publishing retry logic (exponential backoff)
-- [x] Graceful shutdown handlers (5s grace period)
-- [x] ALLOWED_ORIGINS configurable via environment variable
-- [x] Request ID propagation to RabbitMQ events
-- [x] Health check consistency across services
+> **Full audit details:** See `sdlc-audit/` directory (12 documents).
+> **Current Score:** 58/100 (MVP Stage) → **Target:** 90+/100 (Production-Ready)
 
-### Immediate (Week 1)
-- [ ] Set up centralized logging (ELK / Loki)
-- [ ] Configure Prometheus + Grafana for metrics
-- [ ] Add circuit breaker for inter-service calls (pybreaker)
-- [ ] Add idempotency key validation to Payroll run
+### Phase 0: Emergency Security Fixes (Week 1–2) → Score: 58 → ~68
+- [ ] Remove all secrets from Git history (BFG Repo-Cleaner)
+- [ ] Rotate ALL keys: JWT RSA keys, DB passwords, PII encryption key, service tokens
+- [ ] Move secrets to `.env` files excluded from Git (verify .gitignore)
+- [ ] Switch RabbitMQ from tmpfs to Docker volume
+- [ ] Add Redis AUTH password (`requirepass`)
+- [ ] Change RabbitMQ credentials from guest/guest
+- [ ] Add TLS termination at Nginx gateway
+- [ ] Add `git-secrets` pre-commit hook
 
-### Short-term (Month 1)
-- [ ] Implement PostgreSQL read replicas
-- [ ] Set up RabbitMQ clustering
-- [ ] Add mTLS between services
-- [ ] Deploy to Kubernetes (EKS/AKS)
-- [ ] Add database indexes (created_at, employee_id)
+### Phase 1: CI/CD & Quality Foundation (Week 3–6) → Score: ~68 → ~75
+- [ ] Create shared CI pipeline (GitHub Actions matrix for all 8 services)
+- [ ] Add linting (ruff + mypy) and security scanning (bandit + safety)
+- [ ] Expand unit tests to 70% coverage
+- [ ] Create `ophillia-commons` shared Python package (reduce duplication)
+- [ ] Standardize pagination across all services
 
-### Medium-term (Month 2-3)
-- [ ] Add Analytics Service
-- [ ] Implement caching layer optimization
-- [ ] Multi-region deployment (if applicable)
-- [ ] Advanced notification channels (SMS, Slack)
+### Phase 2: Observability & Hardening (Week 7–10) → Score: ~75 → ~82
+- [ ] Deploy Loki + Promtail for centralized logging
+- [ ] Deploy Prometheus + Grafana with pre-built dashboards
+- [ ] Add OpenTelemetry SDK to all services
+- [ ] Implement circuit breakers on cross-service HTTP calls
+- [ ] Move rate limiting to Redis backend
+- [ ] Add database backup automation (pg_dump)
 
-### Long-term (Q2-Q3)
-- [ ] Machine learning for payroll predictions
-- [ ] Real-time dashboards
-- [ ] Mobile app optimization
-- [ ] Data warehouse for BI/analytics
+### Phase 3: Missing Core Features (Week 11–18) → Score: ~82 → ~88
+- [ ] Build Organization Service (hierarchy, org chart, locations)
+- [ ] Build Reporting/Analytics Service (dashboards, KPIs, exports)
+- [ ] Add income tax + TDS to Payroll
+- [ ] Implement email delivery (SendGrid/SES integration)
+- [ ] Implement leave accrual cron
+- [ ] Add PDF payslip generation
+- [ ] Unify `students_events` → `hrms_events` exchange
+
+### Phase 4: Enterprise Features (Week 19–30) → Score: ~88 → ~93
+- [ ] Build Workflow/Approval Engine (extract from leave/payroll)
+- [ ] Build Recruitment/ATS Service
+- [ ] Build Performance Management Service
+- [ ] Add 2FA/MFA to auth service
+- [ ] Add contract tests (Pact) for all service boundaries
+
+### Phase 5: Scale & Optimize (Week 31+) → Score: ~93 → ~98
+- [ ] Create Kubernetes manifests (Kustomize)
+- [ ] Set up managed PostgreSQL (Multi-AZ, read replicas)
+- [ ] Deploy HashiCorp Vault for secrets management
+- [ ] Implement blue-green deployments
+- [ ] SOC 2 / GDPR compliance audit
 
 ---
 
 **Document Generated:** 2026-03-19
-**Last Updated:** 2026-03-19 (Post-audit fix review)
-**Architecture Status:** Production-Ready (critical fixes applied, improvements ongoing)
+**Last Updated:** 2026-03-22 (Updated with full SDLC audit findings — see `sdlc-audit/`)
+**Architecture Status:** MVP Stage (Production Readiness Score: 58/100)
 **Maintenance:** Review quarterly; update on major changes
 

@@ -13,7 +13,8 @@
       "Bash(python tests_live/test_e2e_lifecycle.py)",
       "Bash(wc -l src/**/*.ts src/**/*.vue)",
       "Bash(npx vue-tsc:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(find /c/Users/abhin/Desktop/ophilliaHRMS/frontend-tailless-ophillia-hrms-vue -type f \\\\\\(-name *.vue -o -name *.ts -o -name *.js -o -name *.json -o -name *.scss -o -name *.css \\\\\\))"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS",
