@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from uuid import UUID
@@ -91,6 +92,14 @@ class UserRepository:
             )
         await self.db.refresh(new_user)
         return new_user
+
+    async def count_active_by_role(self, role: str | None) -> int:
+        """Count active users with a given role (system-wide). If role is None, count all active users."""
+        query = select(func.count()).select_from(User).where(User.is_active == True)
+        if role is not None:
+            query = query.where(User.role == role)
+        result = await self.db.execute(query)
+        return result.scalar() or 0
 
     async def update_role(self, user: User, role: UserRole) -> User:
         user.role = role.value

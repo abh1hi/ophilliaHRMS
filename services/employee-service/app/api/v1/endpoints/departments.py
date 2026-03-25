@@ -30,7 +30,7 @@ def _get_service(db: AsyncSession = Depends(get_db_with_tenant)) -> DepartmentSe
 @router.post("", response_model=DepartmentResponse, status_code=201)
 async def create_department(
     data: DepartmentCreate,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: DepartmentService = Depends(_get_service),
 ):
     """Create a new department. Requires HR or Super Admin role."""
@@ -65,7 +65,7 @@ async def get_department(
 async def update_department(
     department_id: UUID,
     data: DepartmentUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: DepartmentService = Depends(_get_service),
 ):
     """Update a department. Requires HR or Super Admin role."""
@@ -76,7 +76,7 @@ async def update_department(
 @router.delete("/{department_id}", response_model=DepartmentResponse)
 async def delete_department(
     department_id: UUID,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: DepartmentService = Depends(_get_service),
 ):
     """Soft-delete a department (sets is_active = 0). Requires HR or Super Admin role."""

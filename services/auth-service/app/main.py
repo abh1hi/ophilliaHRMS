@@ -18,6 +18,7 @@ from app.middleware.request_id import request_id_middleware
 from app.tasks.scheduled_jobs import create_scheduler
 from app.core.token_blacklist import set_redis
 from app.db.session import get_db
+from app.events.publisher import EventPublisher
 
 import logging
 
@@ -32,6 +33,12 @@ async def lifespan(app: FastAPI):
     set_redis(redis_client)
     logger.info("Redis connected", extra={"service_task": "startup"})
 
+    # RabbitMQ event publisher
+    event_publisher = EventPublisher(settings.RABBITMQ_URL)
+    await event_publisher.connect()
+    app.state.event_publisher = event_publisher
+    logger.info("Event publisher initialized", extra={"service_task": "startup"})
+
     scheduler = create_scheduler()
     scheduler.start()
     logger.info("Background scheduler started", extra={"service_task": "startup"})
@@ -44,6 +51,8 @@ async def lifespan(app: FastAPI):
 
     scheduler.shutdown(wait=False)
     logger.info("Background scheduler stopped", extra={"service_task": "shutdown"})
+    await event_publisher.close()
+    logger.info("Event publisher closed", extra={"service_task": "shutdown"})
     await redis_client.aclose()
     logger.info("Redis disconnected", extra={"service_task": "shutdown"})
 

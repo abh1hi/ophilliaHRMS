@@ -54,7 +54,7 @@ async def create_leave_balance(
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
     balance_in: LeaveBalanceCreate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN))
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
 ):
     db_obj = await leave_service.create_leave_balance(db, obj_in=balance_in)
     
@@ -72,7 +72,7 @@ async def update_leave_balance(
     db: AsyncSession = Depends(get_db_with_tenant),
     balance_id: UUID,
     balance_in: LeaveBalanceUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN))
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
 ):
     company_id = db.info.get("company_id")
     result = await db.execute(
@@ -105,7 +105,7 @@ async def bulk_create_leave_balances(
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
     data: BulkLeaveBalanceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN))
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
 ):
     """Allocate leave balances for multiple employees at once.
     Skips rows where a balance already exists for that employee+type+year.

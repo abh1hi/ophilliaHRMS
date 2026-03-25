@@ -76,6 +76,9 @@ services:
     <<: *api-limits
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./services/gateway/certs:/etc/nginx/certs:ro
     networks:
       - hrms-network
     restart: unless-stopped
@@ -117,8 +120,8 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
       RABBITMQ_ERLANG_COOKIE: "hrms-rabbitmq-cookie"
-    tmpfs:
-      - /var/lib/rabbitmq
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
     ports:
       - "5672:5672"     # AMQP
       - "15672:15672"   # Management UI
@@ -139,7 +142,7 @@ services:
     image: redis:7-alpine
     container_name: hrms-redis
     <<: *cache-limits
-    command: redis-server --appendonly yes --maxmemory 100mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 100mb --maxmemory-policy allkeys-lru --requirepass hrms_redis_secret_2024
     ports:
       - "6379:6379"
     volumes:
@@ -148,7 +151,7 @@ services:
       - hrms-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "hrms_redis_secret_2024", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -326,6 +329,31 @@ services:
       retries: 3
       start_period: 15s
 
+  # ─────────────── ONBOARDING SERVICE ───────────────
+
+  onboarding-service:
+    profiles: ["core"]
+    build: ./services/onboarding-service
+    container_name: hrms-onboarding
+    <<: *api-limits
+    env_file: ./services/onboarding-service/.env.docker
+    ports:
+      - "8008:8008"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8008/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   # ─────────────── STUDENT MODULE ───────────────
 
   students-service:
@@ -356,6 +384,7 @@ services:
 volumes:
   hrms-db-data:
   redis-data:
+  rabbitmq-data:
 
 networks:
   hrms-network:

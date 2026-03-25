@@ -35,7 +35,7 @@ async def create_leave_type(
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
     leave_type_in: LeaveTypeCreate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN))
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
 ):
     # Check if exists within tenant
     company_id = db.info.get("company_id")
@@ -57,7 +57,7 @@ async def update_leave_type(
     db: AsyncSession = Depends(get_db_with_tenant),
     leave_type_id: UUID,
     leave_type_in: LeaveTypeUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN))
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
 ):
     company_id = db.info.get("company_id")
     result = await db.execute(
@@ -95,7 +95,7 @@ async def delete_leave_type(
     *,
     db: AsyncSession = Depends(get_db_with_tenant),
     leave_type_id: UUID,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN))
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
 ):
     company_id = db.info.get("company_id")
     result = await db.execute(

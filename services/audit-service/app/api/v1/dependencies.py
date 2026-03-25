@@ -8,12 +8,12 @@ from app.services.audit_service import AuditService
 
 def require_hr_or_admin(request: Request) -> dict:
     """Allow HR, Manager, Super Admin roles."""
-    return require_roles(["hr", "manager", "super_admin"])(request)
+    return require_roles(["hr", "manager", "super_admin", "admin"])(request)
 
 
 def require_super_admin(request: Request) -> dict:
     """Allow Super Admin only."""
-    return require_roles(["super_admin"])(request)
+    return require_roles(["super_admin", "admin"])(request)
 
 
 async def get_audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:

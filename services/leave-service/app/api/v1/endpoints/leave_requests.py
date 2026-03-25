@@ -80,7 +80,7 @@ async def update_leave_status(
     db: AsyncSession = Depends(get_db_with_tenant),
     request_id: UUID,
     status_in: LeaveRequestUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN))
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN, UserRole.ADMIN))
 ):
     db_obj = await leave_service.update_leave_status(
         db, 

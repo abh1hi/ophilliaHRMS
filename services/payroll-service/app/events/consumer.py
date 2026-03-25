@@ -1,4 +1,4 @@
-"""RabbitMQ consumer — listens for employee.created to auto-create salary record."""
+"""RabbitMQ consumer — listens for employee.created events."""
 import json
 import logging
 import aio_pika
@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_employee_created(payload: dict) -> None:
-    """When a new employee is created, we could auto-assign a default salary.
-    For now, we log the event. Salary assignment requires HR action via API.
+    """When a new employee is created, log for salary assignment.
+    Salary assignment requires HR action via API.
     """
     employee_id = payload.get("employee_id") or payload.get("user_id")
     company_id = payload.get("company_id")

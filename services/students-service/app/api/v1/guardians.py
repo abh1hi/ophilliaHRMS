@@ -17,7 +17,7 @@ router = APIRouter()
     "/",
     response_model=GuardianResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles(["Admin", "HR"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin", "hr"]))],
 )
 async def create_guardian(
     guardian_in: GuardianCreate, db: AsyncSession = Depends(get_db_with_tenant)
@@ -30,7 +30,7 @@ async def create_guardian(
 @router.get(
     "/{guardian_id}",
     response_model=GuardianResponse,
-    dependencies=[Depends(require_roles(["Admin", "HR"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin", "hr"]))],
 )
 async def get_guardian(
     guardian_id: uuid.UUID, db: AsyncSession = Depends(get_db_with_tenant)
@@ -43,7 +43,7 @@ async def get_guardian(
 @router.get(
     "/student/{student_id}",
     response_model=list[GuardianResponse],
-    dependencies=[Depends(require_roles(["Admin", "HR"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin", "hr"]))],
 )
 async def list_guardians_for_student(
     student_id: uuid.UUID, db: AsyncSession = Depends(get_db_with_tenant)
@@ -56,7 +56,7 @@ async def list_guardians_for_student(
 @router.put(
     "/{guardian_id}",
     response_model=GuardianResponse,
-    dependencies=[Depends(require_roles(["Admin", "HR"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin", "hr"]))],
 )
 async def update_guardian(
     guardian_id: uuid.UUID,
@@ -71,7 +71,7 @@ async def update_guardian(
 @router.delete(
     "/{guardian_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_roles(["Admin"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin"]))],
 )
 async def delete_guardian(
     guardian_id: uuid.UUID, db: AsyncSession = Depends(get_db_with_tenant)

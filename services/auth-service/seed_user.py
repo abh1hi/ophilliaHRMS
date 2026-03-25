@@ -8,7 +8,7 @@ Run inside the auth-service container:
         --role super_admin \
         --company "Ophillia Inc"
 
-Roles: super_admin, hr, manager, employee (default: employee)
+Roles: super_admin, admin, hr, manager, employee (default: employee)
 
 SECURITY NOTE:
   This script requires shell access to the container, which means
@@ -22,7 +22,7 @@ import asyncio
 import re
 import sys
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.core.config import settings  # noqa: E402 — loads .env
 from app.core.constants import UserRole
@@ -81,6 +81,27 @@ async def seed_user(
         if existing.scalars().first():
             print(f"User with email '{email}' already exists. Aborting.")
             sys.exit(1)
+
+        # --- enforce role limits ---
+        if role == "super_admin":
+            count_result = await session.execute(
+                select(func.count()).select_from(User).where(
+                    User.role == "super_admin", User.is_active == True
+                )
+            )
+            if (count_result.scalar() or 0) >= 1:
+                print("ERROR: Maximum of 1 super_admin account already exists.")
+                sys.exit(1)
+
+        if role == "admin":
+            count_result = await session.execute(
+                select(func.count()).select_from(User).where(
+                    User.role == "admin", User.is_active == True
+                )
+            )
+            if (count_result.scalar() or 0) >= 3:
+                print("ERROR: Maximum of 3 admin accounts already exists.")
+                sys.exit(1)
 
         # --- create user ---
         user = User(

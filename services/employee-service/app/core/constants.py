@@ -19,6 +19,7 @@ class Gender(str, Enum):
 class UserRole(str, Enum):
     """HRMS RBAC roles — mirrored from auth-service for local validation."""
     SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
     HR = "hr"
     MANAGER = "manager"
     EMPLOYEE = "employee"

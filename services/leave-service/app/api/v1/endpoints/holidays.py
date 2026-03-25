@@ -36,7 +36,7 @@ class HolidayResponse(BaseModel):
 @router.post("/", response_model=HolidayResponse, status_code=status.HTTP_201_CREATED)
 async def create_holiday(
     data: HolidayCreate,
-    _user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN)),
+    _user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     company_id = db.info.get("company_id")
@@ -69,7 +69,7 @@ async def list_holidays(
 @router.delete("/{holiday_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_holiday(
     holiday_id: UUID,
-    _user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN)),
+    _user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     company_id = db.info.get("company_id")

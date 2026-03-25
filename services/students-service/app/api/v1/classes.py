@@ -17,7 +17,7 @@ router = APIRouter()
     "/",
     response_model=ClassResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles(["Admin"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin"]))],
 )
 async def create_class(
     class_in: ClassCreate, db: AsyncSession = Depends(get_db_with_tenant)
@@ -35,7 +35,7 @@ async def list_classes(
     grade_level: int | None = Query(None),
     db: AsyncSession = Depends(get_db_with_tenant),
     # Ensure user is logged in (token valid)
-    _user=Depends(require_roles(["Admin", "HR", "Teacher"])),
+    _user=Depends(require_roles(["super_admin", "admin", "hr", "manager"])),
 ) -> Any:
     """List classes. Allowed: Admin, HR, Teacher."""
     service = ClassService(db)
@@ -54,7 +54,7 @@ async def list_classes(
 async def get_class(
     class_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_tenant),
-    _user=Depends(require_roles(["Admin", "HR", "Teacher"])),
+    _user=Depends(require_roles(["super_admin", "admin", "hr", "manager"])),
 ) -> Any:
     """Get class details. Allowed: Admin, HR, Teacher."""
     service = ClassService(db)
@@ -64,7 +64,7 @@ async def get_class(
 @router.put(
     "/{class_id}",
     response_model=ClassResponse,
-    dependencies=[Depends(require_roles(["Admin"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin"]))],
 )
 async def update_class(
     class_id: uuid.UUID, class_in: ClassUpdate, db: AsyncSession = Depends(get_db_with_tenant)
@@ -77,7 +77,7 @@ async def update_class(
 @router.delete(
     "/{class_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_roles(["Admin"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin"]))],
 )
 async def delete_class(
     class_id: uuid.UUID, db: AsyncSession = Depends(get_db_with_tenant)

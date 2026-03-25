@@ -1,0 +1,53 @@
+{
+  "category": "general",
+  "region": "US",
+  "name": "United States Onboarding Template",
+  "steps": [
+    {
+      "step_key": "departments",
+      "label": "Set up Departments",
+      "order": 1,
+      "description": "Create your organizational departments"
+    },
+    {
+      "step_key": "leave_types",
+      "label": "Configure PTO Policy",
+      "order": 2,
+      "description": "Define PTO, sick leave, and federal holidays"
+    },
+    {
+      "step_key": "attendance_policy",
+      "label": "Set Attendance Policy",
+      "order": 3,
+      "description": "Choose attendance method and define work hours (8h default)"
+    },
+    {
+      "step_key": "salary_structure",
+      "label": "Define Compensation Structure",
+      "order": 4,
+      "description": "Set up salary components — Base pay, benefits, 401(k) match, insurance"
+    },
+    {
+      "step_key": "first_employee",
+      "label": "Add First Employee",
+      "order": 5,
+      "description": "Invite or create your first team member"
+    }
+  ],
+  "defaults": {
+    "leave_types": [
+      {"name": "Paid Time Off", "days": 15},
+      {"name": "Sick Leave", "days": 10},
+      {"name": "Personal Day", "days": 3},
+      {"name": "Parental Leave", "days": 60}
+    ],
+    "salary_structure": {
+      "basic_pct": 70.0,
+      "hra_pct": 0.0,
+      "allowances_pct": 18.0,
+      "pf_pct": 6.0,
+      "esi_pct": 0.0,
+      "professional_tax": 0.0
+    }
+  }
+}

@@ -16,6 +16,7 @@ from app.core.security import (
     create_refresh_token,
 )
 from app.core.config import settings
+from app.core.constants import UserRole, MAX_SUPER_ADMINS, MAX_ADMINS
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,35 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered",
             )
+
+        # Resolve target role
+        target_role = user_in.role.value if isinstance(user_in.role, UserRole) else user_in.role
+
+        # Admin actors can only create employee/hr/manager — not admin or super_admin
+        if acting_admin.role == UserRole.ADMIN.value:
+            if target_role in (UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Admin cannot create admin or super_admin accounts",
+                )
+
+        # Enforce system-wide role limits
+        if target_role == UserRole.SUPER_ADMIN.value:
+            count = await self.user_repository.count_active_by_role(UserRole.SUPER_ADMIN.value)
+            if count >= MAX_SUPER_ADMINS:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Maximum of {MAX_SUPER_ADMINS} super_admin account(s) allowed",
+                )
+
+        if target_role == UserRole.ADMIN.value:
+            count = await self.user_repository.count_active_by_role(UserRole.ADMIN.value)
+            if count >= MAX_ADMINS:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Maximum of {MAX_ADMINS} admin account(s) allowed",
+                )
+
         # Enforce tenant isolation: admin can only create users in their own company
         if user_in.company_id and str(user_in.company_id) != str(acting_admin.company_id):
             raise HTTPException(

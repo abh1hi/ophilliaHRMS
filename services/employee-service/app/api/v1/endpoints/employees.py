@@ -50,7 +50,7 @@ async def get_my_profile(
 async def create_employee(
     request: Request,
     data: EmployeeCreate,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: EmployeeService = Depends(_get_service),
 ):
     """Create a new employee profile. Requires HR or Super Admin role."""
@@ -63,7 +63,7 @@ async def create_employee(
 async def bulk_create_employees(
     request: Request,
     employees: List[EmployeeCreate],
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: EmployeeService = Depends(_get_service),
 ):
     """Bulk import employees from JSON array. Returns per-row results.
@@ -88,7 +88,7 @@ async def list_employees(
     employment_status: Optional[str] = Query(None, description="Filter by status (active, inactive, terminated)"),
     search: Optional[str] = Query(None, description="Search by name or email"),
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.MANAGER)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
     ),
     service: EmployeeService = Depends(_get_service),
 ):
@@ -126,7 +126,7 @@ async def update_employee(
     request: Request,
     employee_id: UUID,
     data: EmployeeUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: EmployeeService = Depends(_get_service),
 ):
     """Update an employee's profile. Requires HR or Super Admin role."""
@@ -139,7 +139,7 @@ async def update_employee(
 async def deactivate_employee(
     request: Request,
     employee_id: UUID,
-    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.HR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: EmployeeService = Depends(_get_service),
 ):
     """Deactivate (soft-delete) an employee. Requires HR or Super Admin role."""

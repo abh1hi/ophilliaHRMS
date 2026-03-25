@@ -142,3 +142,64 @@ class PostLoginContext(BaseModel):
 class RoleUpdateRequest(BaseModel):
     """HR/Super Admin can update a user's role."""
     role: UserRole
+
+
+class InviteRequest(BaseModel):
+    """Send a team invite to a single email."""
+    email: EmailStr
+    role: UserRole = UserRole.EMPLOYEE
+
+    @field_validator("email")
+    @classmethod
+    def email_normalization(cls, v: str) -> str:
+        return v.lower().strip()
+
+
+class BatchInviteRequest(BaseModel):
+    """Send team invites to multiple emails."""
+    invites: list[InviteRequest]
+
+
+class InviteResponse(BaseModel):
+    id: UUID
+    email: str
+    role: str
+    token: str
+    expires_at: datetime
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AcceptInviteRequest(BaseModel):
+    """Accept an invite by setting a password."""
+    token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _PasswordMixin._validate_password(v)
+
+
+class SystemStatusResponse(BaseModel):
+    initialized: bool
+    has_companies: bool
+
+
+class BootstrapRequest(BaseModel):
+    """First-run bootstrap: creates initial super_admin + company."""
+    email: EmailStr
+    password: str
+    company_name: str
+    company_domain: Optional[str] = None
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _PasswordMixin._validate_password(v)
+
+    @field_validator("email")
+    @classmethod
+    def email_normalization(cls, v: str) -> str:
+        return v.lower().strip()

@@ -49,3 +49,21 @@ class User(Base):
         Index("ix_users_role", "role"),
         Index("ix_users_created_at", "created_at"),
     )
+
+
+class Invite(Base):
+    """Pending team invite — stores token until the invitee accepts."""
+    __tablename__ = "invites"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True)
+    email = Column(String, nullable=False, index=True)
+    role = Column(String, nullable=False, default=UserRole.EMPLOYEE.value)
+    token = Column(String, unique=True, nullable=False, index=True)
+    invited_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=naive_utcnow, nullable=False)
+
+    company = relationship("Company")
+    inviter = relationship("User", foreign_keys=[invited_by])

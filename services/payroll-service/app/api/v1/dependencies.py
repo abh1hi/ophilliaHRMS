@@ -19,4 +19,4 @@ async def get_payroll_service(db: AsyncSession = Depends(get_db_with_tenant)) ->
 
 
 def require_hr_or_admin():
-    return require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+    return require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)

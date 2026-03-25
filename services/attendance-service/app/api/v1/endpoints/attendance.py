@@ -141,7 +141,7 @@ async def list_all_attendance(
     date_to: Optional[date] = Query(None),
     status: Optional[str] = Query(None, description="Filter: present, late, half_day, absent"),
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.MANAGER)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
     ),
     service: AttendanceService = Depends(_get_service),
 ):
@@ -163,7 +163,7 @@ async def list_all_attendance(
 async def get_attendance_record(
     record_id: UUID,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: AttendanceService = Depends(_get_service),
 ):
@@ -176,7 +176,7 @@ async def update_attendance_record(
     record_id: UUID,
     data: AttendanceUpdate,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: AttendanceService = Depends(_get_service),
 ):
@@ -188,7 +188,7 @@ async def update_attendance_record(
 async def manual_entry(
     data: ManualAttendanceCreate,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: AttendanceService = Depends(_get_service),
 ):
@@ -200,7 +200,7 @@ async def manual_entry(
 async def school_mode_entry(
     data: SchoolModeAttendanceCreate,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: AttendanceService = Depends(_get_service),
 ):
@@ -213,7 +213,7 @@ async def school_mode_entry(
 async def bulk_school_mode_entry(
     data: BulkSchoolModeRequest,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: AttendanceService = Depends(_get_service),
 ):
@@ -260,7 +260,7 @@ async def add_task(
     employee_uuid = UUID(current_user.sub)
     assigned_by: Optional[UUID] = None
 
-    if current_user.role in (UserRole.HR.value, UserRole.SUPER_ADMIN.value, UserRole.MANAGER.value):
+    if current_user.role in (UserRole.HR.value, UserRole.SUPER_ADMIN.value, UserRole.ADMIN.value, UserRole.MANAGER.value):
         # HR/Admin/Manager can assign tasks; the task employee_id is inferred from the record
         assigned_by = employee_uuid
 
@@ -356,7 +356,7 @@ async def productivity_report(
     month: int = Query(..., ge=1, le=12, description="Month 1–12"),
     employee_id: Optional[UUID] = Query(None, description="Filter to single employee"),
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.MANAGER)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
     ),
     service: AttendanceService = Depends(_get_service),
 ):
@@ -372,7 +372,7 @@ async def productivity_report(
 @router.get("/alerts", response_model=AlertsResponse)
 async def get_alerts(
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.MANAGER)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
     ),
     service: AttendanceService = Depends(_get_service),
 ):
@@ -388,7 +388,7 @@ async def get_alerts(
 async def create_geofence(
     data: GeofenceCreate,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: GeofenceService = Depends(_get_geofence_service),
 ):
@@ -402,7 +402,7 @@ async def list_geofences(
     limit: int = 100,
     include_inactive: bool = Query(False, description="Include soft-deleted geofences"),
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: GeofenceService = Depends(_get_geofence_service),
 ):
@@ -416,7 +416,7 @@ async def update_geofence(
     geofence_id: UUID,
     data: GeofenceUpdate,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: GeofenceService = Depends(_get_geofence_service),
 ):
@@ -428,7 +428,7 @@ async def update_geofence(
 async def delete_geofence(
     geofence_id: UUID,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: GeofenceService = Depends(_get_geofence_service),
 ):
@@ -442,7 +442,7 @@ async def delete_geofence(
 async def create_policy(
     data: PolicyCreate,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: PolicyService = Depends(_get_policy_service),
 ):
@@ -455,7 +455,7 @@ async def list_policies(
     skip: int = 0,
     limit: int = 100,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: PolicyService = Depends(_get_policy_service),
 ):
@@ -469,7 +469,7 @@ async def update_policy(
     policy_id: UUID,
     data: PolicyUpdate,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: PolicyService = Depends(_get_policy_service),
 ):
@@ -481,7 +481,7 @@ async def update_policy(
 async def delete_policy(
     policy_id: UUID,
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
     ),
     service: PolicyService = Depends(_get_policy_service),
 ):

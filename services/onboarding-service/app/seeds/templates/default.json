@@ -1,0 +1,37 @@
+{
+  "category": "general",
+  "region": "default",
+  "name": "Default Onboarding Template",
+  "steps": [
+    {
+      "step_key": "departments",
+      "label": "Set up Departments",
+      "order": 1,
+      "description": "Create your organizational departments (e.g., Engineering, HR, Finance)"
+    },
+    {
+      "step_key": "leave_types",
+      "label": "Configure Leave Policy",
+      "order": 2,
+      "description": "Define leave types and their annual allowances"
+    },
+    {
+      "step_key": "attendance_policy",
+      "label": "Set Attendance Policy",
+      "order": 3,
+      "description": "Choose attendance tracking method and work schedule"
+    },
+    {
+      "step_key": "salary_structure",
+      "label": "Define Salary Structure",
+      "order": 4,
+      "description": "Set up salary components (basic, HRA, allowances, deductions)"
+    },
+    {
+      "step_key": "first_employee",
+      "label": "Add First Employee",
+      "order": 5,
+      "description": "Invite or create your first team member"
+    }
+  ]
+}

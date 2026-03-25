@@ -8,7 +8,13 @@
       "Bash(docker compose:*)",
       "Bash(curl -s http://localhost/health)",
       "Bash(docker exec:*)",
-      "Bash(curl -s http://localhost/api/v1/attendance/health)"
+      "Bash(curl -s http://localhost/api/v1/attendance/health)",
+      "Bash(grep -r \"pool_size\\\\|max_overflow\\\\|pool_recycle\" /c/Users/abhin/Desktop/ophilliaHRMS/services/*/app/db/session.py)",
+      "Bash(head -30 /c/Users/abhin/Desktop/ophilliaHRMS/services/auth-service/app/db/migrations/versions/*.py)",
+      "Bash(find /c/Users/abhin/Desktop/ophilliaHRMS -type f -path *frontend* -name index.ts)",
+      "Bash(find c:UsersabhinDesktopophilliaHRMSservicesleave-serviceappapiv1endpoints -type f -name *.py)",
+      "Bash(ls -la /c/Users/abhin/Desktop/ophilliaHRMS/services/*/app/events/*.py)",
+      "Bash(grep -E \"\\(nginx|conf\\)$\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit",

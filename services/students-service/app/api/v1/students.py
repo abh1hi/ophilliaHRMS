@@ -29,7 +29,7 @@ def get_event_publisher(request: Request) -> EventPublisher:
     "/",
     response_model=StudentResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles(["Admin", "HR"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin", "hr"]))],
 )
 async def create_student(
     student_in: StudentCreate,
@@ -48,7 +48,7 @@ async def list_students(
     status_filter: StudentStatusEnum | None = Query(None, alias="status"),
     class_id: uuid.UUID | None = Query(None),
     db: AsyncSession = Depends(get_db_with_tenant),
-    _user=Depends(require_roles(["Admin", "HR", "Teacher"])),
+    _user=Depends(require_roles(["super_admin", "admin", "hr", "manager"])),
 ) -> Any:
     """List students. Allowed: Admin, HR, Teacher."""
     # Note: publisher not needed for read
@@ -66,7 +66,7 @@ async def list_students(
 async def get_student(
     student_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_tenant),
-    _user=Depends(require_roles(["Admin", "HR", "Teacher"])),
+    _user=Depends(require_roles(["super_admin", "admin", "hr", "manager"])),
 ) -> Any:
     """Get student profile. Allowed: Admin, HR, Teacher."""
     service = StudentService(db, None)  # type: ignore
@@ -76,7 +76,7 @@ async def get_student(
 @router.put(
     "/{student_id}",
     response_model=StudentResponse,
-    dependencies=[Depends(require_roles(["Admin", "HR"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin", "hr"]))],
 )
 async def update_student(
     student_id: uuid.UUID,
@@ -92,7 +92,7 @@ async def update_student(
 @router.patch(
     "/{student_id}/status",
     response_model=StudentResponse,
-    dependencies=[Depends(require_roles(["Admin"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin"]))],
 )
 async def change_student_status(
     student_id: uuid.UUID,
@@ -108,7 +108,7 @@ async def change_student_status(
 @router.delete(
     "/{student_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_roles(["Admin"]))],
+    dependencies=[Depends(require_roles(["super_admin", "admin"]))],
 )
 async def delete_student(
     student_id: uuid.UUID,

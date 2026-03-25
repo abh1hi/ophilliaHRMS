@@ -24,7 +24,7 @@ async def get_leave_calendar(
     start_date: date,
     end_date: date,
     db: AsyncSession = Depends(get_db_with_tenant),
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN))
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN, UserRole.ADMIN))
 ):
     # Fetch all APPROVED leaves in this range (tenant-scoped)
     company_id = db.info.get("company_id")

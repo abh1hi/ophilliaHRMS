@@ -31,6 +31,8 @@ async def process_event(message: IncomingMessage):
                     await handle_leave_event(db, routing_key, payload)
                 elif routing_key == "employee.created":
                     await handle_employee_created(db, payload)
+                elif routing_key.startswith("onboarding."):
+                    await handle_onboarding_event(db, routing_key, payload)
                 elif routing_key == "payroll.run":
                     await handle_payroll_run(db, payload)
                 elif routing_key == "salary.processed":
@@ -78,6 +80,41 @@ async def handle_employee_created(db: AsyncSession, payload: dict):
 
     log_obj = NotificationLogCreate(company_id=company_id, user_id=user_id, type=NotificationType.EMAIL, subject="Welcome to Ophillia HRMS", message="Your employee profile has been created.")
     await compile_and_send_notification(db, log_obj, template_name="employee_created.html", template_context={})
+
+
+async def handle_onboarding_event(db: AsyncSession, routing_key: str, payload: dict):
+    """Handle onboarding lifecycle emails: welcome, reminder (future), completion."""
+    company_id = payload.get("company_id")
+    user_id = payload.get("user_id")
+
+    if not company_id:
+        return
+
+    if routing_key == "onboarding.wizard_completed":
+        if user_id:
+            log_obj = NotificationLogCreate(
+                company_id=company_id, user_id=user_id,
+                type=NotificationType.EMAIL,
+                subject="Onboarding Complete - Welcome to Ophillia HRMS!",
+                message="Congratulations! Your organization's onboarding wizard is complete. Your HRMS is now fully configured.",
+            )
+            await compile_and_send_notification(db, log_obj, template_name="onboarding_complete.html", template_context={"progress": 100})
+        logger.info(f"Onboarding completion email sent", extra={"service_task": "onboarding_email", "company_id": company_id})
+
+    elif routing_key == "onboarding.step_completed":
+        step_key = payload.get("step_key", "")
+        progress = payload.get("progress_percent", 0)
+        logger.info(
+            f"Onboarding step '{step_key}' completed ({progress}%)",
+            extra={"service_task": "onboarding_analytics", "company_id": company_id, "step_key": step_key},
+        )
+
+    elif routing_key == "onboarding.step_skipped":
+        step_key = payload.get("step_key", "")
+        logger.info(
+            f"Onboarding step '{step_key}' skipped",
+            extra={"service_task": "onboarding_analytics", "company_id": company_id, "step_key": step_key},
+        )
 
 
 async def handle_payroll_run(db: AsyncSession, payload: dict):
@@ -145,10 +182,11 @@ async def start_consumers():
         # Bind to all relevant events
         await queue.bind(exchange, routing_key="leave.*")
         await queue.bind(exchange, routing_key="employee.created")
+        await queue.bind(exchange, routing_key="onboarding.*")
         await queue.bind(exchange, routing_key="payroll.run")
         await queue.bind(exchange, routing_key="salary.processed")
 
-        logger.info("Notification consumer started — listening for leave.*, employee.created, payroll.run, salary.processed")
+        logger.info("Notification consumer started — listening for leave.*, employee.created, onboarding.*, payroll.run, salary.processed")
         await queue.consume(process_event)
     except Exception as exc:
         logger.error(f"Failed to start RabbitMQ consumers: {exc}")
