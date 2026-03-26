@@ -1,7 +1,7 @@
 from typing import Optional, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -21,6 +21,7 @@ from app.schemas.employee import (
     EmployeeListResponse,
     BulkEmployeeResponse,
     BulkEmployeeResult,
+    BulkEmployeeImportItem,
 )
 from app.utils.pagination import PaginationParams
 from app.core.rate_limit import limiter
@@ -77,6 +78,110 @@ async def bulk_create_employees(
         succeeded=succeeded,
         failed=len(results) - succeeded,
         results=results,
+    )
+
+
+# ──────────── POST /employees/bulk-import (field-mapped Excel/CSV import) ────────────
+@router.post("/bulk-import", response_model=BulkEmployeeResponse, status_code=200)
+@limiter.limit("10/minute")
+async def bulk_import_employees(
+    request: Request,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)
+    ),
+    service: EmployeeService = Depends(_get_service),
+):
+    """Bulk import employees from field-mapped Excel/CSV data.
+    Accepts raw JSON array — each row is validated individually so one bad row
+    does not block the rest. Creates auth accounts when initial_password is set.
+    """
+    import httpx, logging, json as _json
+    from pydantic import ValidationError
+    from app.core.config import settings
+
+    logger = logging.getLogger(__name__)
+    company_id = getattr(current_user, "company_id", None)
+
+    raw_body = await request.body()
+    try:
+        rows = _json.loads(raw_body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Request body must be a JSON array")
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=400, detail="Request body must be a JSON array")
+
+    results: list = []
+    db = service.repo.db  # grab session for rollback on failures
+
+    for idx, raw in enumerate(rows):
+        # Guard: each row must be a dict (object), not a string or other type
+        if not isinstance(raw, dict):
+            results.append({"index": idx, "success": False, "employee": None, "error": f"Row {idx}: expected JSON object, got {type(raw).__name__}"})
+            continue
+
+        try:
+            # Coerce numeric values to strings for fields that expect str
+            for k, v in list(raw.items()):
+                if isinstance(v, (int, float)) and k not in (
+                    "joining_salary", "last_drawn_salary",
+                ):
+                    raw[k] = str(int(v)) if isinstance(v, float) and v == int(v) else str(v)
+
+            item = BulkEmployeeImportItem(**raw)
+        except (ValidationError, Exception) as e:
+            err_msg = str(e)
+            if hasattr(e, "errors"):
+                errs = e.errors()  # type: ignore
+                err_msg = "; ".join(f"{'.'.join(str(p) for p in er['loc'])}: {er['msg']}" for er in errs[:3])
+            results.append({"index": idx, "success": False, "employee": None, "error": f"Validation: {err_msg}"})
+            continue
+
+        try:
+            user_id = item.user_id
+
+            # Step 1: Create auth account if password is provided
+            if item.initial_password and not user_id:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    auth_resp = await client.post(
+                        f"{settings.AUTH_SERVICE_URL}/api/v1/auth/register",
+                        json={
+                            "email": item.email,
+                            "password": item.initial_password,
+                            "role": item.role or "employee",
+                            **({"company_id": str(company_id)} if company_id else {}),
+                        },
+                    )
+                    if auth_resp.status_code in (200, 201):
+                        body = auth_resp.json()
+                        data = body.get("data") or body
+                        user_id = data.get("id")
+                    else:
+                        body = auth_resp.json()
+                        err = body.get("detail") or body.get("error", {}).get("message", "Auth registration failed")
+                        results.append({"index": idx, "success": False, "employee": None, "error": f"Auth: {err}"})
+                        continue
+
+            # Step 2: Create employee profile
+            emp_create = item.to_employee_create(
+                user_id_override=UUID(str(user_id)) if user_id else None
+            )
+            employee = await service.create_employee(emp_create)
+            results.append({"index": idx, "success": True, "employee": employee, "error": None})
+
+        except Exception as e:
+            logger.warning(f"Bulk import row {idx} failed: {e}")
+            results.append({"index": idx, "success": False, "employee": None, "error": str(e)})
+            # Roll back the failed transaction so subsequent rows can proceed
+            await db.rollback()
+
+    from app.schemas.employee import BulkEmployeeResult as _BER
+    typed_results = [_BER(**r) for r in results]
+    succeeded = sum(1 for r in typed_results if r.success)
+    return BulkEmployeeResponse(
+        total=len(typed_results),
+        succeeded=succeeded,
+        failed=len(typed_results) - succeeded,
+        results=typed_results,
     )
 
 

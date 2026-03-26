@@ -22,6 +22,24 @@ from app.core.rate_limit import limiter
 event_publisher = EventPublisher(settings.RABBITMQ_URL)
 
 
+async def _run_auto_punchout_loop(interval_seconds: int = 300):
+    """Background task that auto-closes stale attendance records every N seconds."""
+    from app.db.session import AsyncSessionLocal
+    from app.scheduler.auto_punchout import auto_close_stale_records
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            async with AsyncSessionLocal() as session:
+                closed = await auto_close_stale_records(session, event_publisher)
+                if closed:
+                    logger.info(f"Auto punch-out: closed {closed} records")
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Auto punch-out scheduler error")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import redis.asyncio as aioredis
@@ -30,11 +48,20 @@ async def lifespan(app: FastAPI):
     await event_publisher.connect()
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     set_redis(redis_client)
+
+    # Start auto punch-out scheduler (runs every 5 minutes)
+    auto_punchout_task = asyncio.create_task(_run_auto_punchout_loop(300))
+
     logger.info("Attendance service started", extra={"service_task": "startup"})
     yield
 
-    # Graceful shutdown: allow in-flight requests to complete
+    # Graceful shutdown
     logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
+    auto_punchout_task.cancel()
+    try:
+        await auto_punchout_task
+    except asyncio.CancelledError:
+        pass
     await asyncio.sleep(5)
 
     await redis_client.aclose()

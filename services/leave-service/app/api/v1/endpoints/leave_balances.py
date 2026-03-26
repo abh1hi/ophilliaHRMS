@@ -27,6 +27,24 @@ from app.models.leave import LeaveBalance, LeaveType
 
 router = APIRouter()
 
+@router.get("/", response_model=APIResponse[List[LeaveBalanceResponse]])
+async def list_all_leave_balances(
+    year: int = datetime.utcnow().year,
+    db: AsyncSession = Depends(get_db_with_tenant),
+    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN))
+):
+    """List all leave balances for the company (admin/HR only)."""
+    company_id = db.info.get("company_id")
+    result = await db.execute(
+        select(LeaveBalance)
+        .options(selectinload(LeaveBalance.leave_type))
+        .filter(
+            LeaveBalance.company_id == company_id,
+            LeaveBalance.year == year,
+        )
+    )
+    return APIResponse(success=True, data=result.scalars().all())
+
 @router.get("/{employee_id}", response_model=APIResponse[List[LeaveBalanceResponse]])
 async def get_leave_balances(
     employee_id: UUID,

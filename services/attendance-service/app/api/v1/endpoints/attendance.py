@@ -38,7 +38,17 @@ from app.schemas.attendance import (
     BulkSchoolModeRequest,
     BulkSchoolModeResponse,
     BulkSchoolModeResult,
+    TaskTemplateCreate,
+    TaskTemplateUpdate,
+    TaskTemplateResponse,
+    TaskTemplateListResponse,
+    AdminKPIResponse,
+    AttendanceTrendResponse,
+    DailyStatusBreakdown,
+    PerformersResponse,
+    TodayShiftsResponse,
 )
+from app.services.task_template_service import TaskTemplateService
 from app.utils.pagination import PaginationParams
 from app.core.rate_limit import limiter
 
@@ -61,6 +71,10 @@ def _get_policy_service(db: AsyncSession = Depends(get_db_with_tenant)) -> Polic
 
 def _get_task_service(db: AsyncSession = Depends(get_db_with_tenant)) -> TaskService:
     return TaskService(db)
+
+
+def _get_template_service(db: AsyncSession = Depends(get_db_with_tenant)) -> TaskTemplateService:
+    return TaskTemplateService(db)
 
 
 # ──────────────────── ATTENDANCE RECORDS ────────────────────
@@ -112,6 +126,15 @@ async def get_my_today(
     return record
 
 
+@router.get("/me/today/shifts", response_model=TodayShiftsResponse)
+async def get_my_today_shifts(
+    current_user: TokenPayload = Depends(get_current_user),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Get all shift records for today with shift metadata (max shifts, can start new)."""
+    return await service.get_today_shifts(UUID(current_user.sub))
+
+
 @router.get("/me", response_model=AttendanceListResponse)
 async def get_my_records(
     pagination: PaginationParams = Depends(),
@@ -157,31 +180,6 @@ async def list_all_attendance(
     return AttendanceListResponse(
         total=total, skip=pagination.skip, limit=pagination.limit, records=records
     )
-
-
-@router.get("/{record_id}", response_model=AttendanceResponse)
-async def get_attendance_record(
-    record_id: UUID,
-    current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
-    ),
-    service: AttendanceService = Depends(_get_service),
-):
-    """Get a specific attendance record by ID."""
-    return await service.get_record(record_id)
-
-
-@router.patch("/{record_id}", response_model=AttendanceResponse)
-async def update_attendance_record(
-    record_id: UUID,
-    data: AttendanceUpdate,
-    current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
-    ),
-    service: AttendanceService = Depends(_get_service),
-):
-    """Manually correct an attendance record. HR/Super Admin only."""
-    return await service.update_record(record_id, data)
 
 
 @router.post("/manual", response_model=AttendanceResponse, status_code=201)
@@ -264,12 +262,18 @@ async def add_task(
         # HR/Admin/Manager can assign tasks; the task employee_id is inferred from the record
         assigned_by = employee_uuid
 
-    return await service.add_task(
+    task = await service.add_task(
         record_id=record_id,
         employee_id=employee_uuid,
         data=data,
         assigned_by=assigned_by,
     )
+
+    # Trigger state transition: PUNCHED_IN → ACTIVE after first task is added
+    att_service = AttendanceService(service.task_repo.db)
+    await att_service.update_state(record_id, employee_uuid)
+
+    return task
 
 
 @router.get("/tasks/today", response_model=TaskListResponse)
@@ -487,3 +491,184 @@ async def delete_policy(
 ):
     """Hard-delete an attendance policy (config, not data). HR/Super Admin only."""
     await service.delete_policy(policy_id)
+
+
+# ──────────────────── TASK TEMPLATES ────────────────────
+
+@router.post("/templates", response_model=TaskTemplateResponse, status_code=201)
+async def create_template(
+    data: TaskTemplateCreate,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskTemplateService = Depends(_get_template_service),
+):
+    """Create a task template. Employees create personal templates; admins can create shared ones."""
+    is_admin = current_user.role in (UserRole.HR.value, UserRole.SUPER_ADMIN.value, UserRole.ADMIN.value)
+    if data.is_shared and not is_admin:
+        data.is_shared = False  # Only admins can create shared templates
+    return await service.create_template(data, created_by=UUID(current_user.sub))
+
+
+@router.get("/templates", response_model=TaskTemplateListResponse)
+async def list_templates(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskTemplateService = Depends(_get_template_service),
+):
+    """List task templates visible to the current user (personal + shared)."""
+    templates, total = await service.list_templates(UUID(current_user.sub), skip, limit)
+    return TaskTemplateListResponse(total=total, templates=templates)
+
+
+@router.patch("/templates/{template_id}", response_model=TaskTemplateResponse)
+async def update_template(
+    template_id: UUID,
+    data: TaskTemplateUpdate,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskTemplateService = Depends(_get_template_service),
+):
+    """Update a task template. Only the creator or admin can update."""
+    is_admin = current_user.role in (UserRole.HR.value, UserRole.SUPER_ADMIN.value, UserRole.ADMIN.value)
+    return await service.update_template(template_id, data, UUID(current_user.sub), is_admin)
+
+
+@router.delete("/templates/{template_id}", status_code=204)
+async def delete_template(
+    template_id: UUID,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: TaskTemplateService = Depends(_get_template_service),
+):
+    """Delete a task template. Only the creator or admin can delete."""
+    is_admin = current_user.role in (UserRole.HR.value, UserRole.SUPER_ADMIN.value, UserRole.ADMIN.value)
+    await service.delete_template(template_id, UUID(current_user.sub), is_admin)
+
+
+# ──────────────────── ADMIN DASHBOARD / KPI ────────────────────
+
+@router.get("/dashboard/kpi", response_model=AdminKPIResponse)
+async def admin_kpi(
+    target_date: Optional[date] = Query(None, description="Date for KPI (default: today)"),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Top-level KPI summary: present, late, absent, missed punch-outs, avg hours, task metrics."""
+    return await service.get_admin_kpi(target_date)
+
+
+@router.get("/dashboard/trend", response_model=AttendanceTrendResponse)
+async def attendance_trend(
+    days: int = Query(7, ge=1, le=90, description="Number of days to look back"),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Attendance trend for the last N days (line chart data)."""
+    return await service.get_attendance_trend(days)
+
+
+@router.get("/dashboard/status-breakdown", response_model=DailyStatusBreakdown)
+async def daily_status_breakdown(
+    target_date: Optional[date] = Query(None, description="Date (default: today)"),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Daily attendance status breakdown (pie chart data)."""
+    return await service.get_daily_status_breakdown(target_date)
+
+
+@router.get("/dashboard/performers", response_model=PerformersResponse)
+async def performers(
+    year: int = Query(..., description="Year"),
+    month: int = Query(..., ge=1, le=12, description="Month 1-12"),
+    limit: int = Query(5, ge=1, le=20, description="Number of top/low performers"),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Top and low performers for a given month based on productivity score."""
+    return await service.get_performers(year, month, limit)
+
+
+# ──────────────────── EXPORT ────────────────────
+
+@router.get("/export/csv")
+@limiter.limit("5/minute")
+async def export_attendance_csv(
+    request: Request,
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    employee_id: Optional[UUID] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Export attendance data as CSV. HR/Admin only."""
+    import csv
+    import io
+    from starlette.responses import StreamingResponse
+
+    records, _ = await service.list_all(
+        skip=0, limit=10000,
+        employee_id=employee_id,
+        date_from=date_from,
+        date_to=date_to,
+        status=status_filter,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Employee ID", "Date", "Clock In", "Clock Out", "Status", "State",
+        "Work Hours", "Overtime Hours", "Day Rating", "Productivity Score",
+        "Clock In Location", "Clock Out Location", "Shift", "Tasks Count",
+    ])
+    for r in records:
+        writer.writerow([
+            str(r.employee_id), str(r.date), str(r.clock_in), str(r.clock_out or ""),
+            r.status, r.state, r.work_hours or "", r.overtime_hours,
+            r.day_rating or "", r.productivity_score or "",
+            r.clock_in_location_name or "", r.clock_out_location_name or "",
+            r.shift_number, len(r.tasks) if r.tasks else 0,
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attendance_export.csv"},
+    )
+
+
+# ──────────────────── SINGLE RECORD (must be last — wildcard catches all /{id}) ────────────────────
+
+@router.get("/{record_id}", response_model=AttendanceResponse)
+async def get_attendance_record(
+    record_id: UUID,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Get a specific attendance record by ID."""
+    return await service.get_record(record_id)
+
+
+@router.patch("/{record_id}", response_model=AttendanceResponse)
+async def update_attendance_record(
+    record_id: UUID,
+    data: AttendanceUpdate,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Manually correct an attendance record. HR/Super Admin only."""
+    return await service.update_record(record_id, data)

@@ -63,7 +63,20 @@ class PolicyRepository:
             if policy:
                 return policy
 
-        # 3. No policy found — caller should use global default
+        # 3. Try company-wide policy (no employee or department)
+        result = await self.db.execute(
+            self._scoped(select(AttendancePolicy)).where(
+                and_(
+                    AttendancePolicy.employee_id.is_(None),
+                    AttendancePolicy.department_id.is_(None),
+                )
+            )
+        )
+        policy = result.scalars().first()
+        if policy:
+            return policy
+
+        # 4. No policy found — caller should use global default
         return None
 
     async def update(self, policy: AttendancePolicy, updates: dict) -> AttendancePolicy:

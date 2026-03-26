@@ -68,8 +68,20 @@ class TaskService:
         employee_id: UUID,
         data: TaskUpdate,
     ) -> AttendanceTask:
-        """Update pre-completion fields of a task."""
+        """Update pre-completion fields of a task.
+
+        Completed tasks have limited editing: only completion_notes can be updated
+        within a time window (handled at completion level).
+        """
         task = await self._get_task_for_employee(task_id, employee_id)
+
+        # Completed tasks cannot have their core fields edited
+        if task.status in ("completed", "partially_completed", "not_completed"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot edit task details after completion. Only completion notes can be updated.",
+            )
+
         update_data = data.model_dump(exclude_unset=True)
         if not update_data:
             raise HTTPException(
@@ -79,8 +91,16 @@ class TaskService:
         return await self.task_repo.update(task, update_data)
 
     async def delete_task(self, task_id: UUID, employee_id: UUID) -> None:
-        """Delete a task (employee can only delete their own tasks)."""
+        """Delete a task (employee can only delete their own tasks).
+
+        Completed tasks cannot be deleted.
+        """
         task = await self._get_task_for_employee(task_id, employee_id)
+        if task.status in ("completed", "partially_completed", "not_completed"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Completed tasks cannot be deleted",
+            )
         await self.task_repo.delete(task)
 
     async def complete_task(

@@ -42,6 +42,18 @@ class AttendancePolicy(Base):
     work_start_time = Column(Time, nullable=True, default=time(9, 0))
     work_hours_per_day = Column(Float, nullable=False, default=8.0)
 
+    # Auto punch-out time (fail-safe): default 23:59
+    auto_close_time = Column(Time, nullable=True, default=time(23, 59))
+
+    # Task planning grace period in minutes after punch-in
+    task_planning_grace_minutes = Column(Float, nullable=False, default=30.0)
+
+    # Whether night shift (cross-date) is allowed
+    allow_night_shift = Column(String(10), nullable=False, default="false")
+
+    # Maximum shifts per day (1 = standard, >1 = multiple shifts)
+    max_shifts_per_day = Column(Float, nullable=False, default=1)
+
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(
         DateTime,

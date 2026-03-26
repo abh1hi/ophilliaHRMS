@@ -27,6 +27,12 @@ from app.schemas.attendance import (
     ProductivityReportResponse,
     AlertsResponse,
     MissedPunchOutItem,
+    AdminKPIResponse,
+    AttendanceTrendItem,
+    AttendanceTrendResponse,
+    DailyStatusBreakdown,
+    EmployeeProductivitySummary,
+    PerformersResponse,
 )
 from app.events.publisher import EventPublisher
 from app.utils.geofence import is_within_geofence
@@ -114,14 +120,6 @@ class AttendanceService:
     ) -> AttendanceRecord:
         today = date.today()
 
-        # Check if already clocked in today
-        existing = await self.attendance_repo.get_by_employee_and_date(employee_id, today)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Already clocked in for today",
-            )
-
         # Validate employee belongs to current tenant
         company_id = self.attendance_repo.db.info.get("company_id")
         if company_id:
@@ -133,10 +131,31 @@ class AttendanceService:
         )
         self._validate_geofence(method, geofence, data.latitude, data.longitude)
 
+        # Check existing records for today (support multiple shifts)
+        existing = await self.attendance_repo.get_by_employee_and_date(employee_id, today)
+        shift_number = 1
+        if existing:
+            # Check if the last record is still open (not clocked out)
+            if existing.clock_out is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Already clocked in for today. Punch out first before starting a new shift.",
+                )
+            # Allow new shift only if policy permits multiple shifts
+            policy = await self.policy_repo.get_for_employee(employee_id, department_id)
+            max_shifts = policy.max_shifts_per_day if policy else 1
+            current_shift_count = await self.attendance_repo.get_shift_count_today(employee_id, today)
+            if current_shift_count >= max_shifts:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Maximum {int(max_shifts)} shift(s) per day reached",
+                )
+            shift_number = current_shift_count + 1
+
         # Determine status (on-time vs late)
         now = datetime.now(timezone.utc)
         attendance_status = "present"
-        if work_start:
+        if work_start and shift_number == 1:
             clock_in_time = now.time()
             if clock_in_time > work_start:
                 attendance_status = "late"
@@ -148,9 +167,13 @@ class AttendanceService:
             clock_in_lng=data.longitude,
             clock_in_location_name=data.location_name,
             status=attendance_status,
+            state="punched_in",
             method=method if method != "both" else "geofence" if data.latitude else "manual",
             notes=data.notes,
             date=today,
+            shift_number=shift_number,
+            device_info=data.device_info,
+            network_info=data.network_info,
         )
         record = await self.attendance_repo.create(record)
 
@@ -162,14 +185,49 @@ class AttendanceService:
                 "employee_id": str(employee_id),
                 "method": record.method,
                 "status": record.status,
+                "shift_number": shift_number,
                 "timestamp": now.isoformat(),
             })
 
         logger.info(
-            f"Clock-in: employee={employee_id}, status={attendance_status}",
+            f"Clock-in: employee={employee_id}, status={attendance_status}, shift={shift_number}",
             extra={"user_id": str(employee_id), "service_task": "clock_in"},
         )
         return record
+
+    # ──────────── PRODUCTIVITY SCORE ────────────
+
+    @staticmethod
+    def _calculate_productivity_score(
+        tasks: list,
+        day_rating: Optional[int],
+        work_hours: float,
+        work_hours_per_day: float,
+    ) -> float:
+        """Calculate system productivity score (0-100).
+
+        Formula:
+        - 50% task completion rate
+        - 25% self-rating (scaled to 0-25)
+        - 25% hours worked vs expected (capped at 100%)
+        """
+        # Task completion component (50%)
+        total_tasks = len(tasks)
+        if total_tasks > 0:
+            completed = sum(1 for t in tasks if t.status == "completed")
+            partial = sum(1 for t in tasks if t.status == "partially_completed")
+            task_score = ((completed + partial * 0.5) / total_tasks) * 50
+        else:
+            task_score = 0.0
+
+        # Rating component (25%)
+        rating_score = ((day_rating or 3) / 5) * 25
+
+        # Hours component (25%)
+        hours_ratio = min(work_hours / work_hours_per_day, 1.0) if work_hours_per_day > 0 else 0
+        hours_score = hours_ratio * 25
+
+        return round(task_score + rating_score + hours_score, 1)
 
     # ──────────── CLOCK OUT ────────────
 
@@ -181,16 +239,16 @@ class AttendanceService:
     ) -> AttendanceRecord:
         today = date.today()
 
-        record = await self.attendance_repo.get_by_employee_and_date(employee_id, today)
+        record = await self.attendance_repo.get_open_record_today(employee_id, today)
         if not record:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No clock-in record found for today. Clock in first.",
+                detail="No open clock-in record found for today. Clock in first.",
             )
         if record.clock_out:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Already clocked out for today",
+                detail="Already clocked out for this shift",
             )
 
         # Validate geofence on clock-out too
@@ -198,6 +256,37 @@ class AttendanceService:
             employee_id, department_id
         )
         self._validate_geofence(method, geofence, data.latitude, data.longitude)
+
+        # Process task completions supplied inline with punch-out FIRST
+        if data.task_completions:
+            for item in data.task_completions:
+                task = await self.task_repo.get_by_id(item.task_id)
+                if task and task.employee_id == employee_id:
+                    await self.task_repo.update(task, {
+                        "status": item.status,
+                        "completion_notes": item.completion_notes,
+                        "actual_expenses": item.actual_expenses,
+                    })
+
+        # Reload tasks after processing completions
+        tasks = await self.task_repo.get_by_record(record.id)
+
+        # ── Punch-out validations ──
+        # At least 1 task must exist
+        if len(tasks) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="At least one task must be added before punching out",
+            )
+
+        # All tasks must have a final status (not pending)
+        pending_tasks = [t for t in tasks if t.status == "pending"]
+        if pending_tasks:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{len(pending_tasks)} task(s) still have 'pending' status. "
+                       "Update all tasks before punching out.",
+            )
 
         # Compute work hours and overtime
         now = datetime.now(timezone.utc)
@@ -210,6 +299,11 @@ class AttendanceService:
         if total_hours < (work_hours_per_day / 2):
             current_status = "half_day"
 
+        # Calculate productivity score
+        productivity = self._calculate_productivity_score(
+            tasks, data.day_rating, total_hours, work_hours_per_day
+        )
+
         update_data = {
             "clock_out": now,
             "clock_out_lat": data.latitude,
@@ -218,21 +312,13 @@ class AttendanceService:
             "work_hours": total_hours,
             "overtime_hours": overtime,
             "status": current_status,
+            "state": "completed",
             "notes": data.notes if data.notes else record.notes,
             "day_rating": data.day_rating,
+            "rating_comment": data.rating_comment,
+            "productivity_score": productivity,
         }
         record = await self.attendance_repo.update(record, update_data)
-
-        # Process task completions supplied inline with punch-out
-        if data.task_completions:
-            for item in data.task_completions:
-                task = await self.task_repo.get_by_id(item.task_id)
-                if task and task.employee_id == employee_id:
-                    await self.task_repo.update(task, {
-                        "status": item.status,
-                        "completion_notes": item.completion_notes,
-                        "actual_expenses": item.actual_expenses,
-                    })
 
         # Publish event
         if self.event_publisher:
@@ -243,11 +329,13 @@ class AttendanceService:
                 "work_hours": total_hours,
                 "overtime_hours": overtime,
                 "day_rating": data.day_rating,
+                "productivity_score": productivity,
                 "timestamp": now.isoformat(),
             })
 
         logger.info(
-            f"Clock-out: employee={employee_id}, hours={total_hours}, overtime={overtime}, rating={data.day_rating}",
+            f"Clock-out: employee={employee_id}, hours={total_hours}, overtime={overtime}, "
+            f"rating={data.day_rating}, productivity={productivity}",
             extra={"user_id": str(employee_id), "service_task": "clock_out"},
         )
         return record
@@ -256,6 +344,33 @@ class AttendanceService:
 
     async def get_today_record(self, employee_id: UUID) -> Optional[AttendanceRecord]:
         return await self.attendance_repo.get_by_employee_and_date(employee_id, date.today())
+
+    # ──────────── GET ALL SHIFTS TODAY ────────────
+
+    async def get_today_shifts(
+        self, employee_id: UUID, department_id: Optional[UUID] = None
+    ) -> dict:
+        """Return all shift records for today plus shift metadata."""
+        today = date.today()
+        shifts = await self.attendance_repo.get_all_shifts_today(employee_id, today)
+        shift_count = len(shifts)
+
+        # Resolve max_shifts_per_day from policy
+        policy = await self.policy_repo.get_for_employee(employee_id, department_id)
+        max_shifts = int(policy.max_shifts_per_day) if policy else 1
+
+        # Can start a new shift if:
+        # - all existing shifts are clocked out
+        # - shift count < max_shifts
+        all_closed = all(s.clock_out is not None for s in shifts) if shifts else True
+        can_start_new_shift = all_closed and shift_count < max_shifts
+
+        return {
+            "shifts": shifts,
+            "shift_count": shift_count,
+            "max_shifts": max_shifts,
+            "can_start_new_shift": can_start_new_shift,
+        }
 
     # ──────────── LIST (Employee's own) ────────────
 
@@ -441,6 +556,51 @@ class AttendanceService:
         items = [ProductivityReportItem(**row) for row in rows]
         return ProductivityReportResponse(month=month, year=year, items=items)
 
+    # ──────────── ADMIN KPI DASHBOARD ────────────
+
+    async def get_admin_kpi(self, target_date: Optional[date] = None) -> AdminKPIResponse:
+        """Return top-level KPI summary for admin dashboard."""
+        target = target_date or date.today()
+        return await self.attendance_repo.get_admin_kpi(target)
+
+    async def get_attendance_trend(self, days: int = 7) -> AttendanceTrendResponse:
+        """Return attendance trend for the last N days."""
+        items = await self.attendance_repo.get_attendance_trend(days)
+        return AttendanceTrendResponse(items=items)
+
+    async def get_daily_status_breakdown(self, target_date: Optional[date] = None) -> DailyStatusBreakdown:
+        """Return status breakdown for a single day (pie chart data)."""
+        target = target_date or date.today()
+        return await self.attendance_repo.get_daily_status_breakdown(target)
+
+    async def get_performers(self, year: int, month: int, limit: int = 5) -> PerformersResponse:
+        """Return top and low performers for a month."""
+        return await self.attendance_repo.get_performers(year, month, limit)
+
+    # ──────────── STATE TRANSITION ────────────
+
+    async def update_state(self, record_id: UUID, employee_id: UUID) -> AttendanceRecord:
+        """Transition attendance state based on task count.
+
+        Called after a task is added: PUNCHED_IN → PENDING_TASKS → ACTIVE
+        """
+        record = await self.attendance_repo.get_by_id(record_id)
+        if not record or record.employee_id != employee_id:
+            return record
+
+        tasks = await self.task_repo.get_by_record(record_id)
+        new_state = record.state
+
+        if record.state == "punched_in" and len(tasks) > 0:
+            new_state = "active"
+        elif record.state == "pending_tasks" and len(tasks) > 0:
+            new_state = "active"
+
+        if new_state != record.state:
+            record = await self.attendance_repo.update(record, {"state": new_state})
+
+        return record
+
 
 class GeofenceService:
     """Business logic for managing geofence locations."""
@@ -518,6 +678,10 @@ class PolicyService:
             geofence_id=data.geofence_id,
             work_start_time=data.work_start_time,
             work_hours_per_day=data.work_hours_per_day,
+            auto_close_time=data.auto_close_time,
+            task_planning_grace_minutes=data.task_planning_grace_minutes,
+            allow_night_shift=data.allow_night_shift,
+            max_shifts_per_day=data.max_shifts_per_day,
         )
         return await self.repo.create(policy)
 
