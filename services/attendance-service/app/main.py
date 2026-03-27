@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.exception_handlers import register_exception_handlers
 from app.middleware.request_id import request_id_middleware
+from app.middleware.idempotency import IdempotencyMiddleware
 from app.events.publisher import EventPublisher
 
 import logging
@@ -40,6 +41,22 @@ async def _run_auto_punchout_loop(interval_seconds: int = 300):
             logger.exception("Auto punch-out scheduler error")
 
 
+async def _run_idempotency_cleanup_loop(interval_seconds: int = 3600):
+    """Background task that cleans up expired idempotency keys every N seconds (default: 1h)."""
+    from app.db.session import AsyncSessionLocal
+    from app.scheduler.idempotency_cleanup import cleanup_expired_idempotency_keys
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            async with AsyncSessionLocal() as session:
+                await cleanup_expired_idempotency_keys(session)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Idempotency cleanup scheduler error")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import redis.asyncio as aioredis
@@ -49,8 +66,68 @@ async def lifespan(app: FastAPI):
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     set_redis(redis_client)
 
+    # ── Startup health check: flag dangerously old open records ──
+    from datetime import datetime, timedelta, timezone as tz
+    from sqlalchemy import select, and_, func
+    from app.db.session import AsyncSessionLocal
+    from app.models.attendance_record import AttendanceRecord
+
+    try:
+        async with AsyncSessionLocal() as session:
+            stale_threshold = datetime.now(tz.utc).replace(tzinfo=None) - timedelta(hours=24)
+            count_result = await session.execute(
+                select(func.count(AttendanceRecord.id)).where(
+                    and_(
+                        AttendanceRecord.clock_out.is_(None),
+                        AttendanceRecord.created_at < stale_threshold,
+                    )
+                )
+            )
+            stale_count = count_result.scalar() or 0
+            if stale_count > 0:
+                # Fetch details for the alert
+                detail_result = await session.execute(
+                    select(
+                        AttendanceRecord.employee_id,
+                        AttendanceRecord.date,
+                        AttendanceRecord.clock_in,
+                        AttendanceRecord.company_id,
+                    ).where(
+                        and_(
+                            AttendanceRecord.clock_out.is_(None),
+                            AttendanceRecord.created_at < stale_threshold,
+                        )
+                    ).limit(20)
+                )
+                stale_records = detail_result.all()
+                employee_ids = [str(r.employee_id) for r in stale_records]
+                logger.critical(
+                    f"STARTUP ALERT: {stale_count} open attendance record(s) older than 24h found. "
+                    f"Manual correction may be needed. "
+                    f"First {len(stale_records)} employee_ids: {employee_ids}",
+                    extra={"service_task": "startup_audit", "stale_count": stale_count},
+                )
+
+                # Publish event so HR dashboards / notification services can react
+                if event_publisher._exchange is not None:
+                    await event_publisher.publish("attendance.stale_records_alert", {
+                        "stale_count": stale_count,
+                        "employee_ids": employee_ids,
+                        "threshold_hours": 24,
+                        "timestamp": datetime.now(tz.utc).isoformat(),
+                    })
+            else:
+                logger.info(
+                    "Startup audit: no stale open records found",
+                    extra={"service_task": "startup_audit"},
+                )
+    except Exception:
+        logger.exception("Startup audit failed — non-blocking, continuing startup")
+
     # Start auto punch-out scheduler (runs every 5 minutes)
     auto_punchout_task = asyncio.create_task(_run_auto_punchout_loop(300))
+    # Start idempotency key cleanup (runs every 1 hour)
+    idempotency_cleanup_task = asyncio.create_task(_run_idempotency_cleanup_loop(3600))
 
     logger.info("Attendance service started", extra={"service_task": "startup"})
     yield
@@ -58,8 +135,13 @@ async def lifespan(app: FastAPI):
     # Graceful shutdown
     logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
     auto_punchout_task.cancel()
+    idempotency_cleanup_task.cancel()
     try:
         await auto_punchout_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await idempotency_cleanup_task
     except asyncio.CancelledError:
         pass
     await asyncio.sleep(5)
@@ -89,10 +171,11 @@ app.add_middleware(
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
 )
 
 app.add_middleware(BaseHTTPMiddleware, dispatch=request_id_middleware)
+app.add_middleware(IdempotencyMiddleware)
 
 @app.get("/health", tags=["health"])
 async def health_check():

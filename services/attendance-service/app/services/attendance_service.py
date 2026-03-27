@@ -110,7 +110,7 @@ class AttendanceService:
                            f"Allowed radius: {geofence.radius_meters}m.",
                 )
 
-    # ──────────── CLOCK IN ────────────
+    # ──────────── CLOCK IN (idempotent) ────────────
 
     async def clock_in(
         self,
@@ -118,6 +118,15 @@ class AttendanceService:
         data: ClockInRequest,
         department_id: Optional[UUID] = None,
     ) -> AttendanceRecord:
+        """Idempotent clock-in.
+
+        Uses SELECT FOR UPDATE to prevent race conditions between concurrent
+        requests.  If a duplicate INSERT hits the unique constraint
+        (employee_id, date, shift_number), we catch the IntegrityError and
+        return the existing record instead of a 500.
+        """
+        from sqlalchemy.exc import IntegrityError
+
         today = date.today()
 
         # Validate employee belongs to current tenant
@@ -131,21 +140,27 @@ class AttendanceService:
         )
         self._validate_geofence(method, geofence, data.latitude, data.longitude)
 
-        # Check existing records for today (support multiple shifts)
-        existing = await self.attendance_repo.get_by_employee_and_date(employee_id, today)
+        # ── Locked read: prevent two concurrent clock-ins from racing ──
+        existing = await self.attendance_repo.get_by_employee_and_date_for_update(
+            employee_id, today
+        )
         shift_number = 1
         if existing:
-            # Check if the last record is still open (not clocked out)
+            # Already clocked in and still open → idempotent: return existing
             if existing.clock_out is None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Already clocked in for today. Punch out first before starting a new shift.",
+                logger.info(
+                    f"Clock-in duplicate detected (idempotent): employee={employee_id}",
+                    extra={"user_id": str(employee_id), "service_task": "clock_in", "duplicate": True},
                 )
+                await self.attendance_repo.commit()
+                return existing
+
             # Allow new shift only if policy permits multiple shifts
             policy = await self.policy_repo.get_for_employee(employee_id, department_id)
-            max_shifts = policy.max_shifts_per_day if policy else 1
+            max_shifts = policy.max_shifts_per_day if policy else 2
             current_shift_count = await self.attendance_repo.get_shift_count_today(employee_id, today)
             if current_shift_count >= max_shifts:
+                await self.attendance_repo.commit()
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Maximum {int(max_shifts)} shift(s) per day reached",
@@ -175,11 +190,28 @@ class AttendanceService:
             device_info=data.device_info,
             network_info=data.network_info,
         )
-        record = await self.attendance_repo.create(record)
 
-        # Publish event
+        try:
+            record = await self.attendance_repo.create(record)
+            await self.attendance_repo.commit()
+        except IntegrityError:
+            # Race condition: another request inserted first.
+            # Rollback and return the existing record (idempotent).
+            await self.attendance_repo.rollback()
+            existing = await self.attendance_repo.get_by_employee_and_date(employee_id, today)
+            if existing:
+                logger.info(
+                    f"Clock-in IntegrityError resolved (idempotent): employee={employee_id}",
+                    extra={"user_id": str(employee_id), "service_task": "clock_in", "duplicate": True},
+                )
+                return existing
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Already clocked in for today.",
+            )
+
+        # Publish event (after commit — fire-and-forget)
         if self.event_publisher:
-            company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.clock_in", {
                 "company_id": str(company_id) if company_id else None,
                 "employee_id": str(employee_id),
@@ -229,7 +261,7 @@ class AttendanceService:
 
         return round(task_score + rating_score + hours_score, 1)
 
-    # ──────────── CLOCK OUT ────────────
+    # ──────────── CLOCK OUT (idempotent) ────────────
 
     async def clock_out(
         self,
@@ -237,18 +269,31 @@ class AttendanceService:
         data: ClockOutRequest,
         department_id: Optional[UUID] = None,
     ) -> AttendanceRecord:
+        """Idempotent clock-out.
+
+        Uses SELECT FOR UPDATE to lock the open record, preventing concurrent
+        punch-outs (manual + auto-close, or double-click) from conflicting.
+        If already clocked out, returns the existing completed record.
+        """
         today = date.today()
 
-        record = await self.attendance_repo.get_open_record_today(employee_id, today)
+        # ── Locked read: only one punch-out can proceed at a time ──
+        record = await self.attendance_repo.get_open_record_today_for_update(
+            employee_id, today
+        )
+
         if not record:
+            # Maybe already clocked out — check for idempotent return
+            latest = await self.attendance_repo.get_by_employee_and_date(employee_id, today)
+            if latest and latest.clock_out is not None:
+                logger.info(
+                    f"Clock-out duplicate detected (idempotent): employee={employee_id}",
+                    extra={"user_id": str(employee_id), "service_task": "clock_out", "duplicate": True},
+                )
+                return latest
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No open clock-in record found for today. Clock in first.",
-            )
-        if record.clock_out:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Already clocked out for this shift",
             )
 
         # Validate geofence on clock-out too
@@ -272,16 +317,16 @@ class AttendanceService:
         tasks = await self.task_repo.get_by_record(record.id)
 
         # ── Punch-out validations ──
-        # At least 1 task must exist
         if len(tasks) == 0:
+            await self.attendance_repo.commit()  # release lock
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="At least one task must be added before punching out",
             )
 
-        # All tasks must have a final status (not pending)
         pending_tasks = [t for t in tasks if t.status == "pending"]
         if pending_tasks:
+            await self.attendance_repo.commit()  # release lock
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"{len(pending_tasks)} task(s) still have 'pending' status. "
@@ -319,8 +364,9 @@ class AttendanceService:
             "productivity_score": productivity,
         }
         record = await self.attendance_repo.update(record, update_data)
+        await self.attendance_repo.commit()
 
-        # Publish event
+        # Publish event (after commit — fire-and-forget)
         if self.event_publisher:
             company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.clock_out", {
@@ -357,7 +403,7 @@ class AttendanceService:
 
         # Resolve max_shifts_per_day from policy
         policy = await self.policy_repo.get_for_employee(employee_id, department_id)
-        max_shifts = int(policy.max_shifts_per_day) if policy else 1
+        max_shifts = int(policy.max_shifts_per_day) if policy else 2
 
         # Can start a new shift if:
         # - all existing shifts are clocked out
@@ -412,9 +458,11 @@ class AttendanceService:
             )
         return record
 
-    # ──────────── MANUAL CORRECTION (Admin) ────────────
+    # ──────────── MANUAL CORRECTION (Admin, optimistic lock) ────────────
 
     async def update_record(self, record_id: UUID, data: AttendanceUpdate) -> AttendanceRecord:
+        """Update with optimistic locking to prevent silent overwrites from
+        concurrent admin corrections."""
         record = await self.get_record(record_id)
         update_data = data.model_dump(exclude_unset=True)
         if not update_data:
@@ -424,26 +472,38 @@ class AttendanceService:
             )
         if "status" in update_data and update_data["status"] is not None:
             update_data["status"] = update_data["status"].value
-        return await self.attendance_repo.update(record, update_data)
 
-    # ──────────── MANUAL ENTRY (Admin) ────────────
+        record = await self.attendance_repo.update_with_optimistic_lock(
+            record, update_data, expected_version=record.version
+        )
+        await self.attendance_repo.commit()
+        return record
+
+    # ──────────── MANUAL ENTRY (Admin, idempotent) ────────────
 
     async def manual_entry(self, data: ManualAttendanceCreate, created_by: str) -> AttendanceRecord:
-        # Validate employee belongs to current tenant
+        """Idempotent manual entry.
+
+        Uses SELECT FOR UPDATE to prevent race conditions, then catches
+        IntegrityError as a safety net if two requests slip through.
+        """
+        from sqlalchemy.exc import IntegrityError
+
         company_id = self.attendance_repo.db.info.get("company_id")
         if company_id:
             await validate_employee_tenant(data.employee_id, company_id)
 
-        existing = await self.attendance_repo.get_by_employee_and_date(
+        # Locked check: prevents two concurrent manual entries from racing
+        existing = await self.attendance_repo.get_by_employee_and_date_for_update(
             data.employee_id, data.date
         )
         if existing:
+            await self.attendance_repo.commit()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Attendance record already exists for {data.date}",
             )
 
-        # Compute work_hours if both clock_in and clock_out provided
         work_hours = None
         overtime = 0.0
         if data.clock_out:
@@ -462,10 +522,18 @@ class AttendanceService:
             notes=data.notes,
             date=data.date,
         )
-        record = await self.attendance_repo.create(record)
+
+        try:
+            record = await self.attendance_repo.create(record)
+            await self.attendance_repo.commit()
+        except IntegrityError:
+            await self.attendance_repo.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Attendance record already exists for {data.date}",
+            )
 
         if self.event_publisher:
-            company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.manual_entry", {
                 "company_id": str(company_id) if company_id else None,
                 "employee_id": str(data.employee_id),
@@ -475,41 +543,57 @@ class AttendanceService:
 
         return record
 
-
-    # ──────────── SCHOOL MODE (Admin/HR) ────────────
+    # ──────────── SCHOOL MODE (Admin/HR, idempotent) ────────────
 
     async def mark_school_mode_attendance(self, data: "SchoolModeAttendanceCreate", created_by: str) -> AttendanceRecord:
-        # Validate employee belongs to current tenant
+        """Idempotent school-mode attendance.
+
+        Uses SELECT FOR UPDATE + IntegrityError catch to prevent duplicate
+        records from concurrent bulk or individual marking.
+        """
+        from sqlalchemy.exc import IntegrityError
+
         company_id = self.attendance_repo.db.info.get("company_id")
         if company_id:
             await validate_employee_tenant(data.employee_id, company_id)
 
         today = date.today()
-        existing = await self.attendance_repo.get_by_employee_and_date(
+
+        # Locked check
+        existing = await self.attendance_repo.get_by_employee_and_date_for_update(
             data.employee_id, today
         )
         if existing:
+            await self.attendance_repo.commit()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Attendance record already exists for today",
+                detail="Attendance record already exists for today",
             )
 
         now = datetime.now(timezone.utc)
         record = AttendanceRecord(
             employee_id=data.employee_id,
-            clock_in=now,  # Using current time as clock-in time for school mode
-            clock_out=now, # Automatically clocking out to complete the entry immediately, or leave None
-            work_hours=settings.DEFAULT_WORK_HOURS_PER_DAY if data.status.value in ["present", "late"] else 0, # Assuming full day for present
+            clock_in=now,
+            clock_out=now,
+            work_hours=settings.DEFAULT_WORK_HOURS_PER_DAY if data.status.value in ["present", "late"] else 0,
             overtime_hours=0.0,
             status=data.status.value,
             method="school_mode",
             notes=data.notes,
             date=today,
         )
-        record = await self.attendance_repo.create(record)
+
+        try:
+            record = await self.attendance_repo.create(record)
+            await self.attendance_repo.commit()
+        except IntegrityError:
+            await self.attendance_repo.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Attendance record already exists for today",
+            )
 
         if self.event_publisher:
-            company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.school_mode_entry", {
                 "company_id": str(company_id) if company_id else None,
                 "employee_id": str(data.employee_id),
@@ -582,10 +666,12 @@ class AttendanceService:
     async def update_state(self, record_id: UUID, employee_id: UUID) -> AttendanceRecord:
         """Transition attendance state based on task count.
 
-        Called after a task is added: PUNCHED_IN → PENDING_TASKS → ACTIVE
+        Called after a task is added: PUNCHED_IN → PENDING_TASKS → ACTIVE.
+        Commits the transaction so task creation + state change are atomic.
         """
         record = await self.attendance_repo.get_by_id(record_id)
         if not record or record.employee_id != employee_id:
+            await self.attendance_repo.commit()
             return record
 
         tasks = await self.task_repo.get_by_record(record_id)
@@ -599,6 +685,7 @@ class AttendanceService:
         if new_state != record.state:
             record = await self.attendance_repo.update(record, {"state": new_state})
 
+        await self.attendance_repo.commit()
         return record
 
 

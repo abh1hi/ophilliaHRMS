@@ -57,6 +57,9 @@ class AttendanceRecord(Base):
     # Shift tracking: allows multiple sessions per day for night/multiple shifts
     shift_number = Column(Integer, nullable=False, default=1)
 
+    # Optimistic locking: incremented on every update to detect concurrent modifications
+    version = Column(Integer, nullable=False, default=1)
+
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(
         DateTime,

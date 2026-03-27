@@ -1,16 +1,21 @@
+import logging
 from typing import Optional, List
 from uuid import UUID
 from datetime import date, timedelta
 
-from sqlalchemy import select, func, and_, extract, case, literal_column
+from sqlalchemy import select, func, and_, extract, case, update as sa_update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attendance_record import AttendanceRecord
 from app.models.attendance_task import AttendanceTask
 
+logger = logging.getLogger(__name__)
+
 
 class AttendanceRepository:
-    """Data access layer for attendance records — async CRUD."""
+    """Data access layer for attendance records — async CRUD with concurrency control."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -25,12 +30,29 @@ class AttendanceRepository:
     def _scoped(self, stmt):
         return stmt.where(AttendanceRecord.company_id == self._company_id)
 
+    # ──────────── CREATE (with IntegrityError handling) ────────────
+
     async def create(self, record: AttendanceRecord) -> AttendanceRecord:
+        """Insert a new attendance record. Raises IntegrityError on duplicate (employee, date, shift)."""
         record.company_id = self._company_id
         self.db.add(record)
-        await self.db.commit()
+        await self.db.flush()  # flush, don't commit — let service layer control transaction
         await self.db.refresh(record)
         return record
+
+    async def create_and_commit(self, record: AttendanceRecord) -> AttendanceRecord:
+        """Insert and immediately commit. Handles IntegrityError for idempotent clock-in."""
+        record.company_id = self._company_id
+        self.db.add(record)
+        try:
+            await self.db.commit()
+            await self.db.refresh(record)
+            return record
+        except IntegrityError as e:
+            await self.db.rollback()
+            raise e
+
+    # ──────────── READ ────────────
 
     async def get_by_id(self, record_id: UUID) -> Optional[AttendanceRecord]:
         result = await self.db.execute(
@@ -49,6 +71,21 @@ class AttendanceRepository:
                     AttendanceRecord.date == record_date,
                 )
             ).order_by(AttendanceRecord.shift_number.desc())
+        )
+        return result.scalars().first()
+
+    async def get_by_employee_and_date_for_update(
+        self, employee_id: UUID, record_date: date
+    ) -> Optional[AttendanceRecord]:
+        """Same as get_by_employee_and_date but with SELECT FOR UPDATE (pessimistic lock)."""
+        result = await self.db.execute(
+            self._scoped(select(AttendanceRecord)).where(
+                and_(
+                    AttendanceRecord.employee_id == employee_id,
+                    AttendanceRecord.date == record_date,
+                )
+            ).order_by(AttendanceRecord.shift_number.desc())
+            .with_for_update()
         )
         return result.scalars().first()
 
@@ -113,39 +150,50 @@ class AttendanceRepository:
         result = await self.db.execute(query)
         return list(result.scalars().all()), total
 
+    # ──────────── UPDATE (with optimistic locking) ────────────
+
     async def update(self, record: AttendanceRecord, update_data: dict) -> AttendanceRecord:
+        """Update a record. Uses flush (not commit) for transaction control by service layer."""
         for field, value in update_data.items():
             if value is not None:
                 setattr(record, field, value)
-        await self.db.commit()
+        record.version = (record.version or 1) + 1
+        await self.db.flush()
         await self.db.refresh(record)
         return record
 
-    async def get_missed_punchout_today(self) -> List[AttendanceRecord]:
-        """Return attendance records for today that have no clock_out."""
-        today = date.today()
-        result = await self.db.execute(
-            self._scoped(select(AttendanceRecord)).where(
-                and_(
-                    AttendanceRecord.date == today,
-                    AttendanceRecord.clock_out.is_(None),
-                )
-            )
-        )
-        return list(result.scalars().all())
+    async def update_with_optimistic_lock(
+        self, record: AttendanceRecord, update_data: dict, expected_version: int
+    ) -> AttendanceRecord:
+        """Update with optimistic locking. Raises HTTPException if version mismatch."""
+        from fastapi import HTTPException, status
 
-    async def get_late_count_today(self) -> int:
-        """Return count of late clock-ins for today."""
-        today = date.today()
-        result = await self.db.execute(
-            self._scoped(select(func.count(AttendanceRecord.id))).where(
+        # Use a WHERE clause that includes the expected version
+        stmt = (
+            sa_update(AttendanceRecord)
+            .where(
                 and_(
-                    AttendanceRecord.date == today,
-                    AttendanceRecord.status == "late",
+                    AttendanceRecord.id == record.id,
+                    AttendanceRecord.version == expected_version,
                 )
             )
+            .values(**update_data, version=expected_version + 1)
+            .returning(AttendanceRecord.id)
         )
-        return result.scalar() or 0
+        result = await self.db.execute(stmt)
+        updated = result.scalars().first()
+
+        if updated is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Record was modified by another request. Please retry.",
+            )
+
+        await self.db.flush()
+        await self.db.refresh(record)
+        return record
+
+    # ──────────── OPEN RECORD (with locking) ────────────
 
     async def get_open_record_today(
         self, employee_id: UUID, record_date: date
@@ -161,6 +209,25 @@ class AttendanceRepository:
             ).order_by(AttendanceRecord.shift_number.desc())
         )
         return result.scalars().first()
+
+    async def get_open_record_today_for_update(
+        self, employee_id: UUID, record_date: date
+    ) -> Optional[AttendanceRecord]:
+        """Get open record with row-level lock (SELECT FOR UPDATE).
+        Prevents concurrent punch-out or auto-close from conflicting."""
+        result = await self.db.execute(
+            self._scoped(select(AttendanceRecord)).where(
+                and_(
+                    AttendanceRecord.employee_id == employee_id,
+                    AttendanceRecord.date == record_date,
+                    AttendanceRecord.clock_out.is_(None),
+                )
+            ).order_by(AttendanceRecord.shift_number.desc())
+            .with_for_update()
+        )
+        return result.scalars().first()
+
+    # ──────────── SHIFT COUNT ────────────
 
     async def get_all_shifts_today(
         self, employee_id: UUID, record_date: date
@@ -188,11 +255,37 @@ class AttendanceRepository:
         )
         return result.scalar() or 0
 
+    # ──────────── ALERTS / KPI ────────────
+
+    async def get_missed_punchout_today(self) -> List[AttendanceRecord]:
+        """Return attendance records for today that have no clock_out."""
+        today = date.today()
+        result = await self.db.execute(
+            self._scoped(select(AttendanceRecord)).where(
+                and_(
+                    AttendanceRecord.date == today,
+                    AttendanceRecord.clock_out.is_(None),
+                )
+            )
+        )
+        return list(result.scalars().all())
+
+    async def get_late_count_today(self) -> int:
+        """Return count of late clock-ins for today."""
+        today = date.today()
+        result = await self.db.execute(
+            self._scoped(select(func.count(AttendanceRecord.id))).where(
+                and_(
+                    AttendanceRecord.date == today,
+                    AttendanceRecord.status == "late",
+                )
+            )
+        )
+        return result.scalar() or 0
+
     async def get_admin_kpi(self, target_date: date) -> dict:
         """Aggregate KPI data for admin dashboard."""
         from app.schemas.attendance import AdminKPIResponse
-
-        base = self._scoped(select(AttendanceRecord)).where(AttendanceRecord.date == target_date)
 
         # Attendance counts
         result = await self.db.execute(
@@ -367,11 +460,7 @@ class AttendanceRepository:
         month: int,
         employee_id: Optional[UUID] = None,
     ) -> List[dict]:
-        """Aggregate per-employee productivity stats for a given month.
-
-        Returns a list of dicts with employee_id and aggregated attendance/task counts.
-        """
-        # Build attendance aggregation
+        """Aggregate per-employee productivity stats for a given month."""
         att_query = (
             self._scoped(select(
                 AttendanceRecord.employee_id,
@@ -402,7 +491,6 @@ class AttendanceRepository:
         att_result = await self.db.execute(att_query)
         att_rows = att_result.mappings().all()
 
-        # Build task aggregation joined via attendance record
         task_query = (
             self._scoped(select(
                 AttendanceRecord.employee_id,
@@ -437,7 +525,6 @@ class AttendanceRepository:
         task_result = await self.db.execute(task_query)
         task_rows = {row["employee_id"]: row for row in task_result.mappings().all()}
 
-        # Merge
         results = []
         for row in att_rows:
             emp_id = row["employee_id"]
@@ -463,3 +550,13 @@ class AttendanceRepository:
                 "total_actual_expenses": task_data.get("total_actual_expenses"),
             })
         return results
+
+    # ──────────── COMMIT / ROLLBACK (transaction control) ────────────
+
+    async def commit(self):
+        """Explicit commit — called by service layer at end of business operation."""
+        await self.db.commit()
+
+    async def rollback(self):
+        """Explicit rollback."""
+        await self.db.rollback()

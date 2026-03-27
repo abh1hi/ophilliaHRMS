@@ -52,7 +52,7 @@ class AttendancePolicy(Base):
     allow_night_shift = Column(String(10), nullable=False, default="false")
 
     # Maximum shifts per day (1 = standard, >1 = multiple shifts)
-    max_shifts_per_day = Column(Float, nullable=False, default=1)
+    max_shifts_per_day = Column(Float, nullable=False, default=2)
 
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(

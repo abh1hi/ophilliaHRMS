@@ -25,7 +25,7 @@ class TaskRepository:
     async def create(self, task: AttendanceTask) -> AttendanceTask:
         task.company_id = self._company_id
         self.db.add(task)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(task)
         return task
 
@@ -46,10 +46,16 @@ class TaskRepository:
     async def update(self, task: AttendanceTask, data: dict) -> AttendanceTask:
         for key, value in data.items():
             setattr(task, key, value)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(task)
         return task
 
     async def delete(self, task: AttendanceTask) -> None:
         await self.db.delete(task)
+        await self.db.flush()
+
+    async def commit(self):
         await self.db.commit()
+
+    async def rollback(self):
+        await self.db.rollback()

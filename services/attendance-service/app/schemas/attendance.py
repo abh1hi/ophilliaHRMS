@@ -167,6 +167,7 @@ class AttendanceResponse(BaseModel):
     device_info: Optional[str] = None
     network_info: Optional[str] = None
     shift_number: int = 1
+    version: int = 1
     status: str
     method: str
     notes: Optional[str] = None
@@ -331,7 +332,7 @@ class PolicyCreate(BaseModel):
     auto_close_time: Optional[time] = None
     task_planning_grace_minutes: float = 30.0
     allow_night_shift: str = "false"
-    max_shifts_per_day: float = 1
+    max_shifts_per_day: float = 2
 
 
 class PolicyUpdate(BaseModel):
@@ -359,7 +360,7 @@ class PolicyResponse(BaseModel):
     auto_close_time: Optional[time] = None
     task_planning_grace_minutes: float = 30.0
     allow_night_shift: str = "false"
-    max_shifts_per_day: float = 1
+    max_shifts_per_day: float = 2
     created_at: datetime
     updated_at: datetime
 
