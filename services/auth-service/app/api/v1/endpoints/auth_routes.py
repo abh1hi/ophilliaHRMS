@@ -10,6 +10,7 @@ from app.schemas.request_response_models import (
     UserLogin,
     UserResponse,
     Token,
+    RefreshTokenRequest,
     PasswordResetRequest,
     PasswordResetConfirm,
     RoleUpdateRequest,
@@ -258,10 +259,10 @@ async def login(request: Request, user_in: UserLogin, db: AsyncSession = Depends
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
+async def refresh_token(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
     """Rotate refresh token and issue new access token."""
     auth_service = AuthService(db)
-    return await auth_service.refresh_token(refresh_token)
+    return await auth_service.refresh_token(payload.refresh_token)
 
 
 @router.get("/me", response_model=UserResponse)
