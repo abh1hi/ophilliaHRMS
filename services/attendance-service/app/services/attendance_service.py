@@ -1,7 +1,9 @@
+import json
 import logging
+from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
-from datetime import date, datetime, timezone, time
+from datetime import date, datetime, timezone, time, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,7 @@ from app.models.attendance_policy import AttendancePolicy
 from app.repositories.attendance_repository import AttendanceRepository
 from app.repositories.geofence_repository import GeofenceRepository
 from app.repositories.policy_repository import PolicyRepository
+from app.repositories.policy_exception_repository import PolicyExceptionRepository
 from app.repositories.task_repository import TaskRepository
 from app.schemas.attendance import (
     ClockInRequest,
@@ -20,8 +23,6 @@ from app.schemas.attendance import (
     AttendanceUpdate,
     GeofenceCreate,
     GeofenceUpdate,
-    PolicyCreate,
-    PolicyUpdate,
     SchoolModeAttendanceCreate,
     ProductivityReportItem,
     ProductivityReportResponse,
@@ -41,6 +42,46 @@ from app.core.employee_validator import validate_employee_tenant
 
 logger = logging.getLogger(__name__)
 
+_POLICY_CACHE_TTL = 300  # seconds
+
+
+@dataclass
+class _CachedGeofence:
+    """Lightweight stand-in for GeofenceLocation when deserializing from Redis."""
+    id: str
+    name: str
+    latitude: float
+    longitude: float
+    radius_meters: int
+
+
+def _serialize_geofence(geofence) -> Optional[dict]:
+    if geofence is None:
+        return None
+    return {
+        "id": str(geofence.id),
+        "name": geofence.name,
+        "latitude": geofence.latitude,
+        "longitude": geofence.longitude,
+        "radius_meters": geofence.radius_meters,
+    }
+
+
+def _deserialize_geofence(data: Optional[dict]) -> Optional[_CachedGeofence]:
+    if data is None:
+        return None
+    return _CachedGeofence(**data)
+
+
+def _parse_time(value: Optional[str]) -> Optional[time]:
+    if not value:
+        return None
+    try:
+        parts = value.split(":")
+        return time(int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0)
+    except Exception:
+        return None
+
 
 class AttendanceService:
     """Business logic for attendance: clock-in/out, geofence, overtime."""
@@ -49,6 +90,7 @@ class AttendanceService:
         self.attendance_repo = AttendanceRepository(db)
         self.geofence_repo = GeofenceRepository(db)
         self.policy_repo = PolicyRepository(db)
+        self.exception_repo = PolicyExceptionRepository(db)
         self.task_repo = TaskRepository(db)
         self.event_publisher = event_publisher
 
@@ -56,37 +98,107 @@ class AttendanceService:
 
     async def _resolve_policy(
         self, employee_id: UUID, department_id: Optional[UUID] = None
-    ) -> tuple[str, Optional[GeofenceLocation], float, Optional[time]]:
+    ) -> tuple[str, Optional[object], float, Optional[time], int]:
         """Resolve attendance policy for an employee.
 
-        Returns: (method, geofence_location, work_hours_per_day, work_start_time)
+        Checks (in order):
+          1. Redis cache
+          2. Active PolicyException (employee-level temporary override)
+          3. Normal cascade: employee-policy → department-policy → global → defaults
+
+        Returns:
+          (method, geofence, work_hours_per_day, work_start_time, late_grace_period_minutes)
         """
+        company_id = self.attendance_repo.db.info.get("company_id")
+        cache_key = f"policy:resolve:{company_id}:{employee_id}:{department_id or 'none'}"
+
+        # ── 1. Try Redis cache ──
+        try:
+            from app.core.token_blacklist import _redis
+            if _redis is not None:
+                cached = await _redis.get(cache_key)
+                if cached:
+                    data = json.loads(cached)
+                    return (
+                        data["method"],
+                        _deserialize_geofence(data.get("geofence")),
+                        data["work_hours_per_day"],
+                        _parse_time(data.get("work_start_time")),
+                        data.get("late_grace_period_minutes", 0),
+                    )
+        except Exception:
+            logger.debug("Policy cache read failed — falling back to DB", exc_info=True)
+
+        # ── 2. Active exemption overrides normal policy ──
+        exception = await self.exception_repo.get_active_for_employee(
+            employee_id, date.today()
+        )
+        if exception:
+            geofence = None
+            if exception.override_geofence_id:
+                geofence = await self.geofence_repo.get_by_id(exception.override_geofence_id)
+            method = exception.override_method or "manual"
+            work_hours = exception.override_work_hours or settings.DEFAULT_WORK_HOURS_PER_DAY
+            result = (method, geofence, work_hours, None, 0)
+            await self._cache_policy_result(cache_key, result)
+            return result
+
+        # ── 3. Normal policy cascade ──
         policy = await self.policy_repo.get_for_employee(employee_id, department_id)
 
         if policy is None:
-            return "manual", None, settings.DEFAULT_WORK_HOURS_PER_DAY, None
+            result = ("manual", None, settings.DEFAULT_WORK_HOURS_PER_DAY, None, 0)
+            await self._cache_policy_result(cache_key, result)
+            return result
 
         geofence = None
         if policy.geofence_id:
             geofence = await self.geofence_repo.get_by_id(policy.geofence_id)
 
-        return (
+        result = (
             policy.method,
             geofence,
             policy.work_hours_per_day,
             policy.work_start_time,
+            policy.late_grace_period_minutes,
         )
+        await self._cache_policy_result(cache_key, result)
+        return result
+
+    async def _cache_policy_result(self, cache_key: str, result: tuple) -> None:
+        """Serialize and store a policy resolution result in Redis."""
+        try:
+            from app.core.token_blacklist import _redis
+            if _redis is None:
+                return
+            method, geofence, work_hours, work_start, grace = result
+            payload = {
+                "method": method,
+                "work_hours_per_day": work_hours,
+                "work_start_time": work_start.isoformat() if work_start else None,
+                "late_grace_period_minutes": grace,
+                "geofence": _serialize_geofence(geofence),
+            }
+            await _redis.set(cache_key, json.dumps(payload), ex=_POLICY_CACHE_TTL)
+        except Exception:
+            logger.debug("Policy cache write failed — continuing", exc_info=True)
 
     # ──────────── GEOFENCE VALIDATION ────────────
 
     def _validate_geofence(
         self,
         method: str,
-        geofence: Optional[GeofenceLocation],
+        geofence,
         lat: Optional[float],
         lng: Optional[float],
+        accuracy_meters: Optional[float] = None,
     ) -> None:
-        """Validate location against geofence if required by policy."""
+        """Validate location against geofence if required by policy.
+
+        accuracy_meters: GPS accuracy radius reported by the device.
+        When provided, the effective radius is expanded by this amount to
+        prevent false rejections from GPS jitter.
+        """
         if method in ("geofence", "both"):
             if lat is None or lng is None:
                 raise HTTPException(
@@ -98,10 +210,11 @@ class AttendanceService:
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Geofence location not configured. Contact admin.",
                 )
+            effective_radius = geofence.radius_meters + (accuracy_meters or 0.0)
             is_within, distance = is_within_geofence(
                 lat, lng,
                 geofence.latitude, geofence.longitude,
-                geofence.radius_meters,
+                effective_radius,
             )
             if not is_within:
                 raise HTTPException(
@@ -135,10 +248,10 @@ class AttendanceService:
             await validate_employee_tenant(employee_id, company_id)
 
         # Resolve policy and validate geofence
-        method, geofence, work_hours, work_start = await self._resolve_policy(
+        method, geofence, work_hours, work_start, late_grace = await self._resolve_policy(
             employee_id, department_id
         )
-        self._validate_geofence(method, geofence, data.latitude, data.longitude)
+        self._validate_geofence(method, geofence, data.latitude, data.longitude, data.accuracy_meters)
 
         # ── Locked read: prevent two concurrent clock-ins from racing ──
         existing = await self.attendance_repo.get_by_employee_and_date_for_update(
@@ -167,12 +280,15 @@ class AttendanceService:
                 )
             shift_number = current_shift_count + 1
 
-        # Determine status (on-time vs late)
+        # Determine status (on-time vs late) using grace period
         now = datetime.now(timezone.utc)
         attendance_status = "present"
         if work_start and shift_number == 1:
             clock_in_time = now.time()
-            if clock_in_time > work_start:
+            grace_end = (
+                datetime.combine(today, work_start) + timedelta(minutes=late_grace)
+            ).time()
+            if clock_in_time > grace_end:
                 attendance_status = "late"
 
         record = AttendanceRecord(
@@ -297,7 +413,7 @@ class AttendanceService:
             )
 
         # Validate geofence on clock-out too
-        method, geofence, work_hours_per_day, _ = await self._resolve_policy(
+        method, geofence, work_hours_per_day, _, _ = await self._resolve_policy(
             employee_id, department_id
         )
         self._validate_geofence(method, geofence, data.latitude, data.longitude)
@@ -749,55 +865,3 @@ class GeofenceService:
                 detail="Geofence is already deactivated",
             )
         return await self.repo.soft_delete(geofence)
-
-
-class PolicyService:
-    """Business logic for managing attendance policies."""
-
-    def __init__(self, db: AsyncSession):
-        self.repo = PolicyRepository(db)
-
-    async def create_policy(self, data: PolicyCreate) -> AttendancePolicy:
-        policy = AttendancePolicy(
-            department_id=data.department_id,
-            employee_id=data.employee_id,
-            method=data.method.value,
-            geofence_id=data.geofence_id,
-            work_start_time=data.work_start_time,
-            work_hours_per_day=data.work_hours_per_day,
-            auto_close_time=data.auto_close_time,
-            task_planning_grace_minutes=data.task_planning_grace_minutes,
-            allow_night_shift=data.allow_night_shift,
-            max_shifts_per_day=data.max_shifts_per_day,
-        )
-        return await self.repo.create(policy)
-
-    async def list_policies(self, skip: int = 0, limit: int = 100) -> tuple[list, int]:
-        return await self.repo.get_all(skip=skip, limit=limit)
-
-    async def update_policy(self, policy_id: UUID, data: PolicyUpdate) -> AttendancePolicy:
-        policy = await self.repo.get_by_id(policy_id)
-        if not policy:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Policy not found",
-            )
-        updates = data.model_dump(exclude_unset=True)
-        if not updates:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No fields to update",
-            )
-        # Convert enum to string value if method is present
-        if "method" in updates and updates["method"] is not None:
-            updates["method"] = updates["method"].value
-        return await self.repo.update(policy, updates)
-
-    async def delete_policy(self, policy_id: UUID) -> None:
-        policy = await self.repo.get_by_id(policy_id)
-        if not policy:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Policy not found",
-            )
-        await self.repo.delete(policy)

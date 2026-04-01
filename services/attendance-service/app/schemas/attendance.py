@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator, model_validator
-from typing import Optional, List
+from typing import Optional, List, Any
 from uuid import UUID
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -77,6 +77,7 @@ class ClockInRequest(BaseModel):
     notes: Optional[str] = None
     device_info: Optional[str] = None     # e.g. "iPhone 14 / Chrome 120"
     network_info: Optional[str] = None    # e.g. "WiFi / 4G"
+    accuracy_meters: Optional[float] = None  # GPS accuracy radius from device (for smart geofence adjust)
 
 
 # ──────────── CLOCK OUT ────────────
@@ -333,6 +334,7 @@ class PolicyCreate(BaseModel):
     task_planning_grace_minutes: float = 30.0
     allow_night_shift: str = "false"
     max_shifts_per_day: float = 2
+    late_grace_period_minutes: int = 0
 
 
 class PolicyUpdate(BaseModel):
@@ -346,6 +348,7 @@ class PolicyUpdate(BaseModel):
     task_planning_grace_minutes: Optional[float] = None
     allow_night_shift: Optional[str] = None
     max_shifts_per_day: Optional[float] = None
+    late_grace_period_minutes: Optional[int] = None
 
 
 class PolicyResponse(BaseModel):
@@ -361,6 +364,7 @@ class PolicyResponse(BaseModel):
     task_planning_grace_minutes: float = 30.0
     allow_night_shift: str = "false"
     max_shifts_per_day: float = 2
+    late_grace_period_minutes: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -370,6 +374,149 @@ class PolicyResponse(BaseModel):
 class PolicyListResponse(BaseModel):
     total: int
     policies: List[PolicyResponse]
+
+
+# ──────────── POLICY AUDIT LOG ────────────
+class PolicyAuditLogResponse(BaseModel):
+    id: UUID
+    policy_id: UUID
+    company_id: Optional[UUID] = None
+    action: str
+    changed_by: UUID
+    timestamp: datetime
+    old_value: Optional[Any] = None
+    new_value: Optional[Any] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PolicyAuditLogListResponse(BaseModel):
+    total: int
+    items: List[PolicyAuditLogResponse]
+
+
+# ──────────── POLICY TEMPLATES ────────────
+class PolicyTemplateCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    method: AttendanceMethod = AttendanceMethod.MANUAL
+    geofence_id: Optional[UUID] = None
+    work_start_time: Optional[time] = None
+    work_hours_per_day: float = 8.0
+    auto_close_time: Optional[time] = None
+    task_planning_grace_minutes: float = 30.0
+    allow_night_shift: str = "false"
+    max_shifts_per_day: float = 2
+    late_grace_period_minutes: int = 0
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Template name must not be empty")
+        return v.strip()
+
+
+class PolicyTemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    method: Optional[AttendanceMethod] = None
+    geofence_id: Optional[UUID] = None
+    work_start_time: Optional[time] = None
+    work_hours_per_day: Optional[float] = None
+    auto_close_time: Optional[time] = None
+    task_planning_grace_minutes: Optional[float] = None
+    allow_night_shift: Optional[str] = None
+    max_shifts_per_day: Optional[float] = None
+    late_grace_period_minutes: Optional[int] = None
+
+
+class PolicyTemplateResponse(BaseModel):
+    id: UUID
+    company_id: Optional[UUID] = None
+    name: str
+    description: Optional[str] = None
+    method: str
+    geofence_id: Optional[UUID] = None
+    work_start_time: Optional[time] = None
+    work_hours_per_day: float
+    auto_close_time: Optional[time] = None
+    task_planning_grace_minutes: float
+    allow_night_shift: str
+    max_shifts_per_day: float
+    late_grace_period_minutes: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PolicyTemplateListResponse(BaseModel):
+    total: int
+    templates: List[PolicyTemplateResponse]
+
+
+class ApplyTemplateRequest(BaseModel):
+    template_id: UUID
+
+
+# ──────────── POLICY EXCEPTIONS ────────────
+class PolicyExceptionCreate(BaseModel):
+    employee_id: UUID
+    reason: str
+    from_date: date
+    to_date: Optional[date] = None
+    override_method: Optional[str] = None
+    override_work_hours: Optional[float] = None
+    override_geofence_id: Optional[UUID] = None
+
+    @field_validator("override_method")
+    @classmethod
+    def valid_method(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in {"manual", "geofence", "both"}:
+            raise ValueError("override_method must be manual, geofence, or both")
+        return v
+
+    @field_validator("reason")
+    @classmethod
+    def reason_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Reason must not be empty")
+        return v.strip()
+
+
+class PolicyExceptionUpdate(BaseModel):
+    reason: Optional[str] = None
+    from_date: Optional[date] = None
+    to_date: Optional[date] = None
+    override_method: Optional[str] = None
+    override_work_hours: Optional[float] = None
+    override_geofence_id: Optional[UUID] = None
+    is_active: Optional[bool] = None
+
+
+class PolicyExceptionResponse(BaseModel):
+    id: UUID
+    company_id: Optional[UUID] = None
+    employee_id: UUID
+    reason: str
+    from_date: date
+    to_date: Optional[date] = None
+    override_method: Optional[str] = None
+    override_work_hours: Optional[float] = None
+    override_geofence_id: Optional[UUID] = None
+    approved_by: UUID
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PolicyExceptionListResponse(BaseModel):
+    total: int
+    items: List[PolicyExceptionResponse]
 
 
 # ──────────── BULK SCHOOL-MODE ATTENDANCE ────────────

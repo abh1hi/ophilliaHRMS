@@ -11,6 +11,9 @@ from app.db.base import Base
 from app.models.attendance_record import AttendanceRecord    # noqa: F401
 from app.models.geofence_location import GeofenceLocation    # noqa: F401
 from app.models.attendance_policy import AttendancePolicy     # noqa: F401
+from app.models.policy_audit_log import PolicyAuditLog        # noqa: F401
+from app.models.policy_template import PolicyTemplate         # noqa: F401
+from app.models.policy_exception import PolicyException       # noqa: F401
 from app.core.config import settings
 
 config = context.config

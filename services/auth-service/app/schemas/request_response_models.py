@@ -68,6 +68,11 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("email")
+    @classmethod
+    def email_normalization(cls, v: str) -> str:
+        return v.lower().strip()
+
 
 class UserResponse(UserBase):
     id: UUID

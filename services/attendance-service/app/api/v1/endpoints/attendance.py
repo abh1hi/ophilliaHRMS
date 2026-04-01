@@ -9,7 +9,8 @@ from app.db.session import get_db
 from app.core.security import get_current_user, require_role, TokenPayload
 from app.api.v1.dependencies import get_db_with_tenant
 from app.core.constants import UserRole
-from app.services.attendance_service import AttendanceService, GeofenceService, PolicyService
+from app.services.attendance_service import AttendanceService, GeofenceService
+from app.services.policy_service import PolicyService, PolicyTemplateService, PolicyExceptionService
 from app.services.task_service import TaskService
 from app.schemas.attendance import (
     ClockInRequest,
@@ -27,6 +28,16 @@ from app.schemas.attendance import (
     PolicyUpdate,
     PolicyResponse,
     PolicyListResponse,
+    PolicyAuditLogListResponse,
+    PolicyTemplateCreate,
+    PolicyTemplateUpdate,
+    PolicyTemplateResponse,
+    PolicyTemplateListResponse,
+    ApplyTemplateRequest,
+    PolicyExceptionCreate,
+    PolicyExceptionUpdate,
+    PolicyExceptionResponse,
+    PolicyExceptionListResponse,
     TaskCreate,
     TaskUpdate,
     TaskCompleteUpdate,
@@ -67,6 +78,14 @@ def _get_geofence_service(db: AsyncSession = Depends(get_db_with_tenant)) -> Geo
 
 def _get_policy_service(db: AsyncSession = Depends(get_db_with_tenant)) -> PolicyService:
     return PolicyService(db)
+
+
+def _get_policy_template_service(db: AsyncSession = Depends(get_db_with_tenant)) -> PolicyTemplateService:
+    return PolicyTemplateService(db)
+
+
+def _get_policy_exception_service(db: AsyncSession = Depends(get_db_with_tenant)) -> PolicyExceptionService:
+    return PolicyExceptionService(db)
 
 
 def _get_task_service(db: AsyncSession = Depends(get_db_with_tenant)) -> TaskService:
@@ -450,8 +469,10 @@ async def create_policy(
     ),
     service: PolicyService = Depends(_get_policy_service),
 ):
-    """Assign attendance method (manual/geofence/both) to dept or employee."""
-    return await service.create_policy(data)
+    """Assign attendance method (manual/geofence/both) to dept or employee.
+    Returns 409 if a policy for the same scope already exists.
+    """
+    return await service.create_policy(data, changed_by=UUID(current_user.sub))
 
 
 @router.get("/policies", response_model=PolicyListResponse)
@@ -478,7 +499,7 @@ async def update_policy(
     service: PolicyService = Depends(_get_policy_service),
 ):
     """Update an attendance policy's method, times, or scope. HR/Super Admin only."""
-    return await service.update_policy(policy_id, data)
+    return await service.update_policy(policy_id, data, changed_by=UUID(current_user.sub))
 
 
 @router.delete("/policies/{policy_id}", status_code=204)
@@ -490,7 +511,166 @@ async def delete_policy(
     service: PolicyService = Depends(_get_policy_service),
 ):
     """Hard-delete an attendance policy (config, not data). HR/Super Admin only."""
-    await service.delete_policy(policy_id)
+    await service.delete_policy(policy_id, changed_by=UUID(current_user.sub))
+
+
+@router.get("/policies/{policy_id}/audit-log", response_model=PolicyAuditLogListResponse)
+async def get_policy_audit_log(
+    policy_id: UUID,
+    skip: int = 0,
+    limit: int = 50,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyService = Depends(_get_policy_service),
+):
+    """Full audit trail for a specific policy (creates, updates, deletes)."""
+    logs, total = await service.get_audit_log(policy_id, skip=skip, limit=limit)
+    return PolicyAuditLogListResponse(total=total, items=logs)
+
+
+# ──────────────────── POLICY TEMPLATES ────────────────────
+
+@router.post("/policy-templates", response_model=PolicyTemplateResponse, status_code=201)
+async def create_policy_template(
+    data: PolicyTemplateCreate,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyTemplateService = Depends(_get_policy_template_service),
+):
+    """Create a reusable policy template. HR/Admin only."""
+    return await service.create_template(data, changed_by=UUID(current_user.sub))
+
+
+@router.get("/policy-templates", response_model=PolicyTemplateListResponse)
+async def list_policy_templates(
+    skip: int = 0,
+    limit: int = 100,
+    include_inactive: bool = False,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyTemplateService = Depends(_get_policy_template_service),
+):
+    """List all active policy templates."""
+    templates, total = await service.list_templates(
+        skip=skip, limit=limit, include_inactive=include_inactive
+    )
+    return PolicyTemplateListResponse(total=total, templates=templates)
+
+
+@router.patch("/policy-templates/{template_id}", response_model=PolicyTemplateResponse)
+async def update_policy_template(
+    template_id: UUID,
+    data: PolicyTemplateUpdate,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyTemplateService = Depends(_get_policy_template_service),
+):
+    """Update a policy template. HR/Admin only."""
+    return await service.update_template(template_id, data)
+
+
+@router.delete("/policy-templates/{template_id}", response_model=PolicyTemplateResponse)
+async def delete_policy_template(
+    template_id: UUID,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyTemplateService = Depends(_get_policy_template_service),
+):
+    """Soft-delete a policy template (sets is_active=False). HR/Admin only."""
+    return await service.delete_template(template_id)
+
+
+@router.post("/departments/{dept_id}/apply-policy-template", response_model=PolicyResponse, status_code=201)
+async def apply_policy_template_to_department(
+    dept_id: UUID,
+    data: ApplyTemplateRequest,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyTemplateService = Depends(_get_policy_template_service),
+):
+    """Stamp a new AttendancePolicy from a template onto a department.
+    Returns 409 if the department already has a policy.
+    """
+    return await service.apply_template_to_department(
+        dept_id=dept_id,
+        template_id=data.template_id,
+        changed_by=UUID(current_user.sub),
+    )
+
+
+# ──────────────────── POLICY EXCEPTIONS ────────────────────
+
+@router.post("/policy-exceptions", response_model=PolicyExceptionResponse, status_code=201)
+async def create_policy_exception(
+    data: PolicyExceptionCreate,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyExceptionService = Depends(_get_policy_exception_service),
+):
+    """Create a temporary policy override for an employee (e.g. medical, WFH). HR/Admin only."""
+    return await service.create_exception(data, approved_by=UUID(current_user.sub))
+
+
+@router.get("/policy-exceptions", response_model=PolicyExceptionListResponse)
+async def list_policy_exceptions(
+    skip: int = 0,
+    limit: int = 100,
+    employee_id: Optional[UUID] = Query(None, description="Filter by employee"),
+    include_inactive: bool = Query(False, description="Include deactivated exceptions"),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyExceptionService = Depends(_get_policy_exception_service),
+):
+    """List all policy exceptions. HR/Admin only."""
+    items, total = await service.list_exceptions(
+        skip=skip, limit=limit, employee_id=employee_id, include_inactive=include_inactive
+    )
+    return PolicyExceptionListResponse(total=total, items=items)
+
+
+@router.get("/policy-exceptions/{exception_id}", response_model=PolicyExceptionResponse)
+async def get_policy_exception(
+    exception_id: UUID,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyExceptionService = Depends(_get_policy_exception_service),
+):
+    """Get a specific policy exception by ID. HR/Admin only."""
+    return await service.get_exception(exception_id)
+
+
+@router.patch("/policy-exceptions/{exception_id}", response_model=PolicyExceptionResponse)
+async def update_policy_exception(
+    exception_id: UUID,
+    data: PolicyExceptionUpdate,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyExceptionService = Depends(_get_policy_exception_service),
+):
+    """Update a policy exception (e.g. extend to_date). HR/Admin only."""
+    return await service.update_exception(exception_id, data)
+
+
+@router.delete("/policy-exceptions/{exception_id}", status_code=204)
+async def delete_policy_exception(
+    exception_id: UUID,
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: PolicyExceptionService = Depends(_get_policy_exception_service),
+):
+    """Hard-delete a policy exception. HR/Admin only."""
+    await service.delete_exception(exception_id)
 
 
 # ──────────────────── TASK TEMPLATES ────────────────────

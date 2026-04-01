@@ -30,11 +30,14 @@
       "Bash(taskkill //PID 21804 //F)",
       "Bash(npx tsc:*)",
       "Bash(curl -s http://localhost:5173)",
-      "Bash(curl -s http://localhost:8002/health)"
+      "Bash(curl -s http://localhost:8002/health)",
+      "Bash(git config:*)",
+      "Bash(git submodule:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS",
-      "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit"
+      "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit",
+      "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\frontend-admin-ophillia-hrms-vue"
     ]
   }
 }

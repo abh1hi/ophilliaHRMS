@@ -90,6 +90,41 @@ class PolicyRepository:
         await self.db.delete(policy)
         await self.db.commit()
 
+    async def get_conflicting_policy(
+        self,
+        scope_type: str,
+        scope_id: Optional[UUID] = None,
+        exclude_id: Optional[UUID] = None,
+    ) -> Optional[AttendancePolicy]:
+        """Find an existing policy with the same scope to detect conflicts.
+
+        scope_type: "employee" | "department" | "global"
+        scope_id:   employee_id or department_id (None for global)
+        exclude_id: policy to exclude from the check (used on updates)
+        """
+        if scope_type == "employee":
+            q = self._scoped(select(AttendancePolicy)).where(
+                AttendancePolicy.employee_id == scope_id
+            )
+        elif scope_type == "department":
+            q = self._scoped(select(AttendancePolicy)).where(
+                and_(
+                    AttendancePolicy.department_id == scope_id,
+                    AttendancePolicy.employee_id.is_(None),
+                )
+            )
+        else:  # global
+            q = self._scoped(select(AttendancePolicy)).where(
+                and_(
+                    AttendancePolicy.employee_id.is_(None),
+                    AttendancePolicy.department_id.is_(None),
+                )
+            )
+        if exclude_id:
+            q = q.where(AttendancePolicy.id != exclude_id)
+        result = await self.db.execute(q.limit(1))
+        return result.scalars().first()
+
     async def get_all(self, skip: int = 0, limit: int = 100) -> tuple[List[AttendancePolicy], int]:
         count_result = await self.db.execute(self._scoped(select(func.count(AttendancePolicy.id))))
         total = count_result.scalar() or 0

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, Time, DateTime, ForeignKey, Index
+from sqlalchemy import Column, String, Float, Integer, Time, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -53,6 +53,9 @@ class AttendancePolicy(Base):
 
     # Maximum shifts per day (1 = standard, >1 = multiple shifts)
     max_shifts_per_day = Column(Float, nullable=False, default=2)
+
+    # Grace window after work_start_time before an employee is marked late (minutes)
+    late_grace_period_minutes = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(
