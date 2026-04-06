@@ -32,7 +32,10 @@
       "Bash(curl -s http://localhost:5173)",
       "Bash(curl -s http://localhost:8002/health)",
       "Bash(git config:*)",
-      "Bash(git submodule:*)"
+      "Bash(git submodule:*)",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/services/attendance-service/app/**)",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/services/attendance-service/app/schemas/**)",
+      "Bash(curl -s http://localhost/api/v1/employee-groups -H \"Authorization: Bearer test\" -w \"\\\\nStatus: %{http_code}\\\\n\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS",

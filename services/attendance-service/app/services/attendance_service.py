@@ -804,6 +804,117 @@ class AttendanceService:
         await self.attendance_repo.commit()
         return record
 
+    # ──────────── CSV TEMPLATE ────────────
+
+    def get_csv_template(self) -> bytes:
+        """Return a CSV template file with headers and one example row."""
+        lines = [
+            "employee_id,date,status,clock_in,clock_out,notes",
+            "00000000-0000-0000-0000-000000000001,2026-04-01,present,09:00,18:00,On-site",
+        ]
+        return "\n".join(lines).encode("utf-8")
+
+    # ──────────── CSV UPLOAD ────────────
+
+    async def upload_csv(self, file_bytes: bytes, created_by: str) -> dict:
+        """Parse an attendance CSV and bulk-create records.
+
+        CSV columns: employee_id, date, status, clock_in, clock_out, notes
+        Returns: {total, succeeded, failed, errors}
+        """
+        import csv
+        import io
+        from datetime import datetime, timezone
+        from app.schemas.attendance import ManualAttendanceCreate, AttendanceStatus
+
+        reader = csv.DictReader(io.StringIO(file_bytes.decode("utf-8-sig")))
+        total = 0
+        succeeded = 0
+        errors = []
+
+        for row_num, row in enumerate(reader, start=2):
+            total += 1
+            try:
+                emp_id = UUID(row["employee_id"].strip())
+                record_date = date.fromisoformat(row["date"].strip())
+
+                # Parse optional times — treat as UTC noon to avoid date-shift issues
+                def _parse_dt(time_str: str) -> Optional[datetime]:
+                    if not time_str or not time_str.strip():
+                        return None
+                    h, m = [int(x) for x in time_str.strip().split(":")]
+                    return datetime(record_date.year, record_date.month, record_date.day,
+                                    h, m, 0, tzinfo=timezone.utc)
+
+                clock_in = _parse_dt(row.get("clock_in", ""))
+                clock_out = _parse_dt(row.get("clock_out", ""))
+
+                if clock_in is None:
+                    clock_in = datetime(record_date.year, record_date.month, record_date.day,
+                                        9, 0, 0, tzinfo=timezone.utc)
+
+                raw_status = row.get("status", "present").strip()
+                try:
+                    att_status = AttendanceStatus(raw_status)
+                except ValueError:
+                    att_status = AttendanceStatus.present
+
+                entry = ManualAttendanceCreate(
+                    employee_id=emp_id,
+                    date=record_date,
+                    clock_in=clock_in,
+                    clock_out=clock_out,
+                    status=att_status,
+                    notes=row.get("notes", "").strip() or None,
+                )
+                await self.manual_entry(entry, created_by)
+                succeeded += 1
+            except Exception as exc:
+                errors.append({"row": row_num, "error": str(exc)})
+
+        return {
+            "total": total,
+            "succeeded": succeeded,
+            "failed": total - succeeded,
+            "errors": errors,
+        }
+
+    # ──────────── EMPLOYEE FILTER PROXY ────────────
+
+    async def get_employees_by_dept_branch(
+        self,
+        token: str,
+        department_id: Optional[UUID] = None,
+        branch_id: Optional[UUID] = None,
+    ) -> list:
+        """Proxy to employee-service: list employees filtered by dept/branch."""
+        from app.core.http_client import get_http_client
+
+        params = {}
+        if department_id:
+            params["department_id"] = str(department_id)
+        if branch_id:
+            params["branch_id"] = str(branch_id)
+        params["limit"] = "200"
+
+        async with get_http_client(headers={
+            "Authorization": f"Bearer {token}",
+            "X-Internal-Token": settings.INTERNAL_SERVICE_TOKEN,
+        }) as client:
+            resp = await client.get(
+                f"{settings.EMPLOYEE_SERVICE_URL}/api/v1/employees",
+                params=params,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            # Unwrap envelope: {success, data: {employees: [...]}}
+            if isinstance(data, dict) and "data" in data:
+                inner = data["data"]
+                if isinstance(inner, dict) and "employees" in inner:
+                    return inner["employees"]
+                return inner if isinstance(inner, list) else []
+            return data if isinstance(data, list) else []
+
 
 class GeofenceService:
     """Business logic for managing geofence locations."""

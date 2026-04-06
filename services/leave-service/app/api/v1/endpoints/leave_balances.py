@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from typing import List
+from typing import Annotated, List
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.api.v1.dependencies import (
     get_current_user,
@@ -27,11 +27,19 @@ from app.models.leave import LeaveBalance, LeaveType
 
 router = APIRouter()
 
+DB = Annotated[AsyncSession, Depends(get_db_with_tenant)]
+AnyUser = Annotated[TokenPayload, Depends(get_current_user)]
+HRUser = Annotated[TokenPayload, Depends(require_role(UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN))]
+
+_current_year = datetime.now(timezone.utc).year
+
+
 @router.get("/", response_model=APIResponse[List[LeaveBalanceResponse]])
 async def list_all_leave_balances(
-    year: int = datetime.utcnow().year,
-    db: AsyncSession = Depends(get_db_with_tenant),
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN))
+    year: int = _current_year,
+    *,
+    db: DB,
+    current_user: HRUser,
 ):
     """List all leave balances for the company (admin/HR only)."""
     company_id = db.info.get("company_id")
@@ -45,12 +53,14 @@ async def list_all_leave_balances(
     )
     return APIResponse(success=True, data=result.scalars().all())
 
+
 @router.get("/{employee_id}", response_model=APIResponse[List[LeaveBalanceResponse]])
 async def get_leave_balances(
     employee_id: UUID,
-    year: int = datetime.utcnow().year,
-    db: AsyncSession = Depends(get_db_with_tenant),
-    current_user: TokenPayload = Depends(get_current_user)
+    year: int = _current_year,
+    *,
+    db: DB,
+    current_user: AnyUser,
 ):
     if current_user.role == UserRole.EMPLOYEE.value and str(employee_id) != current_user.sub:
         raise HTTPException(status_code=403, detail="Not enough permissions")
@@ -67,16 +77,10 @@ async def get_leave_balances(
     )
     return APIResponse(success=True, data=result.scalars().all())
 
+
 @router.post("/", response_model=APIResponse[LeaveBalanceResponse], status_code=status.HTTP_201_CREATED)
-async def create_leave_balance(
-    *,
-    db: AsyncSession = Depends(get_db_with_tenant),
-    balance_in: LeaveBalanceCreate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
-):
+async def create_leave_balance(balance_in: LeaveBalanceCreate, db: DB, current_user: HRUser):
     db_obj = await leave_service.create_leave_balance(db, obj_in=balance_in)
-    
-    # Reload with leave_type
     result = await db.execute(
         select(LeaveBalance)
         .options(selectinload(LeaveBalance.leave_type))
@@ -84,13 +88,13 @@ async def create_leave_balance(
     )
     return APIResponse(success=True, data=result.scalars().first())
 
+
 @router.patch("/{balance_id}", response_model=APIResponse[LeaveBalanceResponse])
 async def update_leave_balance(
-    *,
-    db: AsyncSession = Depends(get_db_with_tenant),
     balance_id: UUID,
     balance_in: LeaveBalanceUpdate,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
+    db: DB,
+    current_user: HRUser,
 ):
     company_id = db.info.get("company_id")
     result = await db.execute(
@@ -106,10 +110,8 @@ async def update_leave_balance(
 
     for field, value in update_data.items():
         setattr(db_obj, field, value)
-
     await db.commit()
 
-    # Reload with leave_type
     result = await db.execute(
         select(LeaveBalance)
         .options(selectinload(LeaveBalance.leave_type))
@@ -119,18 +121,12 @@ async def update_leave_balance(
 
 
 @router.post("/bulk", response_model=BulkLeaveBalanceResponse)
-async def bulk_create_leave_balances(
-    *,
-    db: AsyncSession = Depends(get_db_with_tenant),
-    data: BulkLeaveBalanceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
-):
+async def bulk_create_leave_balances(data: BulkLeaveBalanceRequest, db: DB, current_user: HRUser):
     """Allocate leave balances for multiple employees at once.
     Skips rows where a balance already exists for that employee+type+year.
     """
     company_id = db.info.get("company_id")
 
-    # Verify leave type exists and belongs to tenant
     lt_result = await db.execute(
         select(LeaveType).filter(LeaveType.id == data.leave_type_id, LeaveType.company_id == company_id)
     )
@@ -164,13 +160,9 @@ async def bulk_create_leave_balances(
             )
             db.add(obj)
             await db.flush()
-            results.append(BulkLeaveBalanceResult(
-                index=idx, employee_id=item.employee_id, success=True
-            ))
+            results.append(BulkLeaveBalanceResult(index=idx, employee_id=item.employee_id, success=True))
         except Exception as e:
-            results.append(BulkLeaveBalanceResult(
-                index=idx, employee_id=item.employee_id, success=False, error=str(e)
-            ))
+            results.append(BulkLeaveBalanceResult(index=idx, employee_id=item.employee_id, success=False, error=str(e)))
 
     await db.commit()
     succeeded = sum(1 for r in results if r.success)

@@ -11,13 +11,9 @@ from app.api.v1.dependencies import (
     get_db_with_tenant
 )
 from app.core.constants import UserRole
+from app.core.responses import ok
 from app.services.department_service import DepartmentService
-from app.schemas.department import (
-    DepartmentCreate,
-    DepartmentUpdate,
-    DepartmentResponse,
-    DepartmentListResponse,
-)
+from app.schemas.department import DepartmentCreate, DepartmentUpdate, DepartmentResponse
 
 router = APIRouter(prefix="/departments", tags=["departments"])
 
@@ -26,58 +22,48 @@ def _get_service(db: AsyncSession = Depends(get_db_with_tenant)) -> DepartmentSe
     return DepartmentService(db)
 
 
-# ──────────── POST /departments ────────────
-@router.post("", response_model=DepartmentResponse, status_code=201)
+@router.post("", status_code=201)
 async def create_department(
     data: DepartmentCreate,
     current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: DepartmentService = Depends(_get_service),
 ):
-    """Create a new department. Requires HR or Super Admin role."""
-    return await service.create_department(data)
+    return ok(DepartmentResponse.model_validate(await service.create_department(data)).model_dump(mode="json"))
 
 
-# ──────────── GET /departments ────────────
-@router.get("", response_model=DepartmentListResponse)
+@router.get("")
 async def list_departments(
     include_inactive: bool = Query(False, description="Include soft-deleted departments"),
     current_user: TokenPayload = Depends(get_current_user),
     service: DepartmentService = Depends(_get_service),
 ):
-    """List all departments. Any authenticated user can access."""
-    departments, total = await service.list_departments(include_inactive=include_inactive)
-    return DepartmentListResponse(total=total, departments=departments)
+    departments, _ = await service.list_departments(include_inactive=include_inactive)
+    return ok([DepartmentResponse.model_validate(d).model_dump(mode="json") for d in departments])
 
 
-# ──────────── GET /departments/{id} ────────────
-@router.get("/{department_id}", response_model=DepartmentResponse)
+@router.get("/{department_id}")
 async def get_department(
     department_id: UUID,
     current_user: TokenPayload = Depends(get_current_user),
     service: DepartmentService = Depends(_get_service),
 ):
-    """Get a department by ID. Any authenticated user can access."""
-    return await service.get_department(department_id)
+    return ok(DepartmentResponse.model_validate(await service.get_department(department_id)).model_dump(mode="json"))
 
 
-# ──────────── PATCH /departments/{id} ────────────
-@router.patch("/{department_id}", response_model=DepartmentResponse)
+@router.patch("/{department_id}")
 async def update_department(
     department_id: UUID,
     data: DepartmentUpdate,
     current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: DepartmentService = Depends(_get_service),
 ):
-    """Update a department. Requires HR or Super Admin role."""
-    return await service.update_department(department_id, data)
+    return ok(DepartmentResponse.model_validate(await service.update_department(department_id, data)).model_dump(mode="json"))
 
 
-# ──────────── DELETE /departments/{id} ────────────
-@router.delete("/{department_id}", response_model=DepartmentResponse)
+@router.delete("/{department_id}")
 async def delete_department(
     department_id: UUID,
     current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: DepartmentService = Depends(_get_service),
 ):
-    """Soft-delete a department (sets is_active = 0). Requires HR or Super Admin role."""
-    return await service.soft_delete_department(department_id)
+    return ok(DepartmentResponse.model_validate(await service.soft_delete_department(department_id)).model_dump(mode="json"))

@@ -2,31 +2,38 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from typing import List
-from datetime import date
+from typing import Annotated, List
+from datetime import date, timedelta
 from pydantic import BaseModel
 
-from app.api.v1.dependencies import get_current_user, require_role, TokenPayload, get_db_with_tenant
+from app.api.v1.dependencies import require_role, TokenPayload, get_db_with_tenant
 from app.core.constants import UserRole, LeaveStatus
 from app.models.leave import LeaveRequest
 from app.schemas.response import APIResponse
 
 router = APIRouter()
 
+DB = Annotated[AsyncSession, Depends(get_db_with_tenant)]
+CalendarUser = Annotated[TokenPayload, Depends(
+    require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+)]
+
+
 class CalendarDateResponse(BaseModel):
     date: date
     staff_on_leave: int
-    staff_available: int # This requires knowing total staff from employee-service, will just return placeholder or parameterize
+    staff_available: int
     leaves: List[dict]
+
 
 @router.get("/", response_model=APIResponse[List[CalendarDateResponse]])
 async def get_leave_calendar(
     start_date: date,
     end_date: date,
-    db: AsyncSession = Depends(get_db_with_tenant),
-    current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.MANAGER, UserRole.SUPER_ADMIN, UserRole.ADMIN))
+    *,
+    db: DB,
+    current_user: CalendarUser,
 ):
-    # Fetch all APPROVED leaves in this range (tenant-scoped)
     company_id = db.info.get("company_id")
     query = (
         select(LeaveRequest)
@@ -35,18 +42,14 @@ async def get_leave_calendar(
             LeaveRequest.company_id == company_id,
             LeaveRequest.status == LeaveStatus.APPROVED.value,
             LeaveRequest.start_date <= end_date,
-            LeaveRequest.end_date >= start_date
+            LeaveRequest.end_date >= start_date,
         )
     )
     result = await db.execute(query)
     leaves = result.scalars().all()
 
-    # Group by date for the calendar view
-    calendar_data = {}
-    
-    # Iterate through the range
+    calendar_data: dict = {}
     current_dt = start_date
-    from datetime import timedelta
     while current_dt <= end_date:
         calendar_data[current_dt] = []
         current_dt += timedelta(days=1)
@@ -58,17 +61,17 @@ async def get_leave_calendar(
                 calendar_data[d].append({
                     "employee_id": str(leave.employee_id),
                     "leave_type": leave.leave_type.name,
-                    "duration_type": leave.duration_type
+                    "duration_type": leave.duration_type,
                 })
             d += timedelta(days=1)
 
-    response_data = []
-    for d, daily_leaves in calendar_data.items():
-        response_data.append(CalendarDateResponse(
+    response_data = [
+        CalendarDateResponse(
             date=d,
             staff_on_leave=len(daily_leaves),
-            staff_available=0, # Placeholder: Needs total staff count from employee-service minus staff_on_leave
-            leaves=daily_leaves
-        ))
-
+            staff_available=0,
+            leaves=daily_leaves,
+        )
+        for d, daily_leaves in calendar_data.items()
+    ]
     return APIResponse(success=True, data=response_data)

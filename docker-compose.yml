@@ -354,6 +354,36 @@ services:
       retries: 3
       start_period: 15s
 
+  # ─────────────── CALENDAR SERVICE ───────────────
+
+  calendar-service:
+    profiles: ["hr", "full"]
+    build:
+      context: ./services/calendar-service
+      dockerfile: Dockerfile
+    container_name: hrms-calendar
+    <<: *api-limits
+    environment:
+      - ENV=docker
+    env_file:
+      - ./services/calendar-service/.env.docker
+    ports:
+      - "8009:8009"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   # ─────────────── STUDENT MODULE ───────────────
 
   students-service:

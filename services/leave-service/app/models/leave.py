@@ -20,8 +20,34 @@ class LeaveType(Base):
     name = Column(String(100), index=True, nullable=False)
     description = Column(String(255), nullable=True)
     days_allowed = Column(Integer, nullable=False)
-    requires_approval = Column(Integer, default=1, nullable=False) # 1=True, 0=False
-    is_active = Column(Integer, default=1, nullable=False) # 1=True, 0=False
+    requires_approval = Column(Integer, default=1, nullable=False)  # 1=True, 0=False
+    is_active = Column(Integer, default=1, nullable=False)  # 1=True, 0=False
+
+    # ── Extended fields added in migration 0005 ────────────────────────────
+    is_carry_forward = Column(Integer, default=0, nullable=True)
+    is_leave_without_pay = Column(Integer, default=0, nullable=True)
+    is_compensatory = Column(Integer, default=0, nullable=True)
+    is_optional_leave = Column(Integer, default=0, nullable=True)
+    allow_negative_balance = Column(Integer, default=0, nullable=True)
+    allow_over_allocation = Column(Integer, default=0, nullable=True)
+    include_holidays_in_leaves = Column(Integer, default=0, nullable=True)
+    is_partially_paid = Column(Integer, default=0, nullable=True)
+    fraction_of_daily_salary = Column(Integer, default=0, nullable=True)
+
+    # Earned leave: credits accumulate at each interval
+    is_earned_leave = Column(Integer, default=0, nullable=True)
+    # "monthly" | "quarterly" | "half-yearly" | "yearly"
+    earned_leave_frequency = Column(String(20), nullable=True)
+
+    # Leave encashment
+    allow_encashment = Column(Integer, default=0, nullable=True)
+    non_encashable_leaves = Column(Integer, default=0, nullable=True)
+
+    # Limits
+    max_consecutive_days = Column(Integer, nullable=True)
+    applicable_after_working_days = Column(Integer, default=0, nullable=True)
+    max_leaves_allowed = Column(Integer, nullable=True)
+    # ── End extended fields ─────────────────────────────────────────────────
 
     balances = relationship("LeaveBalance", back_populates="leave_type", cascade="all, delete-orphan")
     requests = relationship("LeaveRequest", back_populates="leave_type", cascade="all, delete-orphan")

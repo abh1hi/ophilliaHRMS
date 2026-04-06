@@ -8,8 +8,15 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.db.base import Base
-from app.models.employee import Employee       # noqa: F401 - register model
-from app.models.department import Department   # noqa: F401 - register model
+from app.models.employee import Employee             # noqa: F401 - register model
+from app.models.department import Department         # noqa: F401 - register model
+from app.models.branch import Branch                 # noqa: F401 - register model
+from app.models.designation import Designation       # noqa: F401 - register model
+from app.models.employment_type import EmploymentType  # noqa: F401 - register model
+from app.models.employee_grade import EmployeeGrade  # noqa: F401 - register model
+from app.models.employee_group import EmployeeGroup  # noqa: F401 - register model
+from app.models.shift_type import ShiftType          # noqa: F401 - register model
+from app.models.shift_location import ShiftLocation  # noqa: F401 - register model
 from app.core.config import settings
 
 config = context.config

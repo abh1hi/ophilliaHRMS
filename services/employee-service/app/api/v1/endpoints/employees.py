@@ -12,6 +12,9 @@ from app.api.v1.dependencies import (
     TokenPayload,
     get_db_with_tenant
 )
+from app.core.responses import ok
+from app.repositories.employee_repository import EmployeeRepository
+from app.repositories.department_repository import DepartmentRepository
 from app.core.constants import UserRole
 from app.services.employee_service import EmployeeService
 from app.schemas.employee import (
@@ -211,6 +214,25 @@ async def list_employees(
         limit=pagination.limit,
         employees=employees,
     )
+
+
+# ──────────── GET /employees/stats ────────────
+@router.get("/stats")
+async def get_employee_stats(
+    current_user: TokenPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    """Company-level employee and department counts."""
+    emp_repo = EmployeeRepository(db)
+    dept_repo = DepartmentRepository(db)
+    _, total_employees = await emp_repo.get_all(skip=0, limit=1)
+    _, active_employees = await emp_repo.get_all(skip=0, limit=1, employment_status="active")
+    _, total_departments = await dept_repo.get_all(include_inactive=False)
+    return ok({
+        "total_employees": total_employees,
+        "active_employees": active_employees,
+        "total_departments": total_departments,
+    })
 
 
 # ──────────── GET /employees/{id} ────────────
