@@ -1,6 +1,6 @@
 import { apiFetchData } from './http'
 
-const BASE = '/leave/leave-ledger'
+const BASE = '/leave-ledger'
 
 export interface LeaveLedgerEntry {
   id: string

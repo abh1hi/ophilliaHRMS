@@ -1,5 +1,6 @@
 """Calendar Service — FastAPI Application Entry Point."""
 import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 
@@ -26,19 +27,32 @@ event_publisher = EventPublisher(settings.RABBITMQ_URL)
 
 
 async def _run_google_sync_loop(interval_seconds: int = 300):
-    """Background task: sync Google Calendar for all active integrations every N seconds."""
+    """Background task: sync Google Calendar + Tasks for all active integrations every N seconds."""
     while True:
         try:
             await asyncio.sleep(interval_seconds)
-            # Lazy import to avoid circular deps at startup
             from app.db.session import AsyncSessionLocal
             from app.repositories.google_repository import list_active_integrations
+            from app.services.google_calendar_sync import sync_calendar_for_integration
+            from app.services.google_tasks_sync import sync_tasks_for_integration
+
             async with AsyncSessionLocal() as session:
                 integrations = await list_active_integrations(session)
-                logger.info(f"Google sync: checking {len(integrations)} integrations")
-                # Phase 3: actual sync logic will be in google_calendar_sync.py
+                logger.info(f"Google sync: processing {len(integrations)} integrations")
+                for integration in integrations:
+                    try:
+                        cal_result = await sync_calendar_for_integration(session, integration)
+                        task_result = await sync_tasks_for_integration(session, integration)
+                        await session.commit()
+                        logger.info(
+                            f"Integration {integration.id}: "
+                            f"cal={cal_result}, tasks={task_result}"
+                        )
+                    except Exception:
+                        await session.rollback()
+                        logger.exception(f"Sync failed for integration {integration.id}")
         except asyncio.CancelledError:
-            break
+            raise
         except Exception:
             logger.exception("Google sync scheduler error")
 
@@ -64,10 +78,20 @@ async def lifespan(app: FastAPI):
     set_redis(redis_client)
     set_cache_redis(redis_client)
 
-    # Start background schedulers
+    # Start background schedulers and consumers
+    from app.scheduler.reminder_scheduler import run_reminder_scheduler
+    from app.scheduler.holiday_sync import run_holiday_sync_scheduler
+    from app.events.consumer import start_calendar_consumer
+    from app.db.session import AsyncSessionLocal
+
     google_sync_task = asyncio.create_task(
         _run_google_sync_loop(settings.GOOGLE_SYNC_INTERVAL_SECONDS)
     )
+    reminder_task = asyncio.create_task(
+        run_reminder_scheduler(event_publisher, AsyncSessionLocal, redis_client)
+    )
+    holiday_sync_task = asyncio.create_task(run_holiday_sync_scheduler())
+    consumer_task = asyncio.create_task(start_calendar_consumer())
 
     logger.info("Calendar service started", extra={"service_task": "startup"})
     yield
@@ -75,10 +99,17 @@ async def lifespan(app: FastAPI):
     # Graceful shutdown
     logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
     google_sync_task.cancel()
-    try:
+    reminder_task.cancel()
+    holiday_sync_task.cancel()
+    consumer_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
         await google_sync_task
-    except asyncio.CancelledError:
-        pass
+    with contextlib.suppress(asyncio.CancelledError):
+        await reminder_task
+    with contextlib.suppress(asyncio.CancelledError):
+        await holiday_sync_task
+    with contextlib.suppress(asyncio.CancelledError):
+        await consumer_task
     await asyncio.sleep(5)
     await redis_client.aclose()
     await event_publisher.close()
@@ -92,6 +123,7 @@ app = FastAPI(
     docs_url=f"{settings.API_V1_STR}/docs" if settings.DEBUG else None,
     redoc_url=None,
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # Generic error envelope handlers (must be registered before rate-limit handler)
@@ -116,7 +148,7 @@ try:
 except ImportError:
     pass
 
-app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(api_router, prefix=f"{settings.API_V1_STR}/calendar")
 
 
 @app.get("/health", include_in_schema=False)

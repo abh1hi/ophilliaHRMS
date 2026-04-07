@@ -12,6 +12,11 @@ from app.repositories import calendar_repository as cal_repo
 from app.core.permissions import check_permission
 from app.core.cache import cache_invalidate, company_events_pattern
 
+# Lazy imports to avoid circular startup dependency
+def _get_publisher():
+    from app.main import event_publisher
+    return event_publisher
+
 
 async def create_event(db: AsyncSession, data: EventCreate, created_by: UUID, company_id: str) -> CalendarEvent:
     cal = await cal_repo.get_calendar(db, data.calendar_id, company_id)
@@ -28,6 +33,31 @@ async def create_event(db: AsyncSession, data: EventCreate, created_by: UUID, co
     db.add(event)
     await db.commit()
     await cache_invalidate(company_events_pattern(company_id))
+
+    # Notify attendees about the new event invitation
+    if data.attendees:
+        try:
+            attendee_ids = [str(a.employee_id) for a in data.attendees]
+            await _get_publisher().publish("calendar.event_invited", {
+                "event_id": str(event.id),
+                "company_id": company_id,
+                "title": event.title,
+                "start_time": event.start_time.isoformat(),
+                "end_time": event.end_time.isoformat(),
+                "location": event.location or "",
+                "organizer_employee_id": str(created_by),
+                "attendee_employee_ids": attendee_ids,
+            })
+        except Exception:
+            pass  # Never block event creation on notification failure
+
+    # Fire outbound webhook (fire-and-forget)
+    try:
+        from app.services.webhook_dispatcher import fire_event_created
+        await fire_event_created(cal, event)
+    except Exception:
+        pass
+
     return event
 
 
@@ -40,6 +70,8 @@ async def update_event(
         raise HTTPException(status_code=404, detail="Event not found")
     check_permission("event:update", current_user_role, current_user_id, event.created_by)
 
+    cal = await cal_repo.get_calendar(db, event.calendar_id, company_id)
+
     update_data = data.model_dump(exclude_unset=True)
     if "attendees" in update_data and update_data["attendees"] is not None:
         update_data["attendees"] = [a.model_dump() for a in update_data["attendees"]]
@@ -47,6 +79,14 @@ async def update_event(
         setattr(event, field, value)
     await db.commit()
     await cache_invalidate(company_events_pattern(company_id))
+
+    # Fire outbound webhook (fire-and-forget)
+    try:
+        from app.services.webhook_dispatcher import fire_event_updated
+        await fire_event_updated(cal, event)
+    except Exception:
+        pass
+
     return event
 
 
@@ -58,10 +98,20 @@ async def delete_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     check_permission("event:delete", current_user_role, current_user_id, event.created_by)
+
+    cal = await cal_repo.get_calendar(db, event.calendar_id, company_id)
+
     event.is_deleted = True
     event.deleted_at = datetime.now(timezone.utc)
     await db.commit()
     await cache_invalidate(company_events_pattern(company_id))
+
+    # Fire outbound webhook (fire-and-forget)
+    try:
+        from app.services.webhook_dispatcher import fire_event_deleted
+        await fire_event_deleted(cal, event)
+    except Exception:
+        pass
 
 
 async def rsvp_event(db: AsyncSession, event_id: UUID, employee_id: UUID, rsvp_status: str, company_id: str) -> CalendarEvent:

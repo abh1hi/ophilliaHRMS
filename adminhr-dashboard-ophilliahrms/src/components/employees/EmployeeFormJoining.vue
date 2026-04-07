@@ -29,6 +29,7 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-5">
+    <FormInput label="Employee Code" :modelValue="modelValue.employee_code" @update:modelValue="update('employee_code', $event)" placeholder="e.g. EMP-001, REG-U-90" />
     <FormInput label="Date of Joining" type="date" :modelValue="modelValue.date_joined" @update:modelValue="update('date_joined', $event)" required />
     <FormInput label="Offer Date" type="date" :modelValue="modelValue.offer_date" @update:modelValue="update('offer_date', $event)" />
     <FormInput label="Confirmation Date" type="date" :modelValue="modelValue.confirmation_date" @update:modelValue="update('confirmation_date', $event)" />

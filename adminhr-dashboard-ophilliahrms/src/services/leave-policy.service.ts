@@ -1,6 +1,6 @@
 import { apiFetchData } from './http'
 
-const BASE = '/leave/leave-policies'
+const BASE = '/leave-policies'
 
 export interface LeavePolicyItem {
   id: string

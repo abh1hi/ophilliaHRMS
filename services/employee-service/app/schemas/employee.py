@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -9,7 +9,7 @@ from app.core.constants import EmploymentStatus, Gender
 
 # ──────────── CREATE ────────────
 class EmployeeCreate(BaseModel):
-    user_id: UUID
+    user_id: Optional[UUID] = None  # auto-generated if not provided
     # Personal
     first_name: str
     last_name: str
@@ -63,6 +63,9 @@ class EmployeeCreate(BaseModel):
     # Health
     health_issues: Optional[str] = None
     allergies: Optional[str] = None
+
+    # Employee code (company-defined)
+    employee_code: Optional[str] = None
 
     # Job info
     date_joined: date
@@ -154,6 +157,9 @@ class EmployeeUpdate(BaseModel):
     health_issues: Optional[str] = None
     allergies: Optional[str] = None
 
+    # Employee code (company-defined)
+    employee_code: Optional[str] = None
+
     # Job info
     department_id: Optional[UUID] = None
     designation: Optional[str] = None
@@ -226,6 +232,9 @@ class EmployeeResponse(BaseModel):
     # Health
     health_issues: Optional[str] = None
     allergies: Optional[str] = None
+
+    # Employee code (company-defined)
+    employee_code: Optional[str] = None
 
     # Job info
     date_joined: date

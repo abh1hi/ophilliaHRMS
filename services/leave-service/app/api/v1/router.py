@@ -3,6 +3,7 @@ from .endpoints import (
     leave_types, leave_balances, leave_requests, holidays, leave_calendar,
     leave_periods, holiday_lists, leave_policies, leave_allocations,
     leave_block_lists, compensatory_leave_requests, leave_encashments, leave_ledger,
+    internal,
 )
 
 api_router = APIRouter()
@@ -23,3 +24,4 @@ api_router.include_router(leave_block_lists.router, prefix="/leave-block-lists",
 api_router.include_router(compensatory_leave_requests.router, prefix="/compensatory-leave-requests", tags=["compensatory-leave"])
 api_router.include_router(leave_encashments.router, prefix="/leave-encashments", tags=["leave-encashments"])
 api_router.include_router(leave_ledger.router, prefix="/leave-ledger", tags=["leave-ledger"])
+api_router.include_router(internal.router, prefix="/internal", tags=["internal"])

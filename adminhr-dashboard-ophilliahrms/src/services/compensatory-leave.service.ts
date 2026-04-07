@@ -1,6 +1,6 @@
 import { apiFetchData } from './http'
 
-const BASE = '/leave/compensatory-leave-requests'
+const BASE = '/compensatory-leave-requests'
 
 export interface CompensatoryLeaveRequest {
   id: string

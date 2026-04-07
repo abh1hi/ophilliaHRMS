@@ -81,6 +81,9 @@ class Employee(Base):
     health_issues = Column(Text, nullable=True)
     allergies = Column(Text, nullable=True)
 
+    # ── Employee Code (company-defined, e.g. EMP-001, REG-U-90) ───────────
+    employee_code = Column(String(100), nullable=True, unique=True, index=True)
+
     # ── Employment / Job Info ──────────────────────────────────────────────
     date_joined = Column(Date, nullable=False)
     department_id = Column(

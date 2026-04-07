@@ -1,6 +1,6 @@
 import { apiFetchData } from './http'
 
-const BASE = '/leave/leave-periods'
+const BASE = '/leave-periods'
 
 export interface LeavePeriod {
   id: string

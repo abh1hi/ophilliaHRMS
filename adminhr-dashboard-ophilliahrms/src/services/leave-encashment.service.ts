@@ -1,6 +1,6 @@
 import { apiFetchData } from './http'
 
-const BASE = '/leave/leave-encashments'
+const BASE = '/leave-encashments'
 
 export interface LeaveEncashment {
   id: string

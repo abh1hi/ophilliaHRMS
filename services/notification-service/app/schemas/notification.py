@@ -9,6 +9,7 @@ from app.core.constants import NotificationType, NotificationStatus
 class PreferenceBase(BaseModel):
     email_enabled: bool = True
     sms_enabled: bool = True
+    calendar_enabled: bool = True
 
 class PreferenceCreate(PreferenceBase):
     user_id: UUID

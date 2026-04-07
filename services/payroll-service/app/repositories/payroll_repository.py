@@ -1,10 +1,14 @@
 import logging
 from typing import Optional, List
 from uuid import UUID
+from datetime import date
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.payroll import SalaryStructure, EmployeeSalary, PayrollRun, Payslip
+from app.models.payroll import (
+    SalaryStructure, EmployeeSalary, PayrollRun, Payslip, EmployeeYTD,
+    PayrollAdjustment, PayrollLoan
+)
 
 logger = logging.getLogger(__name__)
 
@@ -154,5 +158,149 @@ class PayrollRepository:
                 and_(Payslip.employee_id == employee_id, Payslip.company_id == self._company_id)
             )
             .order_by(Payslip.period_start.desc())
+        )
+        return list(result.scalars().all())
+
+    async def get_payslips_by_employee_fy(
+        self, employee_id: UUID, financial_year: int
+    ) -> List[Payslip]:
+        """Get all payslips for employee in a financial year (Apr-Mar).
+
+        Args:
+            employee_id: Employee UUID
+            financial_year: FY year (e.g., 2026 = FY 2025-26, Apr 2025 - Mar 2026)
+
+        Returns:
+            List of payslips in chronological order
+        """
+        fy_start = date(financial_year - 1, 4, 1)  # Apr of previous year
+        fy_end = date(financial_year, 3, 31)       # Mar of given year
+
+        result = await self.db.execute(
+            select(Payslip).where(
+                and_(
+                    Payslip.employee_id == employee_id,
+                    Payslip.company_id == self._company_id,
+                    Payslip.period_start >= fy_start,
+                    Payslip.period_end <= fy_end,
+                )
+            )
+            .order_by(Payslip.period_start.asc())
+        )
+        return list(result.scalars().all())
+
+    # ── Employee YTD ─────────────────────────────────────────────────────
+    async def get_employee_ytd(
+        self, employee_id: UUID, financial_year: int
+    ) -> Optional[EmployeeYTD]:
+        """Get YTD record for employee in a financial year.
+
+        Args:
+            employee_id: Employee UUID
+            financial_year: FY year (e.g., 2026)
+
+        Returns:
+            EmployeeYTD record or None
+        """
+        result = await self.db.execute(
+            select(EmployeeYTD).where(
+                and_(
+                    EmployeeYTD.employee_id == employee_id,
+                    EmployeeYTD.company_id == self._company_id,
+                    EmployeeYTD.financial_year == financial_year,
+                )
+            )
+        )
+        return result.scalar_one_or_none()
+
+    def create_or_update_ytd(self, ytd: EmployeeYTD) -> EmployeeYTD:
+        """Create or update YTD record (sync add, caller manages commit)."""
+        ytd.company_id = self._company_id
+        self.db.add(ytd)
+        return ytd
+
+    # ── Payroll Adjustments ──────────────────────────────────────────
+    async def get_adjustments_by_run(self, run_id: UUID) -> List[PayrollAdjustment]:
+        """Get all adjustments for a payroll run.
+
+        Args:
+            run_id: PayrollRun UUID
+
+        Returns:
+            List of PayrollAdjustment records
+        """
+        result = await self.db.execute(
+            select(PayrollAdjustment).where(
+                and_(
+                    PayrollAdjustment.payroll_run_id == run_id,
+                    PayrollAdjustment.company_id == self._company_id,
+                )
+            )
+            .order_by(PayrollAdjustment.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def get_adjustments_by_employee_run(
+        self, run_id: UUID, employee_id: UUID
+    ) -> List[PayrollAdjustment]:
+        """Get all adjustments for an employee in a specific run.
+
+        Args:
+            run_id: PayrollRun UUID
+            employee_id: Employee UUID
+
+        Returns:
+            List of PayrollAdjustment records
+        """
+        result = await self.db.execute(
+            select(PayrollAdjustment).where(
+                and_(
+                    PayrollAdjustment.payroll_run_id == run_id,
+                    PayrollAdjustment.employee_id == employee_id,
+                    PayrollAdjustment.company_id == self._company_id,
+                )
+            )
+            .order_by(PayrollAdjustment.created_at.asc())
+        )
+        return list(result.scalars().all())
+
+    # ── Payroll Loans ───────────────────────────────────────────────
+    async def get_loan(self, loan_id: UUID) -> Optional[PayrollLoan]:
+        """Get a loan record by ID.
+
+        Args:
+            loan_id: Loan UUID
+
+        Returns:
+            PayrollLoan record or None
+        """
+        result = await self.db.execute(
+            select(PayrollLoan).where(
+                and_(
+                    PayrollLoan.id == loan_id,
+                    PayrollLoan.company_id == self._company_id,
+                )
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_active_loans_for_employee(self, employee_id: UUID) -> List[PayrollLoan]:
+        """Get all active loans for an employee.
+
+        Args:
+            employee_id: Employee UUID
+
+        Returns:
+            List of active PayrollLoan records
+        """
+        result = await self.db.execute(
+            select(PayrollLoan).where(
+                and_(
+                    PayrollLoan.employee_id == employee_id,
+                    PayrollLoan.company_id == self._company_id,
+                    PayrollLoan.status == "ACTIVE",
+                )
+            )
+            .order_by(PayrollLoan.created_at.asc())
         )
         return list(result.scalars().all())

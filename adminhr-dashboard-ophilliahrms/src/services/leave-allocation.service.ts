@@ -1,6 +1,6 @@
 import { apiFetchData } from './http'
 
-const BASE = '/leave/leave-allocations'
+const BASE = '/leave-allocations'
 
 export interface LeaveAllocation {
   id: string

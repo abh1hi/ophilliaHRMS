@@ -12,7 +12,7 @@ const isLoading = ref(true)
 onMounted(async () => {
   try {
     const result = await companyApi.getCompanies()
-    companies.value = result.data.map((c: any) => ({
+    companies.value = result.data.companies.map((c: any) => ({
       ...c,
       glow: 'bg-emerald-200/30' // Visual enhancement from guideline
     }))

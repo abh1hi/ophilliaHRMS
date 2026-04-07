@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     search,
     audit,
     internal,
+    google,
 )
 
 api_router = APIRouter()
@@ -19,3 +20,4 @@ api_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(audit.router, prefix="/audit-logs", tags=["audit"])
 api_router.include_router(internal.router, prefix="/internal", tags=["internal"])
+api_router.include_router(google.router, prefix="/google", tags=["google"])

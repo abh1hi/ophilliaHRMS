@@ -17,7 +17,7 @@ async def list_leave_periods(
     db: AsyncSession = Depends(get_db_with_tenant),
     _: TokenPayload = Depends(get_current_user),
 ):
-    items = await leave_period_service.list_periods(db, include_inactive)
+    items, _total = await leave_period_service.list_periods(db, include_inactive)
     return APIResponse(success=True, data=items)
 
 

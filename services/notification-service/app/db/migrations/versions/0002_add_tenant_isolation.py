@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "0002_tenant_isolation"
+revision = "0002_add_tenant_isolation"
 down_revision = "0001_initial"
 branch_labels = None
 depends_on = None

@@ -7,6 +7,7 @@ import {
   CalendarCheckIcon, LogInIcon, FileTextIcon, CheckSquareIcon, UploadIcon,
   UmbrellaIcon, CalendarDaysIcon, ShieldIcon, BookOpenIcon, SlashIcon,
   CoinsIcon, BarChart3Icon, ListIcon, KanbanIcon, StickyNoteIcon, SettingsIcon,
+  WalletIcon,
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 
@@ -29,6 +30,7 @@ const attendanceOpen = ref(false)
 const mainNav = [
   { key: 'dashboard',  label: 'Dashboard',  icon: LayoutDashboardIcon },
   { key: 'employees',  label: 'Employees',  icon: UsersIcon           },
+  { key: 'payroll',    label: 'Payroll',    icon: WalletIcon          },
 ]
 
 const hrSetupNav = [
@@ -101,7 +103,7 @@ const workspaceOpen = ref(false)
     </div>
 
     <!-- Main Nav -->
-    <nav class="flex-1 space-y-1 overflow-y-auto">
+    <nav class="flex-1 space-y-1 overflow-y-auto pr-2">
       <button
         v-for="item in mainNav"
         :key="item.key"

@@ -8,11 +8,11 @@ interface ApiResponse<T> {
   } | null;
 }
 
-const BASE_URL = '/api'
+const BASE_URL = '/api/v1'
 
-const apiFetch = async <T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> => {
+export const apiFetch = async <T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> => {
   const token = localStorage.getItem('access_token')
-  
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -45,9 +45,9 @@ export const authApi = {
 }
 
 export const companyApi = {
-  getCompanies: () => apiFetch<any[]>('/companies'),
-  getStats: (companyId: string | number) => apiFetch<any>(`/companies/${companyId}/stats`),
-  getRecentActivity: (companyId: string | number) => apiFetch<any[]>(`/companies/${companyId}/activity`),
+  getCompanies: () => apiFetch<any[]>('/auth/companies'),
+  getStats: (companyId: string | number) => apiFetch<any>(`/auth/companies/${companyId}/stats`),
+  getRecentActivity: (companyId: string | number) => apiFetch<any[]>(`/auth/companies/${companyId}/activity`),
 }
 
 export const employeeApi = {

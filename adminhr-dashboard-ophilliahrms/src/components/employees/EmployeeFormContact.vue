@@ -25,6 +25,7 @@ function update(key: keyof Employee, val: string) {
         <FormInput label="PAN Number" :modelValue="modelValue.pan_number" @update:modelValue="update('pan_number', $event)" autocomplete="off" />
         <FormInput label="UAN Number" :modelValue="modelValue.uan_number" @update:modelValue="update('uan_number', $event)" autocomplete="off" />
         <FormInput label="ESI Number" :modelValue="modelValue.esi_number" @update:modelValue="update('esi_number', $event)" autocomplete="off" />
+        <FormInput label="Driving License Number" :modelValue="modelValue.driving_license_number" @update:modelValue="update('driving_license_number', $event)" autocomplete="off" />
       </div>
     </div>
   </div>

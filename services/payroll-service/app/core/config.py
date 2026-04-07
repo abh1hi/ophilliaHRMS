@@ -35,6 +35,9 @@ OwIDAQAB
     # Employee Service (for employee verification)
     EMPLOYEE_SERVICE_URL: str = "http://employee-service:8001"
 
+    # Leave Service (for LOP data)
+    LEAVE_SERVICE_URL: str = "http://leave-service:8002"
+
     # Redis (shared blacklist with auth-service)
     REDIS_URL: str = "redis://hrms-redis:6379/0"
 

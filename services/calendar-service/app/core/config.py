@@ -50,6 +50,9 @@ OwIDAQAB
     TOKEN_ENCRYPTION_KEY: str = ""  # Fernet base64 key for encrypting OAuth tokens at rest
     GOOGLE_SYNC_INTERVAL_SECONDS: int = 300
 
+    # Outbound webhooks — HMAC-SHA256 signing key
+    WEBHOOK_SECRET: str = "CHANGE_THIS_WEBHOOK_SECRET_IN_PRODUCTION"
+
     @field_validator("JWT_PUBLIC_KEY", mode="before")
     @classmethod
     def unescape_pem(cls, v: str) -> str:

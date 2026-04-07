@@ -63,6 +63,7 @@ onMounted(async () => {
 const headerTitles: Record<string, { title: string; subtitle: string }> = {
   dashboard:          { title: 'Overview',         subtitle: `What's happening today at ${companyName.value}` },
   employees:          { title: 'Employees',         subtitle: 'Manage your entire workforce'                  },
+  payroll:            { title: 'Payroll Management', subtitle: 'Process salaries and manage payroll runs'       },
   attendance:         { title: 'Attendance',        subtitle: 'Track and review attendance records'           },
   departments:        { title: 'HR Setup',          subtitle: 'Departments'                                   },
   branches:           { title: 'HR Setup',          subtitle: 'Branches'                                      },
@@ -99,7 +100,12 @@ const headerTitles: Record<string, { title: string; subtitle: string }> = {
 }
 
 function navigate(tab: string) {
-  currentTab.value = tab
+  // Route to separate pages for certain tabs
+  if (tab === 'payroll') {
+    router.push('/payroll')
+  } else {
+    currentTab.value = tab
+  }
 }
 
 function switchEntity() {

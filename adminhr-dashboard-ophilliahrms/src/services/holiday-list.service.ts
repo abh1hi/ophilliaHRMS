@@ -1,6 +1,6 @@
 import { apiFetchData } from './http'
 
-const BASE = '/leave/holiday-lists'
+const BASE = '/holiday-lists'
 
 export interface HolidayListEntry {
   id: string

@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.exception_handlers import register_exception_handlers
 from app.middleware.request_id import request_id_middleware
-from app.events.consumers import start_consumers
+from app.events.consumers import start_consumers, set_consumer_redis
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
 
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     set_redis(redis_client)
+    set_consumer_redis(redis_client)
     consumer_task = asyncio.create_task(start_consumers())
     logger.info("Notification service started", extra={"service_task": "startup"})
     yield

@@ -1,6 +1,6 @@
 import { apiFetchData } from './http'
 
-const BASE = '/leave/leave-block-lists'
+const BASE = '/leave-block-lists'
 
 export interface LeaveBlockListDate {
   id: string

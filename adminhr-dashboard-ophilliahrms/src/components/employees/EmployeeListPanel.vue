@@ -22,10 +22,11 @@ const deleteTarget = ref<Employee | null>(null)
 const deleting    = ref(false)
 
 const columns = [
-  { key: 'name',       label: 'Name'       },
-  { key: 'email',      label: 'Email'      },
-  { key: 'department', label: 'Department' },
-  { key: 'designation',label: 'Designation'},
+  { key: 'employee_code', label: 'Code'       },
+  { key: 'name',          label: 'Name'       },
+  { key: 'email',         label: 'Email'      },
+  { key: 'department',    label: 'Department' },
+  { key: 'designation',   label: 'Designation'},
   { key: 'employment_status', label: 'Status' },
 ]
 
@@ -110,6 +111,14 @@ function fullName(emp: Employee | null) {
       @search="onSearch"
     >
       <!-- Custom cells -->
+      <template #cell-employee_code="{ row }">
+        <span
+          v-if="row.employee_code"
+          class="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-mono font-semibold"
+        >{{ row.employee_code }}</span>
+        <span v-else class="text-slate-300 text-xs">—</span>
+      </template>
+
       <template #cell-name="{ row }">
         <div class="flex items-center space-x-3">
           <div class="w-8 h-8 rounded-[10px] bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">

@@ -62,6 +62,7 @@ async def update_preference(db: AsyncSession, user_id: UUID, pref_update: Prefer
     pref = await get_or_create_preference(db, user_id)
     pref.email_enabled = 1 if pref_update.email_enabled else 0
     pref.sms_enabled = 1 if pref_update.sms_enabled else 0
+    pref.calendar_enabled = 1 if pref_update.calendar_enabled else 0
     db.add(pref)
     await db.commit()
     await db.refresh(pref)
@@ -82,10 +83,19 @@ async def compile_and_send_notification(
 
     # Preference enforcement
     should_send = False
+    calendar_enabled = getattr(pref, "calendar_enabled", 1)
     if log_create.type == NotificationType.EMAIL and pref.email_enabled:
         should_send = True
     elif log_create.type == NotificationType.SMS and pref.sms_enabled:
         should_send = True
+    # For calendar events/tasks, additionally check calendar_enabled preference
+    # The subject prefix convention: emails from calendar handlers start with "Reminder:", "Invitation:", "Task Due"
+    is_calendar_notification = any(
+        (log_create.subject or "").startswith(p)
+        for p in ("Reminder:", "Invitation:", "Task Due")
+    )
+    if is_calendar_notification and not calendar_enabled:
+        should_send = False
 
     status = NotificationStatus.PENDING
     error_message = None

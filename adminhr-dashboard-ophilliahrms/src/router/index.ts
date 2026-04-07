@@ -26,6 +26,12 @@ const routes = [
     name: 'Profile',
     component: () => import('../views/ProfileView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/payroll',
+    name: 'Payroll',
+    component: () => import('../views/PayrollView.vue'),
+    meta: { requiresAuth: true, roles: ['admin', 'hr', 'super_admin'] }
   }
 ]
 

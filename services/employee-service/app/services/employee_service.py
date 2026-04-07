@@ -1,6 +1,6 @@
 import logging
 from typing import Optional, List
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +22,9 @@ class EmployeeService:
 
     async def create_employee(self, data: EmployeeCreate) -> Employee:
         """Create a new employee profile."""
+        # Auto-generate user_id if not provided
+        user_id = data.user_id or uuid4()
+
         # Check for duplicate email
         existing = await self.repo.get_by_email(data.email)
         if existing:
@@ -30,16 +33,17 @@ class EmployeeService:
                 detail=f"Employee with email {data.email} already exists",
             )
 
-        # Check for duplicate user_id
-        existing_user = await self.repo.get_by_user_id(data.user_id)
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Employee profile already exists for this user",
-            )
+        # Check for duplicate user_id only if one was explicitly provided
+        if data.user_id:
+            existing_user = await self.repo.get_by_user_id(data.user_id)
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Employee profile already exists for this user",
+                )
 
         employee = Employee(
-            user_id=data.user_id,
+            user_id=user_id,
             # Personal
             first_name=data.first_name,
             last_name=data.last_name,
@@ -85,6 +89,8 @@ class EmployeeService:
             # Health
             health_issues=data.health_issues,
             allergies=data.allergies,
+            # Employee code
+            employee_code=data.employee_code,
             # Job info
             date_joined=data.date_joined,
             department_id=data.department_id,

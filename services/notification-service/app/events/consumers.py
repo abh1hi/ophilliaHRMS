@@ -1,19 +1,29 @@
-"""RabbitMQ consumer — handles leave.*, employee.created, payroll.run, salary.processed events.
+"""RabbitMQ consumer — handles leave.*, employee.created, payroll.run, salary.processed,
+and calendar.* events.
 
 Includes DLQ setup, preference enforcement via service layer, and Jinja2 template rendering.
 """
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
 from aio_pika import connect_robust, IncomingMessage, ExchangeType
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.schemas.notification import NotificationLogCreate
 from app.core.constants import NotificationType
 from app.services.notification_service import compile_and_send_notification
+from app.utils.employee_resolver import get_employee_email, get_employee_emails_bulk
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+# Redis client shared via module-level reference — set by main.py on startup
+_redis = None
+
+def set_consumer_redis(client) -> None:
+    global _redis
+    _redis = client
 
 
 async def process_event(message: IncomingMessage):
@@ -37,6 +47,12 @@ async def process_event(message: IncomingMessage):
                     await handle_payroll_run(db, payload)
                 elif routing_key == "salary.processed":
                     await handle_salary_processed(db, payload)
+                elif routing_key == "calendar.event_reminder":
+                    await handle_calendar_event_reminder(db, payload)
+                elif routing_key == "calendar.event_invited":
+                    await handle_calendar_event_invited(db, payload)
+                elif routing_key == "calendar.task_due_soon":
+                    await handle_calendar_task_due_soon(db, payload)
                 else:
                     logger.debug(f"Ignoring unhandled event: {routing_key}")
 
@@ -142,6 +158,129 @@ async def handle_salary_processed(db: AsyncSession, payload: dict):
     await compile_and_send_notification(db, log_obj, template_name="payroll_processed.html", template_context={"period_start": period_start, "period_end": period_end})
 
 
+def _fmt_dt(iso: str) -> str:
+    """Format an ISO datetime string for human-readable email display."""
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        return dt.strftime("%A, %B %-d %Y at %-I:%M %p UTC")
+    except Exception:
+        return iso
+
+
+async def handle_calendar_event_reminder(db: AsyncSession, payload: dict):
+    """Send event reminder emails to all attendees + the organizer."""
+    company_id = payload.get("company_id")
+    employee_ids: list = payload.get("attendee_employee_ids", [])
+    if not employee_ids or not company_id:
+        return
+
+    start_formatted = _fmt_dt(payload.get("start_time", ""))
+    end_formatted   = _fmt_dt(payload.get("end_time", ""))
+    app_url = f"{settings.ALLOWED_ORIGINS[0] if settings.ALLOWED_ORIGINS else 'http://localhost:3000'}?tab=workspace-calendar"
+    minutes_before  = payload.get("minutes_before", "")
+
+    email_map = await get_employee_emails_bulk(employee_ids, _redis)
+
+    for emp_id, to_email in email_map.items():
+        log_obj = NotificationLogCreate(
+            company_id=company_id,
+            user_id=emp_id,
+            type=NotificationType.EMAIL,
+            subject=f"Reminder: {payload.get('title', 'Event')} starts in {minutes_before}m",
+            message=f"Your event '{payload.get('title')}' starts at {start_formatted}.",
+        )
+        await compile_and_send_notification(
+            db, log_obj,
+            template_name="calendar_event_reminder.html",
+            template_context={
+                "title": payload.get("title", ""),
+                "start_formatted": start_formatted,
+                "end_formatted": end_formatted,
+                "location": payload.get("location", ""),
+                "minutes_before": minutes_before,
+                "app_url": app_url,
+            },
+        )
+
+
+async def handle_calendar_event_invited(db: AsyncSession, payload: dict):
+    """Send calendar invitation emails to all invited attendees."""
+    company_id = payload.get("company_id")
+    employee_ids: list = payload.get("attendee_employee_ids", [])
+    if not employee_ids or not company_id:
+        return
+
+    start_formatted = _fmt_dt(payload.get("start_time", ""))
+    app_url = f"{settings.ALLOWED_ORIGINS[0] if settings.ALLOWED_ORIGINS else 'http://localhost:3000'}?tab=workspace-calendar"
+    organizer_id = payload.get("organizer_employee_id", "")
+
+    # Resolve organizer display name (best-effort — use ID if unavailable)
+    organizer_email = await get_employee_email(organizer_id, _redis) if organizer_id else ""
+    organizer_name = organizer_email.split("@")[0] if "@" in organizer_email else organizer_id
+
+    email_map = await get_employee_emails_bulk(employee_ids, _redis)
+
+    for emp_id, to_email in email_map.items():
+        # Don't invite the organizer
+        if emp_id == organizer_id:
+            continue
+        log_obj = NotificationLogCreate(
+            company_id=company_id,
+            user_id=emp_id,
+            type=NotificationType.EMAIL,
+            subject=f"Invitation: {payload.get('title', 'Event')}",
+            message=f"You have been invited to '{payload.get('title')}' on {start_formatted}.",
+        )
+        await compile_and_send_notification(
+            db, log_obj,
+            template_name="calendar_event_invited.html",
+            template_context={
+                "title": payload.get("title", ""),
+                "start_formatted": start_formatted,
+                "location": payload.get("location", ""),
+                "organizer_name": organizer_name,
+                "event_id": payload.get("event_id", ""),
+                "app_url": app_url,
+            },
+        )
+
+
+async def handle_calendar_task_due_soon(db: AsyncSession, payload: dict):
+    """Send task due-soon emails to all assignees."""
+    company_id = payload.get("company_id")
+    employee_ids: list = payload.get("assignee_employee_ids", [])
+    if not employee_ids or not company_id:
+        return
+
+    due_formatted = _fmt_dt(payload.get("due_date", ""))
+    hours_until   = payload.get("hours_until_due", 0)
+    priority      = payload.get("priority", "medium")
+    app_url = f"{settings.ALLOWED_ORIGINS[0] if settings.ALLOWED_ORIGINS else 'http://localhost:3000'}?tab=workspace-board"
+
+    email_map = await get_employee_emails_bulk(employee_ids, _redis)
+
+    for emp_id, to_email in email_map.items():
+        log_obj = NotificationLogCreate(
+            company_id=company_id,
+            user_id=emp_id,
+            type=NotificationType.EMAIL,
+            subject=f"Task Due Soon: {payload.get('title', 'Task')} ({hours_until}h remaining)",
+            message=f"Task '{payload.get('title')}' is due at {due_formatted}.",
+        )
+        await compile_and_send_notification(
+            db, log_obj,
+            template_name="calendar_task_due_soon.html",
+            template_context={
+                "title": payload.get("title", ""),
+                "due_formatted": due_formatted,
+                "hours_until_due": hours_until,
+                "priority": priority,
+                "status": payload.get("status", ""),
+                "app_url": app_url,
+            },
+        )
+
+
 async def start_consumers():
     try:
         connection = await connect_robust(settings.RABBITMQ_URL)
@@ -185,8 +324,14 @@ async def start_consumers():
         await queue.bind(exchange, routing_key="onboarding.*")
         await queue.bind(exchange, routing_key="payroll.run")
         await queue.bind(exchange, routing_key="salary.processed")
+        await queue.bind(exchange, routing_key="calendar.event_reminder")
+        await queue.bind(exchange, routing_key="calendar.event_invited")
+        await queue.bind(exchange, routing_key="calendar.task_due_soon")
 
-        logger.info("Notification consumer started — listening for leave.*, employee.created, onboarding.*, payroll.run, salary.processed")
+        logger.info(
+            "Notification consumer started — listening for "
+            "leave.*, employee.created, onboarding.*, payroll.run, salary.processed, calendar.*"
+        )
         await queue.consume(process_event)
     except Exception as exc:
         logger.error(f"Failed to start RabbitMQ consumers: {exc}")

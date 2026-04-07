@@ -4,6 +4,8 @@ import type { PaginationMeta } from './http'
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface Employee {
   id: string
+  user_id?: string
+  employee_code?: string
   // Personal
   first_name: string
   last_name: string
@@ -46,6 +48,7 @@ export interface Employee {
   pan_number?: string
   uan_number?: string
   esi_number?: string
+  driving_license_number?: string
   // Emergency
   emergency_contact_name?: string
   emergency_contact_number?: string
@@ -100,9 +103,21 @@ interface RawEmployeeList {
 
 // ─── Employee API ─────────────────────────────────────────────────────────────
 export async function listEmployees(params: ListEmployeesParams = {}): Promise<EmployeeListResult> {
-  const query = new URLSearchParams(params as Record<string, string>).toString()
-  // The list endpoint returns a raw EmployeeListResponse (no envelope wrapper)
-  const raw = await apiFetchAuth<RawEmployeeList>(`/employees?${query}`)
+  const { page = 1, page_size = 20, search, department_id, employment_status } = params
+
+  // Convert page/page_size → skip/limit (backend uses skip/limit)
+  const skip = (page - 1) * page_size
+  const limit = page_size
+
+  // Build query string — only include params that have real values
+  const qs = new URLSearchParams()
+  qs.set('skip', String(skip))
+  qs.set('limit', String(limit))
+  if (search)            qs.set('search', search)
+  if (department_id)     qs.set('department_id', department_id)
+  if (employment_status) qs.set('employment_status', employment_status)
+
+  const raw = await apiFetchAuth<RawEmployeeList>(`/employees?${qs.toString()}`)
   return {
     data: raw.employees ?? [],
     meta: {
