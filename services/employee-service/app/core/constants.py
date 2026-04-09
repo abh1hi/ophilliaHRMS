@@ -23,3 +23,11 @@ class UserRole(str, Enum):
     HR = "hr"
     MANAGER = "manager"
     EMPLOYEE = "employee"
+
+
+class AccountStatus(str, Enum):
+    """Employee portal account provisioning status."""
+    NOT_REGISTERED = "not_registered"
+    INVITED = "invited"
+    ACTIVE = "active"
+    SUSPENDED = "suspended"

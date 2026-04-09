@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -9,7 +9,7 @@ from app.core.constants import EmploymentStatus, Gender
 
 # ──────────── CREATE ────────────
 class EmployeeCreate(BaseModel):
-    user_id: UUID
+    user_id: Optional[UUID] = None  # auto-generated if not provided
     # Personal
     first_name: str
     last_name: str
@@ -63,6 +63,9 @@ class EmployeeCreate(BaseModel):
     # Health
     health_issues: Optional[str] = None
     allergies: Optional[str] = None
+
+    # Employee code (company-defined)
+    employee_code: Optional[str] = None
 
     # Job info
     date_joined: date
@@ -154,6 +157,9 @@ class EmployeeUpdate(BaseModel):
     health_issues: Optional[str] = None
     allergies: Optional[str] = None
 
+    # Employee code (company-defined)
+    employee_code: Optional[str] = None
+
     # Job info
     department_id: Optional[UUID] = None
     designation: Optional[str] = None
@@ -171,7 +177,9 @@ class EmployeeUpdate(BaseModel):
 class EmployeeResponse(BaseModel):
     id: UUID
     company_id: UUID
-    user_id: UUID
+    user_id: Optional[UUID] = None
+    account_status: str = "not_registered"
+    invite_expires_at: Optional[datetime] = None
 
     # Personal
     first_name: str
@@ -227,6 +235,9 @@ class EmployeeResponse(BaseModel):
     health_issues: Optional[str] = None
     allergies: Optional[str] = None
 
+    # Employee code (company-defined)
+    employee_code: Optional[str] = None
+
     # Job info
     date_joined: date
     department_id: Optional[UUID] = None
@@ -260,6 +271,7 @@ class BulkEmployeeResult(BaseModel):
     success: bool
     employee: Optional[EmployeeResponse] = None
     error: Optional[str] = None
+    note: Optional[str] = None  # e.g. "updated existing" for upserted rows
 
 
 class BulkEmployeeResponse(BaseModel):
@@ -367,10 +379,9 @@ class BulkEmployeeImportItem(BaseModel):
         return v.upper() if v else v
 
     def to_employee_create(self, user_id_override: Optional[UUID] = None) -> "EmployeeCreate":
-        import uuid as _uuid
         from datetime import date as _date
         data = self.model_dump(exclude={"user_id", "date_joined", "initial_password"})
-        data["user_id"] = user_id_override or self.user_id or _uuid.uuid4()
+        data["user_id"] = user_id_override  # None → employee created without auth account
         data["date_joined"] = self.date_joined or _date.today()
         # Coerce personal_email to valid or drop
         if data.get("personal_email"):
@@ -381,3 +392,12 @@ class BulkEmployeeImportItem(BaseModel):
         elif data.get("gender"):
             data["gender"] = str(data["gender"]).lower()
         return EmployeeCreate(**data)
+
+
+# ──────────── INVITE FLOW ────────────
+class SendInviteResponse(BaseModel):
+    employee_id: UUID
+    email: str
+    invite_url: str    # full URL for HR to share — raw token is never exposed
+    expires_at: str    # ISO datetime string
+    account_status: str

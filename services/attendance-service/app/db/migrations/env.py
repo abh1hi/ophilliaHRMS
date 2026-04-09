@@ -13,7 +13,13 @@ from app.models.geofence_location import GeofenceLocation    # noqa: F401
 from app.models.attendance_policy import AttendancePolicy     # noqa: F401
 from app.models.policy_audit_log import PolicyAuditLog        # noqa: F401
 from app.models.policy_template import PolicyTemplate         # noqa: F401
-from app.models.policy_exception import PolicyException       # noqa: F401
+from app.models.policy_exception import PolicyException           # noqa: F401
+from app.models.shift_schedule import ShiftSchedule               # noqa: F401
+from app.models.shift_schedule_assignment import ShiftScheduleAssignment  # noqa: F401
+from app.models.shift_assignment import ShiftAssignment           # noqa: F401
+from app.models.shift_request import ShiftRequest                 # noqa: F401
+from app.models.employee_checkin import EmployeeCheckin           # noqa: F401
+from app.models.attendance_request import AttendanceRequest        # noqa: F401
 from app.core.config import settings
 
 config = context.config

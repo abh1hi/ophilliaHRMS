@@ -27,8 +27,9 @@ OwIDAQAB
 -----END PUBLIC KEY-----"""
     ALGORITHM: str = "RS256"
 
-    # Auth Service
+    # Service URLs
     AUTH_SERVICE_URL: str = "http://auth-service:8000"
+    EMPLOYEE_SERVICE_URL: str = "http://employee-service:8001"
     INTERNAL_SERVICE_TOKEN: str = "CHANGE_THIS_INTERNAL_TOKEN_IN_PRODUCTION"
 
     # Redis (shared blacklist with auth-service)

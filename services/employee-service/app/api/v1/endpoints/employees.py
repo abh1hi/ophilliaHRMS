@@ -12,6 +12,9 @@ from app.api.v1.dependencies import (
     TokenPayload,
     get_db_with_tenant
 )
+from app.core.responses import ok
+from app.repositories.employee_repository import EmployeeRepository
+from app.repositories.department_repository import DepartmentRepository
 from app.core.constants import UserRole
 from app.services.employee_service import EmployeeService
 from app.schemas.employee import (
@@ -22,6 +25,7 @@ from app.schemas.employee import (
     BulkEmployeeResponse,
     BulkEmployeeResult,
     BulkEmployeeImportItem,
+    SendInviteResponse,
 )
 from app.utils.pagination import PaginationParams
 from app.core.rate_limit import limiter
@@ -95,12 +99,10 @@ async def bulk_import_employees(
     Accepts raw JSON array — each row is validated individually so one bad row
     does not block the rest. Creates auth accounts when initial_password is set.
     """
-    import httpx, logging, json as _json
+    import logging, json as _json
     from pydantic import ValidationError
-    from app.core.config import settings
 
     logger = logging.getLogger(__name__)
-    company_id = getattr(current_user, "company_id", None)
 
     raw_body = await request.body()
     try:
@@ -122,9 +124,7 @@ async def bulk_import_employees(
         try:
             # Coerce numeric values to strings for fields that expect str
             for k, v in list(raw.items()):
-                if isinstance(v, (int, float)) and k not in (
-                    "joining_salary", "last_drawn_salary",
-                ):
+                if isinstance(v, (int, float)) and k not in ("joining_salary", "last_drawn_salary"):
                     raw[k] = str(int(v)) if isinstance(v, float) and v == int(v) else str(v)
 
             item = BulkEmployeeImportItem(**raw)
@@ -137,36 +137,23 @@ async def bulk_import_employees(
             continue
 
         try:
-            user_id = item.user_id
+            # No auth-service calls: always create employee with user_id=None (account_status=not_registered)
+            # HR sends invite separately when ready.
+            emp_create = item.to_employee_create(user_id_override=None)
 
-            # Step 1: Create auth account if password is provided
-            if item.initial_password and not user_id:
-                async with httpx.AsyncClient(timeout=10) as client:
-                    auth_resp = await client.post(
-                        f"{settings.AUTH_SERVICE_URL}/api/v1/auth/register",
-                        json={
-                            "email": item.email,
-                            "password": item.initial_password,
-                            "role": item.role or "employee",
-                            **({"company_id": str(company_id)} if company_id else {}),
-                        },
-                    )
-                    if auth_resp.status_code in (200, 201):
-                        body = auth_resp.json()
-                        data = body.get("data") or body
-                        user_id = data.get("id")
-                    else:
-                        body = auth_resp.json()
-                        err = body.get("detail") or body.get("error", {}).get("message", "Auth registration failed")
-                        results.append({"index": idx, "success": False, "employee": None, "error": f"Auth: {err}"})
-                        continue
-
-            # Step 2: Create employee profile
-            emp_create = item.to_employee_create(
-                user_id_override=UUID(str(user_id)) if user_id else None
-            )
-            employee = await service.create_employee(emp_create)
-            results.append({"index": idx, "success": True, "employee": employee, "error": None})
+            # Upsert: if email already exists, update profile fields but preserve user_id/account_status
+            existing = await service.repo.get_by_email(item.email)
+            if existing:
+                from app.schemas.employee import EmployeeUpdate as _EU
+                update_fields = {
+                    k: v for k, v in emp_create.model_dump(exclude_unset=False).items()
+                    if k not in ("user_id", "account_status", "invite_expires_at", "email") and v is not None
+                }
+                employee = await service.update_employee(existing.id, _EU(**update_fields))
+                results.append({"index": idx, "success": True, "employee": employee, "error": None, "note": "updated existing"})
+            else:
+                employee = await service.create_employee(emp_create)
+                results.append({"index": idx, "success": True, "employee": employee, "error": None})
 
         except Exception as e:
             logger.warning(f"Bulk import row {idx} failed: {e}")
@@ -191,6 +178,7 @@ async def list_employees(
     pagination: PaginationParams = Depends(),
     department_id: Optional[UUID] = Query(None, description="Filter by department"),
     employment_status: Optional[str] = Query(None, description="Filter by status (active, inactive, terminated)"),
+    account_status: Optional[str] = Query(None, description="Filter by account status (not_registered, invited, active, suspended)"),
     search: Optional[str] = Query(None, description="Search by name or email"),
     current_user: TokenPayload = Depends(
         require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
@@ -203,6 +191,7 @@ async def list_employees(
         limit=pagination.limit,
         department_id=department_id,
         employment_status=employment_status,
+        account_status=account_status,
         search=search,
     )
     return EmployeeListResponse(
@@ -210,6 +199,42 @@ async def list_employees(
         skip=pagination.skip,
         limit=pagination.limit,
         employees=employees,
+    )
+
+
+# ──────────── GET /employees/stats ────────────
+@router.get("/stats")
+async def get_employee_stats(
+    current_user: TokenPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_with_tenant),
+):
+    """Company-level employee and department counts."""
+    emp_repo = EmployeeRepository(db)
+    dept_repo = DepartmentRepository(db)
+    _, total_employees = await emp_repo.get_all(skip=0, limit=1)
+    _, active_employees = await emp_repo.get_all(skip=0, limit=1, employment_status="active")
+    _, total_departments = await dept_repo.get_all(include_inactive=False)
+    return ok({
+        "total_employees": total_employees,
+        "active_employees": active_employees,
+        "total_departments": total_departments,
+    })
+
+
+# ──────────── POST /employees/link-account ────────────
+# MUST appear before /{employee_id} to avoid routing ambiguity
+@router.post("/link-account", response_model=EmployeeResponse)
+async def link_employee_account(
+    current_user: TokenPayload = Depends(get_current_user),
+    service: EmployeeService = Depends(_get_service),
+):
+    """Called by employee app after accepting an invite. JWT has user_id, email, company_id.
+    Idempotent — safe to retry if network failure occurred on first attempt.
+    """
+    return await service.link_account(
+        user_id=UUID(current_user.sub),
+        email=current_user.email,
+        company_id=current_user.company_id,
     )
 
 
@@ -249,6 +274,67 @@ async def deactivate_employee(
 ):
     """Deactivate (soft-delete) an employee. Requires HR or Super Admin role."""
     return await service.deactivate_employee(employee_id)
+
+
+# ──────────── POST /employees/{id}/send-invite ────────────
+@router.post("/{employee_id}/send-invite", response_model=SendInviteResponse)
+@limiter.limit("10/minute")
+async def send_employee_invite(
+    request: Request,
+    employee_id: UUID,
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
+    service: EmployeeService = Depends(_get_service),
+):
+    """Send a portal invite link. Returns invite_url for HR to copy and share.
+    Also works as a first-send — allowed for not_registered and invited states.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    inviter_jwt = auth_header.removeprefix("Bearer ").strip()
+    return await service.send_invite(employee_id, inviter_jwt=inviter_jwt)
+
+
+# ──────────── POST /employees/{id}/resend-invite ────────────
+@router.post("/{employee_id}/resend-invite", response_model=SendInviteResponse)
+@limiter.limit("10/minute")
+async def resend_employee_invite(
+    request: Request,
+    employee_id: UUID,
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
+    service: EmployeeService = Depends(_get_service),
+):
+    """Resend invite — generates a new token. Old token remains valid until it expires."""
+    auth_header = request.headers.get("Authorization", "")
+    inviter_jwt = auth_header.removeprefix("Bearer ").strip()
+    return await service.send_invite(employee_id, inviter_jwt=inviter_jwt)
+
+
+# ──────────── POST /employees/{id}/revoke-invite ────────────
+@router.post("/{employee_id}/revoke-invite")
+@limiter.limit("10/minute")
+async def revoke_employee_invite(
+    request: Request,
+    employee_id: UUID,
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
+    service: EmployeeService = Depends(_get_service),
+):
+    """Clear invite state — employee returns to not_registered.
+    Does not invalidate the token in auth-service (no revoke API there).
+    If employee uses the old link, link_account will fail gracefully.
+    """
+    return await service.revoke_invite(employee_id)
+
+
+# ──────────── POST /employees/{id}/disable-account ────────────
+@router.post("/{employee_id}/disable-account", response_model=EmployeeResponse)
+@limiter.limit("10/minute")
+async def disable_employee_account(
+    request: Request,
+    employee_id: UUID,
+    current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
+    service: EmployeeService = Depends(_get_service),
+):
+    """Disable employee's auth account (sets is_active=False) and mark as suspended."""
+    return await service.disable_account(employee_id)
 
 
 # ──────────── INTERNAL: GET /employees/internal/{user_id} ────────────

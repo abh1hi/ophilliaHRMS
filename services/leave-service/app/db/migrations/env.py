@@ -8,7 +8,18 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.db.base import Base
-from app.models.leave import LeaveType, LeaveBalance, LeaveRequest # noqa: F401
+from app.models.leave import LeaveType, LeaveBalance, LeaveRequest  # noqa: F401
+from app.models.leave_period import LeavePeriod  # noqa: F401
+from app.models.holiday_list import HolidayList, HolidayListEntry  # noqa: F401
+from app.models.holiday_list_assignment import HolidayListAssignment  # noqa: F401
+from app.models.leave_policy import LeavePolicy, LeavePolicyItem  # noqa: F401
+from app.models.leave_policy_assignment import LeavePolicyAssignment  # noqa: F401
+from app.models.leave_allocation import LeaveAllocation  # noqa: F401
+from app.models.leave_adjustment import LeaveAdjustment  # noqa: F401
+from app.models.leave_block_list import LeaveBlockList, LeaveBlockListDate, LeaveBlockListAllowed  # noqa: F401
+from app.models.compensatory_leave_request import CompensatoryLeaveRequest  # noqa: F401
+from app.models.leave_encashment import LeaveEncashment  # noqa: F401
+from app.models.leave_ledger_entry import LeaveLedgerEntry  # noqa: F401
 from app.core.config import settings
 
 config = context.config

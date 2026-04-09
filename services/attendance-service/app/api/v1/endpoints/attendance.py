@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -825,6 +825,59 @@ async def export_attendance_csv(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=attendance_export.csv"},
     )
+
+
+# ──────────────────── CSV UPLOAD ────────────────────
+
+@router.get("/upload/template")
+async def download_attendance_template(
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Download a CSV template for bulk attendance upload."""
+    from starlette.responses import Response
+    content = service.get_csv_template()
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attendance_template.csv"},
+    )
+
+
+@router.post("/upload", status_code=200)
+async def upload_attendance_csv(
+    file: UploadFile = File(...),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Upload a CSV file to bulk-create attendance records.
+
+    Accepts multipart/form-data with a 'file' field containing the CSV.
+    Use GET /attendance/upload/template to download the template.
+    """
+    content = await file.read()
+    result = await service.upload_csv(content, current_user.sub)
+    return {"success": True, "data": result}
+
+
+@router.get("/employees")
+async def list_employees_for_bulk(
+    request: Request,
+    department_id: Optional[UUID] = Query(None),
+    branch_id: Optional[UUID] = Query(None),
+    current_user: TokenPayload = Depends(
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+    ),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Proxy to employee-service: filter employees by department or branch (for bulk marking)."""
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    employees = await service.get_employees_by_dept_branch(token, department_id, branch_id)
+    return {"success": True, "data": employees}
 
 
 # ──────────────────── SINGLE RECORD (must be last — wildcard catches all /{id}) ────────────────────

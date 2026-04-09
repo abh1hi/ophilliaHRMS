@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.db.base import Base
-from app.core.constants import EmploymentStatus, Gender
+from app.core.constants import AccountStatus, EmploymentStatus, Gender
 from app.core.encryption import EncryptedString
 
 
@@ -23,7 +23,9 @@ class Employee(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    user_id = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
+    # nullable: employees created via bulk import have no auth account until invited
+    # uniqueness enforced by partial index ix_employees_user_id (WHERE user_id IS NOT NULL)
+    user_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
     # ── Personal Information ───────────────────────────────────────────────
     first_name = Column(String(100), nullable=False)
@@ -81,6 +83,9 @@ class Employee(Base):
     health_issues = Column(Text, nullable=True)
     allergies = Column(Text, nullable=True)
 
+    # ── Employee Code (company-defined, e.g. EMP-001, REG-U-90) ───────────
+    employee_code = Column(String(100), nullable=True, unique=True, index=True)
+
     # ── Employment / Job Info ──────────────────────────────────────────────
     date_joined = Column(Date, nullable=False)
     department_id = Column(
@@ -96,6 +101,13 @@ class Employee(Base):
         default=EmploymentStatus.ACTIVE.value,
         index=True,
     )
+    account_status = Column(
+        String(20),
+        nullable=False,
+        default=AccountStatus.NOT_REGISTERED.value,
+        index=True,
+    )
+    invite_expires_at = Column(DateTime(timezone=True), nullable=True)
     project = Column(String(200), nullable=True)
     joining_salary = Column(Numeric(12, 2), nullable=True)
     role = Column(String(50), nullable=True)

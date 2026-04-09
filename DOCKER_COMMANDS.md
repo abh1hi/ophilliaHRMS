@@ -1,14 +1,34 @@
 # OphilliaHRMS — Docker Commands Reference
 
-## Profiles
+> **All commands must be run from the project root:**
+> ```
+> cd C:\Users\abhin\Desktop\ophilliaHRMS
+> ```
+> Running from a service subdirectory will fail — `docker-compose.yml` lives at the root.
 
-The system uses Docker Compose profiles to deploy modular blocks:
+---
 
-| Profile   | Services                                                        |
-| --------- | --------------------------------------------------------------- |
-| `core`    | frontend, gateway, hrms-db, rabbitmq, redis, auth, notification, audit |
-| `hr`      | employee, attendance, leave, payroll                            |
-| `student` | students-service                                                |
+## Profiles & Container Names
+
+| Profile   | Service name (in compose)  | Container name      |
+| --------- | -------------------------- | ------------------- |
+| `core`    | `hrms-db`                  | `hrms-db`           |
+| `core`    | `redis`                    | `hrms-redis`        |
+| `core`    | `rabbitmq`                 | `hrms-rabbitmq`     |
+| `core`    | `auth-service`             | `hrms-auth`         |
+| `core`    | `notification-service`     | `hrms-notification` |
+| `core`    | `audit-service`            | `hrms-audit`        |
+| `core`    | `onboarding-service`       | `hrms-onboarding`   |
+| `core`    | `frontend`                 | `hrms-frontend`     |
+| `core`    | `gateway`                  | `hrms-gateway`      |
+| `hr`      | `employee-service`         | `hrms-employee`     |
+| `hr`      | `attendance-service`       | `hrms-attendance`   |
+| `hr`      | `leave-service`            | `hrms-leave`        |
+| `hr`      | `payroll-service`          | `hrms-payroll`      |
+| `student` | `students-service`         | `hrms-students`     |
+
+> **Rule:** `hr` and `student` services depend on `core` (DB, Redis, RabbitMQ, auth).
+> Always start `core` first, or use `--profile core --profile hr` together.
 
 ---
 
@@ -43,47 +63,37 @@ docker compose --profile core --profile hr up --build
 
 ## Rebuilding
 
-### Rebuild all images from scratch (no cache) - Parallel
+### Rebuild all images (no cache)
 ```bash
 docker compose --profile core --profile hr --profile student build --no-cache
 ```
 
-### Rebuild all images from scratch (no cache) - Sequential (one at a time)
+### Rebuild a single service image (no restart)
 ```bash
-docker compose build --no-cache auth-service && \
-docker compose build --no-cache employee-service && \
-docker compose build --no-cache attendance-service && \
-docker compose build --no-cache leave-service && \
-docker compose build --no-cache payroll-service && \
-docker compose build --no-cache frontend
+# core profile services
+docker compose --profile core build auth-service
+docker compose --profile core build frontend
+docker compose --profile core build gateway
+
+# hr profile services
+docker compose --profile hr build employee-service
+docker compose --profile hr build attendance-service
+docker compose --profile hr build leave-service
+docker compose --profile hr build payroll-service
 ```
 
-### Rebuild a single service
+### Rebuild and restart a single service (core must already be running)
 ```bash
-docker compose build auth-service
-docker compose build attendance-service
-docker compose build employee-service
-docker compose build frontend
-```
+# core profile services
+docker compose --profile core up --build -d --no-deps auth-service
+docker compose --profile core up --build -d --no-deps gateway
+docker compose --profile core up --build -d --no-deps frontend
 
-### Rebuild a single service with no cache
-```bash
-docker compose build --no-cache auth-service
-docker compose build --no-cache attendance-service
-docker compose build --no-cache employee-service
-```
-
-### Rebuild and restart a single service (without touching others)
-```bash
-docker compose up --build -d --no-deps auth-service
-docker compose up --build -d --no-deps attendance-service
-docker compose up --build -d --no-deps employee-service
-docker compose up --build -d --no-deps frontend
-```
-
-### Rebuild and restart frontend only
-```bash
-docker compose up --build -d --no-deps frontend
+# hr profile services
+docker compose --profile hr up --build -d --no-deps employee-service
+docker compose --profile hr up --build -d --no-deps attendance-service
+docker compose --profile hr up --build -d --no-deps leave-service
+docker compose --profile hr up --build -d --no-deps payroll-service
 ```
 
 ---
@@ -102,10 +112,10 @@ docker compose --profile core --profile hr --profile student down -v
 
 ### Stop a single service
 ```bash
-docker compose stop auth-service
-docker compose stop attendance-service
-docker compose stop employee-service
-docker compose stop frontend
+docker compose --profile core stop auth-service
+docker compose --profile core stop frontend
+docker compose --profile hr stop attendance-service
+docker compose --profile hr stop employee-service
 ```
 
 ---
@@ -119,40 +129,47 @@ docker compose --profile core --profile hr restart
 
 ### Restart a single service
 ```bash
-docker compose restart auth-service
-docker compose restart attendance-service
-docker compose restart employee-service
-docker compose restart frontend
+docker compose --profile core restart auth-service
+docker compose --profile core restart frontend
+docker compose --profile hr restart attendance-service
+docker compose --profile hr restart employee-service
 ```
 
 ---
 
 ## Logs
 
+> For single-service logs you can also use `docker logs` directly — no profile needed:
+> ```bash
+> docker logs -f hrms-attendance
+> docker logs -f hrms-employee
+> docker logs --tail=100 hrms-auth
+> ```
+
 ### View all logs (follow mode)
 ```bash
 docker compose --profile core --profile hr logs -f
 ```
 
-### View logs for a single service
+### View logs for a single service (compose style)
 ```bash
-docker compose logs -f auth-service
-docker compose logs -f attendance-service
-docker compose logs -f employee-service
-docker compose logs -f frontend
+docker compose --profile core logs -f auth-service
+docker compose --profile core logs -f frontend
+docker compose --profile hr logs -f attendance-service
+docker compose --profile hr logs -f employee-service
 ```
 
 ### View last 100 lines of a service
 ```bash
-docker compose logs --tail=100 auth-service
-docker compose logs --tail=100 attendance-service
-docker compose logs --tail=100 employee-service
+docker logs --tail=100 hrms-auth
+docker logs --tail=100 hrms-attendance
+docker logs --tail=100 hrms-employee
 ```
 
 ### View logs for multiple services
 ```bash
-docker compose logs -f auth-service employee-service attendance-service
-docker compose logs -f auth-service gateway frontend
+docker compose --profile core --profile hr logs -f auth-service employee-service attendance-service
+docker compose --profile core logs -f auth-service gateway frontend
 ```
 
 ---
@@ -172,6 +189,8 @@ docker compose ps -a
 ### Check health of a specific container
 ```bash
 docker inspect --format='{{.State.Health.Status}}' hrms-auth
+docker inspect --format='{{.State.Health.Status}}' hrms-attendance
+docker inspect --format='{{.State.Health.Status}}' hrms-employee
 ```
 
 ### Check resource usage
@@ -195,62 +214,34 @@ docker exec -it hrms-db psql -U postgres -c "\l"
 
 ### Connect to a specific service database
 ```bash
-# Auth service
 docker exec -it hrms-db psql -U postgres -d auth_db
-
-# Employee service
 docker exec -it hrms-db psql -U postgres -d employee_db
-
-# Attendance service
 docker exec -it hrms-db psql -U postgres -d attendance_db
-
-# Leave service
 docker exec -it hrms-db psql -U postgres -d leave_db
-
-# Payroll service
 docker exec -it hrms-db psql -U postgres -d payroll_db
-
-# Students service
 docker exec -it hrms-db psql -U postgres -d students_db
 ```
 
 ### Run Alembic migrations for a service
 ```bash
-# Auth service
 docker exec -it hrms-auth alembic upgrade head
-
-# Employee service
 docker exec -it hrms-employee alembic upgrade head
-
-# Attendance service
 docker exec -it hrms-attendance alembic upgrade head
-
-# Leave service
 docker exec -it hrms-leave alembic upgrade head
 ```
 
 ### Dump a database
 ```bash
-# Auth
 docker exec hrms-db pg_dump -U postgres auth_db > backup_auth.sql
-
-# Attendance
-docker exec hrms-db pg_dump -U postgres attendance_db > backup_attendance.sql
-
-# Employee
 docker exec hrms-db pg_dump -U postgres employee_db > backup_employee.sql
+docker exec hrms-db pg_dump -U postgres attendance_db > backup_attendance.sql
 ```
 
 ### Restore a database
 ```bash
-# Auth
 docker exec -i hrms-db psql -U postgres auth_db < backup_auth.sql
-
-# Attendance
-docker exec -i hrms-db psql -U postgres attendance_db < backup_attendance.sql
-
-# Employee
 docker exec -i hrms-db psql -U postgres employee_db < backup_employee.sql
+docker exec -i hrms-db psql -U postgres attendance_db < backup_attendance.sql
 ```
 
 ---
@@ -264,7 +255,7 @@ curl http://localhost:8002/health
 
 ### View logs
 ```bash
-docker compose logs -f attendance-service
+docker logs -f hrms-attendance
 ```
 
 ### Run migrations
@@ -282,15 +273,13 @@ docker exec -it hrms-attendance pytest tests/unit/test_idempotency_middleware.py
 docker exec -it hrms-attendance bash
 ```
 
-### View database (attendance service DB)
+### View database
 ```bash
 docker exec -it hrms-db psql -U postgres -d attendance_db
 ```
 
 ### Monitor startup alerts (RabbitMQ)
-Events published on startup if stale records > 24h detected:
 ```bash
-# In RabbitMQ management UI, subscribe to:
 docker exec hrms-rabbitmq rabbitmqctl list_bindings
 # Look for: attendance.stale_records_alert
 ```
@@ -388,19 +377,19 @@ docker network inspect hrms-network --format='{{range .Containers}}{{.Name}} {{e
 
 ## Port Reference
 
-| Service             | Port  |
-| ------------------- | ----- |
-| Frontend            | 3000  |
-| Gateway (nginx)     | 80    |
-| Auth Service        | 8000  |
-| Employee Service    | 8001  |
-| Attendance Service  | 8002  |
-| Students Service    | 8003  |
-| Payroll Service     | 8004  |
-| Leave Service       | 8005  |
-| Audit Service       | 8006  |
-| Notification Service| 8007  |
-| PostgreSQL          | 5432  |
-| RabbitMQ AMQP       | 5672  |
-| RabbitMQ Management | 15672 |
-| Redis               | 6379  |
+| Service              | Port  |
+| -------------------- | ----- |
+| Frontend             | 3000  |
+| Gateway (nginx)      | 80    |
+| Auth Service         | 8000  |
+| Employee Service     | 8001  |
+| Attendance Service   | 8002  |
+| Students Service     | 8003  |
+| Payroll Service      | 8004  |
+| Leave Service        | 8005  |
+| Audit Service        | 8006  |
+| Notification Service | 8007  |
+| PostgreSQL           | 5432  |
+| RabbitMQ AMQP        | 5672  |
+| RabbitMQ Management  | 15672 |
+| Redis                | 6379  |

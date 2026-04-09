@@ -84,9 +84,9 @@ services:
     restart: unless-stopped
 
   # ─────────────── POSTGRESQL (Single Master) ───────────────
-  # Profile: CORE
+  # Profile: CORE, HR, STUDENT, FULL
   hrms-db:
-    profiles: ["core"]
+    profiles: ["core", "hr", "student", "full"]
     image: postgres:16-alpine
     container_name: hrms-db
     <<: *db-limits
@@ -110,9 +110,9 @@ services:
       start_period: 30s
 
   # ─────────────── RABBITMQ (Event Broker) ───────────────
-  # Profile: CORE
+  # Profile: CORE, HR, STUDENT, FULL
   rabbitmq:
-    profiles: ["core"]
+    profiles: ["core", "hr", "student", "full"]
     image: rabbitmq:3.12-management-alpine
     container_name: hrms-rabbitmq
     <<: *broker-limits
@@ -136,9 +136,9 @@ services:
       start_period: 180s
 
   # ─────────────── REDIS (Cache) ───────────────
-  # Profile: CORE
+  # Profile: CORE, HR, STUDENT, FULL
   redis:
-    profiles: ["core"]
+    profiles: ["core", "hr", "student", "full"]
     image: redis:7-alpine
     container_name: hrms-redis
     <<: *cache-limits
@@ -349,6 +349,36 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8008/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ─────────────── CALENDAR SERVICE ───────────────
+
+  calendar-service:
+    profiles: ["hr", "full"]
+    build:
+      context: ./services/calendar-service
+      dockerfile: Dockerfile
+    container_name: hrms-calendar
+    <<: *api-limits
+    environment:
+      - ENV=docker
+    env_file:
+      - ./services/calendar-service/.env.docker
+    ports:
+      - "8009:8009"
+    depends_on:
+      hrms-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health')"]
       interval: 30s
       timeout: 5s
       retries: 3

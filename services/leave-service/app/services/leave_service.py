@@ -245,14 +245,6 @@ async def update_leave_status(db: AsyncSession, request_id: UUID, obj_in: LeaveR
     if not balance:
         raise HTTPException(status_code=500, detail="Balance tracking error")
 
-    event_payload = {
-        "company_id": str(company_id) if company_id else None,
-        "leave_request_id": str(leave_req.id),
-        "employee_id": str(leave_req.employee_id),
-        "status": obj_in.status.value,
-        "level_approved": current_approval.level
-    }
-    
     event_name = ""
 
     if obj_in.status == LeaveStatus.REJECTED or obj_in.status == LeaveStatus.CANCELLED:
@@ -291,6 +283,29 @@ async def update_leave_status(db: AsyncSession, request_id: UUID, obj_in: LeaveR
     await db.refresh(leave_req)
 
     if event_name:
+        # Fetch leave type name for calendar enrichment (best-effort)
+        leave_type_name = ""
+        try:
+            lt_res = await db.execute(
+                select(LeaveType).filter(LeaveType.id == leave_req.leave_type_id)
+            )
+            lt = lt_res.scalars().first()
+            if lt:
+                leave_type_name = lt.name
+        except Exception:
+            pass
+
+        event_payload = {
+            "company_id": str(company_id) if company_id else None,
+            "leave_request_id": str(leave_req.id),
+            "employee_id": str(leave_req.employee_id),
+            "status": leave_req.status,
+            "level_approved": current_approval.level,
+            "start_date": leave_req.start_date.isoformat(),
+            "end_date": leave_req.end_date.isoformat(),
+            "total_days": float(leave_req.total_days),
+            "leave_type_name": leave_type_name,
+        }
         await publish_event(event_name, event_payload)
 
     return leave_req

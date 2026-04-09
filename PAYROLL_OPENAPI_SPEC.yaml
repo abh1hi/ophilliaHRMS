@@ -1,0 +1,854 @@
+openapi: 3.0.3
+info:
+  title: Payroll Management Service API
+  version: 1.0.0
+  description: Complete payroll processing, compliance, and reporting system for OphilliaHRMS
+  contact:
+    name: HR Tech Team
+    email: support@ophillia.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://payroll-service:8003
+    description: Production Server
+  - url: http://localhost:8003
+    description: Development Server
+
+paths:
+  /api/v1/payroll/runs:
+    post:
+      summary: Create Payroll Run
+      operationId: createPayrollRun
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePayrollRunRequest'
+      responses:
+        '201':
+          description: Payroll run created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PayrollRun'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate run)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List Payroll Runs
+      operationId: listPayrollRuns
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, REVIEW, APPROVED, PROCESSING, COMPLETED, PAID, LOCKED, FAILED]
+        - name: run_type
+          in: query
+          schema:
+            type: string
+            enum: [REGULAR, OFF_CYCLE, BONUS, FNF]
+      responses:
+        '200':
+          description: List of payroll runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PayrollRun'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /api/v1/payroll/runs/{runId}:
+    get:
+      summary: Get Payroll Run Details
+      operationId: getPayrollRun
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payroll run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PayrollRunDetailed'
+        '404':
+          description: Run not found
+
+  /api/v1/payroll/runs/{runId}/compute:
+    post:
+      summary: Compute Payroll (Draft → Review)
+      operationId: computePayroll
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                include_lop:
+                  type: boolean
+                  default: true
+                override_lop:
+                  type: boolean
+                  default: false
+                lop_override_days:
+                  type: integer
+                  default: 0
+      responses:
+        '200':
+          description: Payroll computed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PayrollRun'
+        '409':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '503':
+          description: Service unavailable (leave-service down)
+
+  /api/v1/payroll/runs/{runId}/approve:
+    post:
+      summary: Approve Payroll (Review → Approved)
+      operationId: approvePayroll
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approval_notes:
+                  type: string
+      responses:
+        '200':
+          description: Payroll approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '409':
+          description: Concurrency conflict or invalid transition
+
+  /api/v1/payroll/runs/{runId}/reject:
+    post:
+      summary: Reject Payroll (Review → Draft)
+      operationId: rejectPayroll
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  minLength: 10
+      responses:
+        '200':
+          description: Payroll rejected
+
+  /api/v1/payroll/runs/{runId}/process:
+    post:
+      summary: Process Payroll (Approved → Completed)
+      operationId: processPayroll
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                batch_id:
+                  type: string
+                  format: uuid
+                idempotency_key:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Payroll processed, YTD updated, payslips locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          description: Negative net pay or other validation error
+        '500':
+          description: Transaction rolled back, run set to FAILED
+
+  /api/v1/payroll/runs/{runId}/mark-paid:
+    post:
+      summary: Mark Payroll as Paid (Completed → Paid)
+      operationId: markPayrollPaid
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment_reference:
+                  type: string
+                payment_method:
+                  type: string
+                bank_description:
+                  type: string
+      responses:
+        '200':
+          description: Payroll marked as paid
+
+  /api/v1/payroll/runs/{runId}/lock:
+    post:
+      summary: Lock Payroll (Paid → Locked)
+      operationId: lockPayroll
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lock_reason:
+                  type: string
+      responses:
+        '200':
+          description: Payroll locked (final)
+
+  /api/v1/payroll/runs/{runId}/retry:
+    post:
+      summary: Retry Failed Payroll (Failed → Draft)
+      operationId: retryPayroll
+      tags:
+        - Payroll Runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payroll reset to draft
+
+  /api/v1/payroll/runs/{runId}/payslips:
+    get:
+      summary: Get Payslips for Run
+      operationId: getPayslips
+      tags:
+        - Payslips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of payslips
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payslip'
+
+  /api/v1/payroll/runs/{runId}/payslips/{payslipId}:
+    get:
+      summary: Get Single Payslip
+      operationId: getPayslip
+      tags:
+        - Payslips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: payslipId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payslip details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Payslip'
+
+  /api/v1/payroll/runs/{runId}/payslips/{payslipId}/pdf:
+    get:
+      summary: Download Payslip PDF
+      operationId: downloadPayslipPDF
+      tags:
+        - Payslips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: payslipId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payslip PDF
+          content:
+            application/pdf: {}
+
+  /api/v1/payroll/runs/{runId}/ecr-file:
+    get:
+      summary: Download ECR File (EPFO)
+      operationId: downloadECR
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: ECR file
+          content:
+            text/plain: {}
+
+  /api/v1/payroll/runs/{runId}/bank-advice:
+    get:
+      summary: Download Bank Advice (CSV)
+      operationId: downloadBankAdvice
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Bank advice CSV
+          content:
+            text/csv: {}
+
+  /api/v1/payroll/runs/{runId}/esic-return:
+    get:
+      summary: Get ESIC Return Data
+      operationId: getESICReturn
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: ESIC return data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/payroll/employees/{employeeId}/form16:
+    get:
+      summary: Download Form 16 (PDF)
+      operationId: downloadForm16
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fy
+          in: query
+          required: true
+          schema:
+            type: integer
+            description: Financial Year (e.g., 2026 for FY 2025-26)
+      responses:
+        '200':
+          description: Form 16 PDF
+          content:
+            application/pdf: {}
+
+  /api/v1/payroll/tax-profiles/{employeeId}:
+    get:
+      summary: Get Tax Profile
+      operationId: getTaxProfile
+      tags:
+        - Tax Profiles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fy
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tax profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+    patch:
+      summary: Update Tax Profile
+      operationId: updateTaxProfile
+      tags:
+        - Tax Profiles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fy
+          in: query
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaxProfileRequest'
+      responses:
+        '200':
+          description: Tax profile updated
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token from auth service
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+        error:
+          type: object
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        data:
+          type: null
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        data:
+          type: null
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION_FAILED]
+            message:
+              type: string
+            exception_report:
+              type: object
+              properties:
+                errors:
+                  type: array
+                  items:
+                    type: string
+                warnings:
+                  type: array
+                  items:
+                    type: string
+                occurred_at:
+                  type: string
+                  format: date-time
+
+    CreatePayrollRunRequest:
+      type: object
+      required:
+        - period_start
+        - period_end
+      properties:
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        run_type:
+          type: string
+          enum: [REGULAR, OFF_CYCLE, BONUS, FNF]
+          default: REGULAR
+        idempotency_key:
+          type: string
+          format: uuid
+          description: For idempotent requests (24h cache)
+
+    PayrollRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [DRAFT, REVIEW, APPROVED, PROCESSING, COMPLETED, PAID, LOCKED, FAILED]
+        run_type:
+          type: string
+          enum: [REGULAR, OFF_CYCLE, BONUS, FNF]
+        total_employees:
+          type: integer
+        total_gross:
+          type: number
+          format: double
+        total_deductions:
+          type: number
+          format: double
+        total_net:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+
+    PayrollRunDetailed:
+      allOf:
+        - $ref: '#/components/schemas/PayrollRun'
+        - type: object
+          properties:
+            approved_by:
+              type: string
+              format: uuid
+              nullable: true
+            approved_at:
+              type: string
+              format: date-time
+              nullable: true
+            locked_at:
+              type: string
+              format: date-time
+              nullable: true
+            idempotency_key:
+              type: string
+              format: uuid
+            exception_report:
+              type: object
+              properties:
+                errors:
+                  type: array
+                  items:
+                    type: string
+                warnings:
+                  type: array
+                  items:
+                    type: string
+                occurred_at:
+                  type: string
+                  format: date-time
+              nullable: true
+            error_message:
+              type: string
+              nullable: true
+
+    Payslip:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        payroll_run_id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+        ctc:
+          type: number
+        basic:
+          type: number
+        hra:
+          type: number
+        allowances:
+          type: number
+        gross:
+          type: number
+        pf_deduction:
+          type: number
+        esi_deduction:
+          type: number
+        professional_tax:
+          type: number
+        tds_deduction:
+          type: number
+        lwf_employee:
+          type: number
+        total_deductions:
+          type: number
+        net:
+          type: number
+        lop_days:
+          type: integer
+        lop_amount:
+          type: number
+        pro_rata_factor:
+          type: number
+        employer_pf:
+          type: number
+        employer_esi:
+          type: number
+        tax_regime:
+          type: string
+        locked_at:
+          type: string
+          format: date-time
+          nullable: true
+        snapshot:
+          type: object
+          description: Immutable snapshot of payslip at process time
+
+    UpdateTaxProfileRequest:
+      type: object
+      properties:
+        tax_regime:
+          type: string
+          enum: [old, new]
+        investment_80c:
+          type: number
+        investment_80d:
+          type: number
+        hra_rent_paid:
+          type: number
+        is_metro_city:
+          type: boolean
+        nps_voluntary:
+          type: number
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer

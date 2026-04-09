@@ -41,6 +41,22 @@ async def _run_auto_punchout_loop(interval_seconds: int = 300):
             logger.exception("Auto punch-out scheduler error")
 
 
+async def _run_auto_attendance_loop(interval_seconds: int = 1800):
+    """Background task that runs auto-attendance every N seconds (default: 30 min)."""
+    from app.db.session import AsyncSessionLocal
+    from app.scheduler.auto_attendance import process_auto_attendance
+
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            async with AsyncSessionLocal() as session:
+                await process_auto_attendance(session, event_publisher)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Auto-attendance scheduler error")
+
+
 async def _run_idempotency_cleanup_loop(interval_seconds: int = 3600):
     """Background task that cleans up expired idempotency keys every N seconds (default: 1h)."""
     from app.db.session import AsyncSessionLocal
@@ -126,6 +142,8 @@ async def lifespan(app: FastAPI):
 
     # Start auto punch-out scheduler (runs every 5 minutes)
     auto_punchout_task = asyncio.create_task(_run_auto_punchout_loop(300))
+    # Start auto-attendance scheduler (runs every 30 minutes)
+    auto_attendance_task = asyncio.create_task(_run_auto_attendance_loop(1800))
     # Start idempotency key cleanup (runs every 1 hour)
     idempotency_cleanup_task = asyncio.create_task(_run_idempotency_cleanup_loop(3600))
 
@@ -135,9 +153,14 @@ async def lifespan(app: FastAPI):
     # Graceful shutdown
     logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
     auto_punchout_task.cancel()
+    auto_attendance_task.cancel()
     idempotency_cleanup_task.cancel()
     try:
         await auto_punchout_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await auto_attendance_task
     except asyncio.CancelledError:
         pass
     try:

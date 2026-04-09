@@ -38,7 +38,8 @@ class NotificationPreference(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     user_id = Column(UUID(as_uuid=True), unique=True, index=True, nullable=False)
-    email_enabled = Column(Integer, default=1, nullable=False) # 1=True, 0=False
-    sms_enabled = Column(Integer, default=1, nullable=False) # 1=True, 0=False
+    email_enabled = Column(Integer, default=1, nullable=False)      # 1=True, 0=False
+    sms_enabled = Column(Integer, default=1, nullable=False)        # 1=True, 0=False
+    calendar_enabled = Column(Integer, default=1, nullable=False)   # calendar event/task notifications
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(DateTime, default=naive_utcnow, onupdate=naive_utcnow, nullable=False)

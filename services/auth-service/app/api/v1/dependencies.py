@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt, JWTError
@@ -54,3 +54,17 @@ def require_role(*roles: UserRole):
             )
         return current_user
     return role_checker
+
+
+def verify_internal_token(request: Request) -> None:
+    """Validate the internal service-to-service X-Service-Token header.
+
+    Use as a dependency on internal-only endpoints:
+        @router.patch("/...", dependencies=[Depends(verify_internal_token)])
+    """
+    token = request.headers.get("X-Service-Token", "")
+    if token != settings.INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid internal service token",
+        )

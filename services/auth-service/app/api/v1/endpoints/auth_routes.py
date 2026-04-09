@@ -26,10 +26,11 @@ from app.schemas.request_response_models import (
     BatchInviteRequest,
     InviteResponse,
     AcceptInviteRequest,
+    UserStatusUpdateRequest,
 )
 from app.services.auth_service import AuthService
 from app.core.rate_limit import limiter
-from app.api.v1.dependencies import get_current_user, require_role, oauth2_scheme
+from app.api.v1.dependencies import get_current_user, require_role, oauth2_scheme, verify_internal_token
 from app.models.user import User
 from app.core.constants import UserRole
 from app.core.config import settings
@@ -549,3 +550,27 @@ async def accept_invite(payload: AcceptInviteRequest, db: AsyncSession = Depends
     auth_service = AuthService(db)
     from app.schemas.request_response_models import UserLogin
     return await auth_service.authenticate_user(UserLogin(email=invite.email, password=payload.password))
+
+
+# ──────────── INTERNAL: PATCH /auth/users/{user_id}/status ────────────
+@router.patch(
+    "/users/{user_id}/status",
+    dependencies=[Depends(verify_internal_token)],
+    include_in_schema=False,
+)
+async def update_user_status(
+    user_id: UUID,
+    payload: UserStatusUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Internal-only endpoint: enable or disable a user's account.
+    Protected by X-Service-Token header (not JWT).
+    """
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(str(user_id))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.is_active = payload.is_active
+    await db.commit()
+    return {"id": str(user.id), "is_active": user.is_active}
