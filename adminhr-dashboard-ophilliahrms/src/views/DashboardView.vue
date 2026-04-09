@@ -5,6 +5,7 @@ import AppSidebar from '../components/layout/AppSidebar.vue'
 import AppHeader from '../components/layout/AppHeader.vue'
 import DashboardOverview from '../components/dashboard/DashboardOverview.vue'
 import EmployeeListPanel from '../components/employees/EmployeeListPanel.vue'
+import EmployeeBulkImportPanel from '../components/employees/EmployeeBulkImportPanel.vue'
 import DepartmentPanel from '../components/hrsetup/DepartmentPanel.vue'
 import BranchPanel from '../components/hrsetup/BranchPanel.vue'
 import DesignationPanel from '../components/hrsetup/DesignationPanel.vue'
@@ -63,6 +64,7 @@ onMounted(async () => {
 const headerTitles: Record<string, { title: string; subtitle: string }> = {
   dashboard:          { title: 'Overview',         subtitle: `What's happening today at ${companyName.value}` },
   employees:          { title: 'Employees',         subtitle: 'Manage your entire workforce'                  },
+  'employees-import': { title: 'Employees',         subtitle: 'Bulk Import via CSV'                           },
   payroll:            { title: 'Payroll Management', subtitle: 'Process salaries and manage payroll runs'       },
   attendance:         { title: 'Attendance',        subtitle: 'Track and review attendance records'           },
   departments:        { title: 'HR Setup',          subtitle: 'Departments'                                   },
@@ -143,7 +145,8 @@ function handleLogout() {
 
       <!-- Tab content -->
       <DashboardOverview   v-if="currentTab === 'dashboard'"           />
-      <EmployeeListPanel   v-else-if="currentTab === 'employees'"      />
+      <EmployeeListPanel        v-else-if="currentTab === 'employees'"        />
+      <EmployeeBulkImportPanel v-else-if="currentTab === 'employees-import'" @navigate="navigate" />
 
       <!-- Attendance panels -->
       <AttendanceRecordsPanel  v-else-if="currentTab === 'attendance-records'"  />

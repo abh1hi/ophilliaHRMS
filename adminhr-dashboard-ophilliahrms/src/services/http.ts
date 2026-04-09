@@ -51,7 +51,7 @@ export async function apiFetch<T>(
   const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers })
   const body: ApiResponse<T> = await response.json()
 
-  if (!response.ok) {
+  if (!response.ok || body?.success === false) {
     const msg = body?.error?.message ?? `Error ${response.status}`
     throw new Error(msg)
   }

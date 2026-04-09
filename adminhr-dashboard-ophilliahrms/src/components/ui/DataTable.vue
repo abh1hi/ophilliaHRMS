@@ -11,11 +11,13 @@ const props = defineProps<{
   pageSize?: number
   searchable?: boolean
   emptyText?: string
+  paginationTop?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'page-change', page: number): void
   (e: 'search', query: string): void
+  (e: 'row-click', row: T): void
 }>()
 
 const searchQuery = ref('')
@@ -31,19 +33,44 @@ const totalPages = computed(() => Math.ceil((props.total ?? props.rows?.length ?
 
 <template>
   <div class="space-y-4">
-    <!-- Search Bar -->
-    <div v-if="searchable" class="relative">
-      <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-        <SearchIcon class="w-4 h-4" />
+    <!-- Top controls: search + optional top pagination -->
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+      <!-- Search -->
+      <div v-if="searchable" class="relative flex-1 max-w-sm">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+          <SearchIcon class="w-4 h-4" />
+        </div>
+        <input
+          v-model="searchQuery"
+          @input="onSearch"
+          type="search"
+          placeholder="Search..."
+          autocomplete="off"
+          class="w-full bg-white/60 border border-slate-200/60 text-slate-900 text-sm rounded-[14px] focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 pl-10 pr-4 py-2.5 outline-none transition-all"
+        />
       </div>
-      <input
-        v-model="searchQuery"
-        @input="onSearch"
-        type="search"
-        placeholder="Search..."
-        autocomplete="off"
-        class="w-full max-w-sm bg-white/60 border border-slate-200/60 text-slate-900 text-sm rounded-[14px] focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 pl-10 pr-4 py-2.5 outline-none transition-all"
-      />
+      <div v-else class="flex-1" />
+
+      <!-- Top Pagination -->
+      <div v-if="paginationTop && totalPages > 1" class="flex items-center gap-2 shrink-0">
+        <span class="text-sm text-slate-500 whitespace-nowrap">
+          Page {{ page ?? 1 }} of {{ totalPages }}
+        </span>
+        <button
+          @click="emit('page-change', (page ?? 1) - 1)"
+          :disabled="(page ?? 1) <= 1"
+          class="p-1.5 rounded-[10px] border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeftIcon class="w-4 h-4 text-slate-600" />
+        </button>
+        <button
+          @click="emit('page-change', (page ?? 1) + 1)"
+          :disabled="(page ?? 1) >= totalPages"
+          class="p-1.5 rounded-[10px] border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRightIcon class="w-4 h-4 text-slate-600" />
+        </button>
+      </div>
     </div>
 
     <!-- Table -->
@@ -82,7 +109,8 @@ const totalPages = computed(() => Math.ceil((props.total ?? props.rows?.length ?
             v-else
             v-for="(row, idx) in (rows ?? [])"
             :key="row.id ?? idx"
-            class="border-b border-slate-100/60 hover:bg-white/60 transition-colors group"
+            class="border-b border-slate-100/60 hover:bg-white/60 transition-colors group cursor-pointer"
+            @click="emit('row-click', row)"
           >
             <td
               v-for="col in columns"
@@ -93,7 +121,7 @@ const totalPages = computed(() => Math.ceil((props.total ?? props.rows?.length ?
                 {{ row[col.key] ?? '—' }}
               </slot>
             </td>
-            <td class="px-5 py-4 text-right">
+            <td class="px-5 py-4 text-right" @click.stop>
               <slot name="actions" :row="row" />
             </td>
           </tr>
@@ -101,25 +129,28 @@ const totalPages = computed(() => Math.ceil((props.total ?? props.rows?.length ?
       </table>
     </div>
 
-    <!-- Pagination -->
+    <!-- Bottom Pagination -->
     <div v-if="totalPages > 1" class="flex items-center justify-between pt-2">
       <span class="text-sm text-slate-500">
         Page {{ page ?? 1 }} of {{ totalPages }}
+        <span class="text-slate-400 ml-1">({{ total }} total)</span>
       </span>
-      <div class="flex items-center space-x-2">
+      <div class="flex items-center gap-2">
         <button
           @click="emit('page-change', (page ?? 1) - 1)"
           :disabled="(page ?? 1) <= 1"
-          class="p-2 rounded-[10px] border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronLeftIcon class="w-4 h-4 text-slate-600" />
+          <ChevronLeftIcon class="w-4 h-4" />
+          Previous
         </button>
         <button
           @click="emit('page-change', (page ?? 1) + 1)"
           :disabled="(page ?? 1) >= totalPages"
-          class="p-2 rounded-[10px] border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronRightIcon class="w-4 h-4 text-slate-600" />
+          Next
+          <ChevronRightIcon class="w-4 h-4" />
         </button>
       </div>
     </div>

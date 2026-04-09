@@ -7,7 +7,7 @@ import {
   CalendarCheckIcon, LogInIcon, FileTextIcon, CheckSquareIcon, UploadIcon,
   UmbrellaIcon, CalendarDaysIcon, ShieldIcon, BookOpenIcon, SlashIcon,
   CoinsIcon, BarChart3Icon, ListIcon, KanbanIcon, StickyNoteIcon, SettingsIcon,
-  WalletIcon,
+  WalletIcon, DatabaseIcon,
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 
@@ -26,11 +26,16 @@ const emit = defineEmits<{
 const hrSetupOpen = ref(false)
 const shiftOpen = ref(false)
 const attendanceOpen = ref(false)
+const employeesOpen = ref(false)
 
 const mainNav = [
-  { key: 'dashboard',  label: 'Dashboard',  icon: LayoutDashboardIcon },
-  { key: 'employees',  label: 'Employees',  icon: UsersIcon           },
-  { key: 'payroll',    label: 'Payroll',    icon: WalletIcon          },
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboardIcon },
+  { key: 'payroll',   label: 'Payroll',   icon: WalletIcon          },
+]
+
+const employeesNav = [
+  { key: 'employees',         label: 'Directory',    icon: UsersIcon    },
+  { key: 'employees-import',  label: 'Bulk Import',  icon: DatabaseIcon },
 ]
 
 const hrSetupNav = [
@@ -79,6 +84,7 @@ const workspaceNav = [
   { key: 'workspace-settings', label: 'Settings',   icon: SettingsIcon    },
 ]
 
+const employeesNavKeys = employeesNav.map(n => n.key)
 const hrSetupKeys = hrSetupNav.map(n => n.key)
 const shiftNavKeys = shiftNav.map(n => n.key)
 const attendanceNavKeys = attendanceNav.map(n => n.key)
@@ -118,6 +124,44 @@ const workspaceOpen = ref(false)
         <component :is="item.icon" class="w-4 h-4" />
         <span>{{ item.label }}</span>
       </button>
+
+      <!-- Employees Group -->
+      <div class="pt-1">
+        <button
+          @click="employeesOpen = !employeesOpen"
+          :class="[
+            'w-full flex items-center justify-between px-4 py-3 rounded-[16px] transition-all duration-300 font-medium text-sm',
+            employeesNavKeys.includes(currentTab)
+              ? 'bg-slate-100 text-slate-900'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+          ]"
+        >
+          <div class="flex items-center space-x-3">
+            <UsersIcon class="w-4 h-4" />
+            <span>Employees</span>
+          </div>
+          <component :is="employeesOpen ? ChevronDownIcon : ChevronRightIcon" class="w-4 h-4" />
+        </button>
+
+        <Transition name="accordion">
+          <div v-if="employeesOpen" class="ml-4 mt-1 space-y-1 border-l border-slate-200/60 pl-3">
+            <button
+              v-for="item in employeesNav"
+              :key="item.key"
+              @click="emit('navigate', item.key)"
+              :class="[
+                'w-full flex items-center space-x-3 px-3 py-2.5 rounded-[12px] transition-all duration-200 font-medium text-sm',
+                currentTab === item.key
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800'
+              ]"
+            >
+              <component :is="item.icon" class="w-4 h-4" />
+              <span>{{ item.label }}</span>
+            </button>
+          </div>
+        </Transition>
+      </div>
 
       <!-- Attendance Group -->
       <div class="pt-2">

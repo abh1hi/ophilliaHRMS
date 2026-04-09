@@ -56,6 +56,7 @@ class EmployeeRepository:
         limit: int = 20,
         department_id: Optional[UUID] = None,
         employment_status: Optional[str] = None,
+        account_status: Optional[str] = None,
         search: Optional[str] = None,
     ) -> tuple[List[Employee], int]:
         """Return paginated employees with optional filters, scoped to tenant."""
@@ -69,6 +70,10 @@ class EmployeeRepository:
         if employment_status:
             query = query.where(Employee.employment_status == employment_status)
             count_query = count_query.where(Employee.employment_status == employment_status)
+
+        if account_status:
+            query = query.where(Employee.account_status == account_status)
+            count_query = count_query.where(Employee.account_status == account_status)
 
         if search:
             search_pattern = f"%{search}%"
@@ -91,9 +96,12 @@ class EmployeeRepository:
 
         return list(employees), total
 
+    # Fields that are allowed to be explicitly cleared to None
+    _NULLABLE_FIELDS = {"invite_expires_at", "user_id"}
+
     async def update(self, employee: Employee, update_data: dict) -> Employee:
         for field, value in update_data.items():
-            if value is not None:
+            if value is not None or field in self._NULLABLE_FIELDS:
                 setattr(employee, field, value)
         await self.db.commit()
         await self.db.refresh(employee)

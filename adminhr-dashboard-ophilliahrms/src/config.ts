@@ -12,6 +12,9 @@ export const API_GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://l
 export const APP_NAME       = import.meta.env.VITE_APP_NAME    || 'Ophillia HRMS Admin'
 export const APP_VERSION    = import.meta.env.VITE_APP_VERSION || '1.0.0'
 
+/** Employee self-service app URL — used to construct invite links for HR to share */
+export const EMPLOYEE_APP_URL = import.meta.env.VITE_EMPLOYEE_APP_URL ?? 'http://localhost:5174'
+
 /** Runtime environment helpers */
 export const IS_DEV  = import.meta.env.DEV
 export const IS_PROD = import.meta.env.PROD

@@ -18,11 +18,14 @@
       "Bash(python -m pytest tests/unit/test_pro_ration_lop.py -v --tb=no)",
       "Bash(python -m pytest tests/unit/test_statutory_deductions.py -v --tb=no)",
       "Bash(python -m pytest tests/integration/test_payroll_workflow.py -v --tb=short)",
-      "Bash(python -m pytest tests/integration/test_payroll_workflow.py::TestPayrollWorkflowStateTransitions::test_full_payroll_lifecycle -xvs --tb=short)"
+      "Bash(python -m pytest tests/integration/test_payroll_workflow.py::TestPayrollWorkflowStateTransitions::test_full_payroll_lifecycle -xvs --tb=short)",
+      "Bash(npx playwright:*)",
+      "Bash(docker restart:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit",
-      "c:\\Users\\abhin\\Desktop\\ophilliaHRMS\\docs"
+      "c:\\Users\\abhin\\Desktop\\ophilliaHRMS\\docs",
+      "c:\\Users\\abhin\\.claude\\projects\\c--Users-abhin-Desktop-ophilliaHRMS\\memory"
     ]
   }
 }

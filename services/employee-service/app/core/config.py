@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     AUTH_SERVICE_URL: str = "http://auth-service:8000"
     INTERNAL_SERVICE_TOKEN: str = "CHANGE_THIS_INTERNAL_TOKEN_IN_PRODUCTION"
 
+    # Employee self-service app (used to construct invite URLs for HR to share)
+    EMPLOYEE_APP_URL: str = "http://localhost:5174"
+
     # Redis (shared blacklist with auth-service)
     REDIS_URL: str = "redis://hrms-redis:6379/0"
 

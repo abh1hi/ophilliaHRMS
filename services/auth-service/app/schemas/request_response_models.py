@@ -196,6 +196,11 @@ class SystemStatusResponse(BaseModel):
     has_companies: bool
 
 
+class UserStatusUpdateRequest(BaseModel):
+    """Internal-only: enable or disable a user account."""
+    is_active: bool
+
+
 class BootstrapRequest(BaseModel):
     """First-run bootstrap: creates initial super_admin + company."""
     email: EmailStr

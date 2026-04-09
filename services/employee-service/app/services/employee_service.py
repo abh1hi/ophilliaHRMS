@@ -1,10 +1,13 @@
 import logging
+from datetime import datetime
 from typing import Optional, List
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.core.constants import AccountStatus
 from app.models.employee import Employee
 from app.repositories.employee_repository import EmployeeRepository
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate
@@ -22,9 +25,6 @@ class EmployeeService:
 
     async def create_employee(self, data: EmployeeCreate) -> Employee:
         """Create a new employee profile."""
-        # Auto-generate user_id if not provided
-        user_id = data.user_id or uuid4()
-
         # Check for duplicate email
         existing = await self.repo.get_by_email(data.email)
         if existing:
@@ -43,7 +43,7 @@ class EmployeeService:
                 )
 
         employee = Employee(
-            user_id=user_id,
+            user_id=data.user_id,  # None when creating without an auth account
             # Personal
             first_name=data.first_name,
             last_name=data.last_name,
@@ -111,7 +111,7 @@ class EmployeeService:
                 {
                     "employee_id": str(employee.id),
                     "company_id": str(employee.company_id),
-                    "user_id": str(employee.user_id),
+                    "user_id": str(employee.user_id) if employee.user_id else None,
                     "email": employee.email,
                     "first_name": employee.first_name,
                     "last_name": employee.last_name,
@@ -120,7 +120,7 @@ class EmployeeService:
 
         logger.info(
             f"Employee created: {employee.id}",
-            extra={"user_id": str(employee.user_id), "service_task": "employee_create"},
+            extra={"user_id": str(employee.user_id) if employee.user_id else None, "service_task": "employee_create"},
         )
         return employee
 
@@ -150,6 +150,7 @@ class EmployeeService:
         limit: int = 20,
         department_id: Optional[UUID] = None,
         employment_status: Optional[str] = None,
+        account_status: Optional[str] = None,
         search: Optional[str] = None,
     ) -> tuple[list[Employee], int]:
         """List employees with pagination and filters."""
@@ -158,6 +159,7 @@ class EmployeeService:
             limit=limit,
             department_id=department_id,
             employment_status=employment_status,
+            account_status=account_status,
             search=search,
         )
 
@@ -186,14 +188,14 @@ class EmployeeService:
                 "employee.updated",
                 {
                     "employee_id": str(employee.id),
-                    "user_id": str(employee.user_id),
+                    "user_id": str(employee.user_id) if employee.user_id else None,
                     "updated_fields": list(update_data.keys()),
                 },
             )
 
         logger.info(
             f"Employee updated: {employee.id}",
-            extra={"user_id": str(employee.user_id), "service_task": "employee_update"},
+            extra={"user_id": str(employee.user_id) if employee.user_id else None, "service_task": "employee_update"},
         )
         return employee
 
@@ -208,14 +210,14 @@ class EmployeeService:
                 "employee.deactivated",
                 {
                     "employee_id": str(employee.id),
-                    "user_id": str(employee.user_id),
+                    "user_id": str(employee.user_id) if employee.user_id else None,
                     "email": employee.email,
                 },
             )
 
         logger.info(
             f"Employee deactivated: {employee.id}",
-            extra={"user_id": str(employee.user_id), "service_task": "employee_deactivate"},
+            extra={"user_id": str(employee.user_id) if employee.user_id else None, "service_task": "employee_deactivate"},
         )
         return employee
 
@@ -231,3 +233,118 @@ class EmployeeService:
             except Exception as e:
                 results.append({"index": idx, "success": False, "employee": None, "error": str(e)})
         return results
+
+    # ──────────── INVITE FLOW ────────────
+
+    async def send_invite(self, employee_id: UUID, inviter_jwt: str) -> dict:
+        """Send (or resend) a portal invite for the given employee.
+
+        Allowed states: not_registered, invited.
+        Returns invite_url (full URL) — raw token is never exposed.
+        """
+        import httpx
+
+        employee = await self.get_employee(employee_id)
+
+        if employee.account_status == AccountStatus.ACTIVE.value:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Employee already has an active account")
+        if employee.account_status == AccountStatus.SUSPENDED.value:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Account is suspended; enable it before sending an invite")
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{settings.AUTH_SERVICE_URL}/api/v1/auth/invite",
+                json={"email": employee.email, "role": employee.role or "employee"},
+                headers={"Authorization": f"Bearer {inviter_jwt}"},
+            )
+
+        if resp.status_code == status.HTTP_409_CONFLICT:
+            raise HTTPException(status.HTTP_409_CONFLICT, "A user account already exists for this email")
+        if not resp.is_success:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Auth service error: {resp.status_code}")
+
+        invite = resp.json()
+        token = invite.get("token", "")
+        expires_at_str = str(invite.get("expires_at", ""))
+        invite_url = f"{settings.EMPLOYEE_APP_URL}/?token={token}"
+
+        try:
+            expires_dt = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
+        except Exception:
+            expires_dt = None
+
+        await self.repo.update(employee, {
+            "account_status": AccountStatus.INVITED.value,
+            "invite_expires_at": expires_dt,
+        })
+
+        logger.info(f"AUDIT invite_sent employee_id={employee_id} email={employee.email}")
+        return {
+            "employee_id": str(employee.id),
+            "email": employee.email,
+            "invite_url": invite_url,
+            "expires_at": expires_at_str,
+            "account_status": AccountStatus.INVITED.value,
+        }
+
+    async def revoke_invite(self, employee_id: UUID) -> dict:
+        """Clear invite state — employee returns to not_registered."""
+        employee = await self.get_employee(employee_id)
+        if employee.account_status not in (AccountStatus.INVITED.value, AccountStatus.NOT_REGISTERED.value):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "No pending invite to revoke")
+        await self.repo.update(employee, {
+            "account_status": AccountStatus.NOT_REGISTERED.value,
+            "invite_expires_at": None,
+        })
+        logger.info(f"AUDIT invite_revoked employee_id={employee_id}")
+        return {"employee_id": str(employee.id), "account_status": AccountStatus.NOT_REGISTERED.value}
+
+    async def link_account(self, user_id: UUID, email: str, company_id: str) -> Employee:
+        """Link an auth-service user account to an employee record after invite acceptance.
+
+        Idempotent: same user calling again returns current state without error.
+        """
+        employee = await self.repo.get_by_email(email)
+        if not employee:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No employee record found for this email")
+        if str(employee.company_id) != company_id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Tenant mismatch")
+        if employee.email.lower() != email.lower():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email mismatch between token and employee record")
+        if employee.account_status == AccountStatus.SUSPENDED.value:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is suspended")
+
+        if employee.user_id:
+            if str(employee.user_id) == str(user_id):
+                # Idempotent retry (e.g. network failure on first attempt)
+                return await self.repo.get_by_id(employee.id)
+            raise HTTPException(status.HTTP_409_CONFLICT, "Account already linked to a different user")
+
+        await self.repo.update(employee, {
+            "user_id": user_id,
+            "account_status": AccountStatus.ACTIVE.value,
+            "invite_expires_at": None,
+        })
+        logger.info(f"AUDIT account_linked employee_id={employee.id} user_id={user_id}")
+        return await self.repo.get_by_id(employee.id)
+
+    async def disable_account(self, employee_id: UUID) -> Employee:
+        """Disable an employee's auth account and set account_status to suspended."""
+        import httpx
+
+        employee = await self.get_employee(employee_id)
+        if not employee.user_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Employee has no linked auth account")
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.patch(
+                f"{settings.AUTH_SERVICE_URL}/api/v1/auth/users/{employee.user_id}/status",
+                json={"is_active": False},
+                headers={"X-Service-Token": settings.INTERNAL_SERVICE_TOKEN},
+            )
+        if not resp.is_success:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Auth service failed to disable account")
+
+        await self.repo.update(employee, {"account_status": AccountStatus.SUSPENDED.value})
+        logger.info(f"AUDIT account_disabled employee_id={employee_id} user_id={employee.user_id}")
+        return await self.repo.get_by_id(employee_id)

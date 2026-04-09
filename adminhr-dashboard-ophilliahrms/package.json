@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ci": "dotenv -e .env.test -- playwright test"
   },
   "dependencies": {
     "@fullcalendar/daygrid": "^6.1.20",
@@ -27,9 +31,12 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
+    "@playwright/test": "^1.59.1",
     "@types/node": "^25.5.2",
     "@vitejs/plugin-vue": "^6.0.5",
     "autoprefixer": "^10.4.27",
+    "dotenv-cli": "^11.0.0",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
     "typescript": "^6.0.2",
