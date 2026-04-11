@@ -19,6 +19,10 @@ python-jose[cryptography]==3.3.0
 # Service-to-service HTTP client
 httpx==0.26.0
 
+# Retry + circuit breaker (used by template application saga)
+tenacity==8.2.3
+circuitbreaker==1.4.0
+
 # Message Broker (RabbitMQ)
 aio-pika==9.3.1
 

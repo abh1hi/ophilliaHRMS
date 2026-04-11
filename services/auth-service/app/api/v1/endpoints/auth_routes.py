@@ -1,8 +1,10 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt, JWTError
 
 from app.db.session import get_db
+from app.models.outbox import OutboxEvent
 from uuid import UUID
 from app.schemas.request_response_models import (
     UserCreate,
@@ -112,15 +114,12 @@ async def bootstrap(request: Request, payload: BootstrapRequest, db: AsyncSessio
         extra={"service_task": "bootstrap"},
     )
 
-    # Publish company.created event
-    publisher = request.app.state.event_publisher
-    if publisher:
-        import asyncio as _asyncio
-        _asyncio.create_task(publisher.publish("company.created", {
-            "company_id": str(company.id),
-            "name": company.name,
-            "domain": company.domain,
-        }))
+    # Write company.created to outbox (same transaction as company row — guaranteed delivery)
+    db.add(OutboxEvent(
+        event_type="company.created",
+        payload_json=json.dumps({"company_id": str(company.id), "name": company.name, "domain": company.domain}),
+    ))
+    await db.commit()
 
     # Return tokens so the user is immediately logged in
     auth_service = AuthService(db)
@@ -134,15 +133,12 @@ async def register_company(request: Request, company_in: CompanyCreate, db: Asyn
     """Register a new Company (Tenant) for SaaS mode."""
     auth_service = AuthService(db)
     company = await auth_service.register_company(company_in)
-    # Fire-and-forget: publish company.created event for downstream services
-    publisher = request.app.state.event_publisher
-    if publisher:
-        import asyncio
-        asyncio.create_task(publisher.publish("company.created", {
-            "company_id": str(company.id),
-            "name": company.name,
-            "domain": company.domain,
-        }))
+    # Write company.created to outbox — guaranteed delivery via relay worker
+    db.add(OutboxEvent(
+        event_type="company.created",
+        payload_json=json.dumps({"company_id": str(company.id), "name": company.name, "domain": company.domain}),
+    ))
+    await db.commit()
     return company
 
 
@@ -191,6 +187,29 @@ async def select_company(
     return await auth_service.select_company(current_user, data.company_id)
 
 
+async def _fetch_onboarding_status(company_id: str) -> str | None:
+    """Call onboarding-service internal status endpoint. Fails open (returns None on error)."""
+    import httpx
+    from jose import jwt as _jwt
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    token = _jwt.encode(
+        {"iss": "auth-service", "aud": "internal", "iat": now, "exp": now + timedelta(seconds=300)},
+        settings.INTERNAL_SERVICE_TOKEN,
+        algorithm="HS256",
+    )
+    url = f"{settings.ONBOARDING_SERVICE_URL}/api/v1/onboarding/internal/status/{company_id}"
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(url, headers={"X-Service-Token": token})
+        if resp.status_code == 200:
+            return resp.json().get("status")
+    except Exception as exc:
+        _logger.warning(f"Could not fetch onboarding status for {company_id}: {exc}")
+    return None
+
+
 @router.get("/post-login-context", response_model=PostLoginContext)
 async def post_login_context(
     current_user: User = Depends(get_current_user),
@@ -200,13 +219,16 @@ async def post_login_context(
     auth_service = AuthService(db)
     companies = await auth_service.list_active_companies()
 
-    # Admin always goes to dashboard with their single assigned company
+    # Admin: check onboarding status; redirect to onboarding wizard if incomplete
     if current_user.role == UserRole.ADMIN.value:
+        onboarding_status = await _fetch_onboarding_status(str(current_user.company_id))
+        incomplete = onboarding_status in ("NOT_STARTED", "IN_PROGRESS")
         return PostLoginContext(
             role=current_user.role,
             companies=None,
-            next_action="ENTER_DASHBOARD",
+            next_action="COMPLETE_ONBOARDING" if incomplete else "ENTER_DASHBOARD",
             selected_company=str(current_user.company_id),
+            onboarding_status=onboarding_status,
         )
 
     if current_user.role == UserRole.SUPER_ADMIN.value:

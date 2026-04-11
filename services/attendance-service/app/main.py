@@ -13,6 +13,7 @@ from app.core.exception_handlers import register_exception_handlers
 from app.middleware.request_id import request_id_middleware
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.events.publisher import EventPublisher
+from app.events.consumer import start_consumer as start_attendance_consumer
 
 import logging
 
@@ -146,6 +147,8 @@ async def lifespan(app: FastAPI):
     auto_attendance_task = asyncio.create_task(_run_auto_attendance_loop(1800))
     # Start idempotency key cleanup (runs every 1 hour)
     idempotency_cleanup_task = asyncio.create_task(_run_idempotency_cleanup_loop(3600))
+    # Start event consumer for company.created
+    attendance_consumer_task = asyncio.create_task(start_attendance_consumer())
 
     logger.info("Attendance service started", extra={"service_task": "startup"})
     yield
@@ -155,6 +158,7 @@ async def lifespan(app: FastAPI):
     auto_punchout_task.cancel()
     auto_attendance_task.cancel()
     idempotency_cleanup_task.cancel()
+    attendance_consumer_task.cancel()
     try:
         await auto_punchout_task
     except asyncio.CancelledError:
@@ -165,6 +169,10 @@ async def lifespan(app: FastAPI):
         pass
     try:
         await idempotency_cleanup_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await attendance_consumer_task
     except asyncio.CancelledError:
         pass
     await asyncio.sleep(5)

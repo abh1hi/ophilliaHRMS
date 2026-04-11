@@ -20,12 +20,14 @@
       "Bash(python -m pytest tests/integration/test_payroll_workflow.py -v --tb=short)",
       "Bash(python -m pytest tests/integration/test_payroll_workflow.py::TestPayrollWorkflowStateTransitions::test_full_payroll_lifecycle -xvs --tb=short)",
       "Bash(npx playwright:*)",
-      "Bash(docker restart:*)"
+      "Bash(docker restart:*)",
+      "mcp__MCP_DOCKER__mcp-exec"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit",
       "c:\\Users\\abhin\\Desktop\\ophilliaHRMS\\docs",
-      "c:\\Users\\abhin\\.claude\\projects\\c--Users-abhin-Desktop-ophilliaHRMS\\memory"
+      "c:\\Users\\abhin\\.claude\\projects\\c--Users-abhin-Desktop-ophilliaHRMS\\memory",
+      "c:\\Users\\abhin\\Desktop\\ophilliaHRMS\\infra"
     ]
   }
 }

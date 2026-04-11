@@ -45,3 +45,17 @@ class TemplateResponse(BaseModel):
 
 class RetryStepRequest(BaseModel):
     step_key: str
+
+
+class ApplyTemplateRequest(BaseModel):
+    region: str = "IN"
+
+
+class ApplyTemplateResponse(BaseModel):
+    status: str  # COMPLETED / PARTIAL / ALREADY_APPLIED
+    log_id: Optional[str] = None
+    message: Optional[str] = None
+    failed_step: Optional[str] = None
+    error: Optional[str] = None
+    compensation_status: Optional[str] = None
+    saga_steps: list = []

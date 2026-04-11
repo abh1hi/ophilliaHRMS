@@ -14,6 +14,7 @@ from app.middleware.request_id import request_id_middleware
 from app.events.publisher import EventPublisher
 from app.events.consumer import OnboardingEventConsumer
 from app.db.session import get_db, AsyncSessionLocal
+from app.scheduler.reconciliation_job import run_reconciliation_loop
 
 import logging
 
@@ -51,10 +52,15 @@ async def lifespan(app: FastAPI):
     # Start event consumer in background
     asyncio.create_task(event_consumer.connect())
 
+    # Start daily reconciliation loop (runs at 02:00 UTC)
+    reconciliation_task = asyncio.create_task(run_reconciliation_loop())
+
     logger.info("Onboarding service started", extra={"service_task": "startup"})
     yield
 
     logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
+    reconciliation_task.cancel()
+    await asyncio.gather(reconciliation_task, return_exceptions=True)
     await asyncio.sleep(3)
 
     await event_consumer.close()

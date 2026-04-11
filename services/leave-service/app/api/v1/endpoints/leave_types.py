@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List
@@ -33,6 +35,7 @@ async def list_leave_types(
 @router.post("/", response_model=APIResponse[LeaveTypeResponse], status_code=status.HTTP_201_CREATED)
 async def create_leave_type(
     *,
+    request: Request,
     db: AsyncSession = Depends(get_db_with_tenant),
     leave_type_in: LeaveTypeCreate,
     current_user: TokenPayload = Depends(require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN))
@@ -49,6 +52,21 @@ async def create_leave_type(
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)
+
+    # Publish leave_type.initialized on first leave type creation for this company
+    count_result = await db.execute(
+        select(func.count(LeaveType.id)).where(LeaveType.company_id == company_id)
+    )
+    if (count_result.scalar() or 0) == 1:
+        publisher = getattr(request.app.state, "event_publisher", None)
+        if publisher:
+            _task = asyncio.create_task(publisher.publish("leave_type.initialized", {
+                "company_id": str(company_id),
+            }))
+            request.state._bg_tasks = getattr(request.state, "_bg_tasks", set())
+            request.state._bg_tasks.add(_task)
+            _task.add_done_callback(request.state._bg_tasks.discard)
+
     return APIResponse(success=True, data=db_obj)
 
 @router.patch("/{leave_type_id}", response_model=APIResponse[LeaveTypeResponse])

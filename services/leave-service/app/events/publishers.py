@@ -24,9 +24,10 @@ async def publish_event(event_type: str, payload: dict):
     event_message = {
         "event_id": str(uuid.uuid4()),
         "event_type": event_type,
+        "event_version": "v1",
         "service_source": "leave-service",
+        "correlation_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "company_id": payload.get("company_id"),
         "payload": payload,
     }
 

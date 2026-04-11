@@ -19,6 +19,7 @@ from app.tasks.scheduled_jobs import create_scheduler
 from app.core.token_blacklist import set_redis
 from app.db.session import get_db
 from app.events.publisher import EventPublisher
+from app.workers.outbox_relay import run_outbox_relay
 
 import logging
 
@@ -43,10 +44,19 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     logger.info("Background scheduler started", extra={"service_task": "startup"})
 
+    # Start outbox relay — polls outbox_events and publishes to RabbitMQ
+    outbox_task = asyncio.create_task(run_outbox_relay(event_publisher))
+    logger.info("Outbox relay started", extra={"service_task": "startup"})
+
     yield
 
     # Graceful shutdown: allow in-flight requests to complete
     logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
+    outbox_task.cancel()
+    try:
+        await outbox_task
+    except asyncio.CancelledError:
+        pass
     await asyncio.sleep(5)
 
     scheduler.shutdown(wait=False)

@@ -1,8 +1,7 @@
-"""RabbitMQ consumer for the Payroll Service.
+"""RabbitMQ event consumer for the Attendance Service.
 
-Listens for:
-  - employee.created → log for salary assignment (ENABLE_EVENT_DRIVEN_ONBOARDING)
-  - company.created  → seed a default salary structure (ENABLE_EVENT_DRIVEN_ONBOARDING)
+Subscribes to:
+  - company.created → seed a default attendance policy (ENABLE_EVENT_DRIVEN_ONBOARDING)
 
 Uses DLQ for failed messages and event_processing_log for idempotency.
 Resilience: asyncio.Semaphore(5) + asyncio.wait_for(timeout=10s) per message.
@@ -26,17 +25,15 @@ try:
     HAS_AIOPIKA = True
 except ImportError:
     HAS_AIOPIKA = False
-    logger.warning("aio-pika not installed — payroll consumer disabled")
+    logger.warning("aio-pika not installed — attendance event consumer disabled")
 
 EXCHANGE_NAME = "hrms_events"
-QUEUE_NAME = "payroll_queue"
-DLQ_EXCHANGE = "payroll_dlq_exchange"
-DLQ_QUEUE = "payroll_dlq"
-BINDING_KEYS = ["employee.created", "company.created"]
+QUEUE_NAME = "attendance_events_queue"
+DLQ_EXCHANGE = "attendance_dlq_exchange"
+DLQ_QUEUE = "attendance_dlq"
+BINDING_KEYS = ["company.created"]
 _HANDLER_TIMEOUT = 10
 _semaphore = asyncio.Semaphore(5)
-
-DEFAULT_STRUCTURE_NAME = "Default Salary Structure"
 
 
 async def _is_processed(db, event_id: str) -> bool:
@@ -55,70 +52,51 @@ async def _mark_processed(db, event_id: str, event_type: str) -> None:
 
 
 async def _handle_company_created(db, company_id: UUID) -> None:
-    """Seed a default salary structure for the new company if none exists."""
-    from app.models.payroll import SalaryStructure
+    """Seed a company-wide default attendance policy (manual, 8h/day)."""
+    from app.models.attendance_policy import AttendancePolicy
     existing = await db.execute(
-        select(SalaryStructure).where(
-            SalaryStructure.company_id == company_id,
-            SalaryStructure.is_active == 1,
+        select(AttendancePolicy).where(
+            AttendancePolicy.company_id == company_id,
+            AttendancePolicy.department_id.is_(None),
+            AttendancePolicy.employee_id.is_(None),
         ).limit(1)
     )
     if existing.scalars().first():
-        logger.info(f"Salary structure already exists for company {company_id} — skipping")
+        logger.info(f"Default attendance policy already exists for company {company_id} — skipping")
         return
 
-    structure = SalaryStructure(
+    policy = AttendancePolicy(
         company_id=company_id,
-        name=DEFAULT_STRUCTURE_NAME,
-        description="Auto-seeded default salary structure",
-        basic_pct=50.0,
-        hra_pct=20.0,
-        allowances_pct=15.0,
-        pf_pct=12.0,
-        esi_pct=1.75,
-        professional_tax=200.0,
-        is_active=1,
+        method="manual",
+        work_hours_per_day=8.0,
+        department_id=None,
+        employee_id=None,
     )
-    db.add(structure)
-    logger.info(f"Seeded default salary structure for company {company_id}")
-
-
-def _handle_employee_created(payload: dict) -> None:
-    employee_id = payload.get("employee_id") or payload.get("user_id")
-    company_id = payload.get("company_id")
-    logger.info(
-        "Employee created event received — salary assignment pending HR action",
-        extra={"service_task": "employee_created", "employee_id": employee_id, "company_id": company_id},
-    )
+    db.add(policy)
+    logger.info(f"Seeded default attendance policy for company {company_id}")
 
 
 async def _handle_message(message: "AbstractIncomingMessage") -> None:
     """Inner handler — feature flag gate + business logic."""
     event_id = "unknown"
     try:
-        raw = json.loads(message.body.decode())
+        raw = json.loads(message.body.decode("utf-8"))
         event_id = raw.get("event_id", "unknown")
-        event_type = raw.get("event_type", "") or message.routing_key or ""
-        payload = raw.get("payload", raw)
-
-        if not settings.ENABLE_EVENT_DRIVEN_ONBOARDING:
-            logger.debug(f"ENABLE_EVENT_DRIVEN_ONBOARDING=False — acking {event_type} without processing")
-            await message.ack()
-            return
+        event_type = raw.get("event_type", "unknown")
+        payload = raw.get("payload", {})
 
         company_id_str = payload.get("company_id")
-
-        if event_type == "employee.created":
-            _handle_employee_created(payload)
-            await message.ack()
-            return
-
         if not company_id_str:
             logger.warning(f"Event {event_type} missing company_id — acking")
             await message.ack()
             return
 
         company_id = UUID(company_id_str)
+
+        if not settings.ENABLE_EVENT_DRIVEN_ONBOARDING:
+            logger.debug(f"ENABLE_EVENT_DRIVEN_ONBOARDING=False — acking {event_type} without processing")
+            await message.ack()
+            return
 
         async with AsyncSessionLocal() as db:
             if await _is_processed(db, event_id):
@@ -144,21 +122,21 @@ async def _handle_message(message: "AbstractIncomingMessage") -> None:
         await message.reject(requeue=False)
 
 
-async def process_message(message: "AbstractIncomingMessage") -> None:
+async def _process_message(message: "AbstractIncomingMessage") -> None:
     """Outer dispatcher: enforces concurrency limit and per-message timeout."""
     async with _semaphore:
         async with message.process(ignore_processed=True):
             try:
                 await asyncio.wait_for(_handle_message(message), timeout=_HANDLER_TIMEOUT)
             except asyncio.TimeoutError:
-                logger.error("Payroll consumer handler timed out — rejecting to DLQ")
+                logger.error("Attendance consumer handler timed out — rejecting to DLQ")
                 await message.reject(requeue=False)
 
 
 async def start_consumer() -> None:
-    """Connect to RabbitMQ and consume payroll domain events."""
+    """Connect and start consuming attendance domain events."""
     if not HAS_AIOPIKA:
-        logger.error("aio-pika not available — payroll consumer disabled")
+        logger.error("aio-pika not available — attendance consumer disabled")
         return
     try:
         connection = await aio_pika.connect_robust(settings.RABBITMQ_URL)
@@ -166,8 +144,8 @@ async def start_consumer() -> None:
         await channel.set_qos(prefetch_count=10)
 
         dlq_exchange = await channel.declare_exchange(DLQ_EXCHANGE, aio_pika.ExchangeType.DIRECT, durable=True)
-        dlq_queue = await channel.declare_queue(DLQ_QUEUE, durable=True)
-        await dlq_queue.bind(dlq_exchange, routing_key=DLQ_QUEUE)
+        dlq_queue_obj = await channel.declare_queue(DLQ_QUEUE, durable=True)
+        await dlq_queue_obj.bind(dlq_exchange, routing_key=DLQ_QUEUE)
 
         exchange = await channel.declare_exchange(EXCHANGE_NAME, aio_pika.ExchangeType.TOPIC, durable=True)
         queue = await channel.declare_queue(
@@ -177,7 +155,7 @@ async def start_consumer() -> None:
         for key in BINDING_KEYS:
             await queue.bind(exchange, routing_key=key)
 
-        await queue.consume(process_message)
-        logger.info("Payroll consumer started — listening for employee.created, company.created")
+        await queue.consume(_process_message)
+        logger.info("Attendance consumer started — listening for company.created")
     except Exception as exc:
-        logger.error(f"Failed to start payroll consumer: {exc}")
+        logger.error(f"Failed to start attendance consumer: {exc}")

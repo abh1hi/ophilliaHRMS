@@ -16,6 +16,14 @@ except ImportError:
 MAX_RETRIES = 3
 
 
+def _resolve_correlation_id(explicit: str | None) -> str:
+    try:
+        from app.middleware.request_id import correlation_id_var
+        return explicit or correlation_id_var.get("") or str(uuid.uuid4())
+    except Exception:
+        return explicit or str(uuid.uuid4())
+
+
 class EventPublisher:
     """Publishes domain events to RabbitMQ with retry logic.
 
@@ -62,11 +70,13 @@ class EventPublisher:
         except Exception:
             return False
 
-    async def publish(self, event_type: str, payload: dict) -> None:
+    async def publish(self, event_type: str, payload: dict, correlation_id: str | None = None) -> None:
         event = {
             "event_id": str(uuid.uuid4()),
             "event_type": event_type,
+            "event_version": "v1",
             "service_source": "auth-service",
+            "correlation_id": _resolve_correlation_id(correlation_id),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "payload": payload,
         }

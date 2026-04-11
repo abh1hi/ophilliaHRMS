@@ -117,8 +117,8 @@ services:
     container_name: hrms-rabbitmq
     <<: *broker-limits
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
       RABBITMQ_ERLANG_COOKIE: "hrms-rabbitmq-cookie"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq

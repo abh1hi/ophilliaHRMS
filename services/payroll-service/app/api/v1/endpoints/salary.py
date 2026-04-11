@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from typing import List
 from uuid import UUID
 
@@ -15,11 +16,29 @@ router = APIRouter(prefix="/salary", tags=["salary"])
 
 @router.post("/structures", response_model=SalaryStructureResponse, status_code=status.HTTP_201_CREATED)
 async def create_salary_structure(
+    request: Request,
     data: SalaryStructureCreate,
     _user: TokenPayload = Depends(require_hr_or_admin()),
     service: PayrollService = Depends(get_payroll_service),
 ):
-    return await service.create_structure(data)
+    result = await service.create_structure(data)
+
+    # Publish salary_structure.initialized on first salary structure creation for this company
+    from app.core.config import settings as _s
+    existing = await service.list_structures(skip=0, limit=2)
+    if _s.ENABLE_EVENT_DRIVEN_ONBOARDING and len(existing) == 1:
+        publisher = getattr(request.app.state, "event_publisher", None)
+        if publisher:
+            company_id = getattr(service, "db", None)
+            company_id = company_id.info.get("company_id") if company_id else None
+            _task = asyncio.create_task(publisher.publish("salary_structure.initialized", {
+                "company_id": str(company_id) if company_id else None,
+            }))
+            request.state._bg_tasks = getattr(request.state, "_bg_tasks", set())
+            request.state._bg_tasks.add(_task)
+            _task.add_done_callback(request.state._bg_tasks.discard)
+
+    return result
 
 
 @router.get("/structures", response_model=List[SalaryStructureResponse])

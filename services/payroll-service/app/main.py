@@ -16,10 +16,13 @@ from app.core.exception_handlers import register_exception_handlers
 from app.middleware.request_id import request_id_middleware
 from app.db.session import check_db_connectivity
 from app.events.consumer import start_consumer
+from app.events.publisher import EventPublisher
 
 configure_logging()
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
+
+event_publisher = EventPublisher(settings.RABBITMQ_URL)
 
 
 @asynccontextmanager
@@ -33,6 +36,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("Database unreachable at startup", extra={"service_task": "startup"})
 
+    await event_publisher.connect()
+    app.state.event_publisher = event_publisher
+
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     set_redis(redis_client)
     consumer_task = asyncio.create_task(start_consumer())
@@ -45,6 +51,7 @@ async def lifespan(app: FastAPI):
 
     await redis_client.aclose()
     consumer_task.cancel()
+    await event_publisher.close()
     logger.info("Payroll service stopped", extra={"service_task": "shutdown"})
 
 

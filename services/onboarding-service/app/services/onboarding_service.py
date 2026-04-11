@@ -2,12 +2,12 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
-from app.models.onboarding import OnboardingState, OnboardingStep, OnboardingTemplate
+from app.models.onboarding import OnboardingState, OnboardingStep, OnboardingTemplate, EventProcessingLog
 from app.core.constants import OnboardingStatus, StepStatus, DEFAULT_STEPS
 
 logger = logging.getLogger(__name__)
@@ -66,8 +66,19 @@ class OnboardingService:
         done = sum(1 for s in state.steps if s.status in (StepStatus.COMPLETED.value, StepStatus.SKIPPED.value))
         return round((done / len(state.steps)) * 100)
 
+    async def is_event_processed(self, event_id: str) -> bool:
+        """Check idempotency log — returns True if event_id was already processed."""
+        result = await self.db.execute(
+            select(EventProcessingLog).where(EventProcessingLog.event_id == event_id)
+        )
+        return result.scalars().first() is not None
+
+    def mark_event_processed(self, event_id: str, event_type: str) -> None:
+        self.db.add(EventProcessingLog(event_id=event_id, event_type=event_type))
+
     async def complete_step(self, company_id: UUID, step_key: str, skipped: bool = False) -> OnboardingState:
         state = await self.get_or_create_status(company_id)
+        current_version = state.version
 
         step = next((s for s in state.steps if s.step_key == step_key), None)
         if not step:
@@ -91,6 +102,21 @@ class OnboardingService:
             state.completed_at = datetime.now(timezone.utc)
 
         state.updated_at = datetime.now(timezone.utc)
+
+        # Optimistic locking: verify version hasn't changed under concurrent edit
+        result = await self.db.execute(
+            update(OnboardingState)
+            .where(OnboardingState.id == state.id, OnboardingState.version == current_version)
+            .values(version=current_version + 1)
+            .returning(OnboardingState.id)
+        )
+        if not result.fetchone():
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Concurrent update detected — please retry",
+            )
+
         await self.db.commit()
         await self.db.refresh(state)
 

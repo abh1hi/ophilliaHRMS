@@ -144,8 +144,9 @@ class PasswordResetConfirm(BaseModel):
 class PostLoginContext(BaseModel):
     role: str
     companies: Optional[list[CompanyResponse]] = None
-    next_action: str  # "CREATE_COMPANY" | "SELECT_COMPANY" | "ENTER_DASHBOARD"
+    next_action: str  # "CREATE_COMPANY" | "SELECT_COMPANY" | "COMPLETE_ONBOARDING" | "ENTER_DASHBOARD"
     selected_company: Optional[str] = None
+    onboarding_status: Optional[str] = None
 
 
 class RoleUpdateRequest(BaseModel):

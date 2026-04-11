@@ -15,10 +15,15 @@ from app.core.logging import configure_logging
 from app.core.exception_handlers import register_exception_handlers
 from app.middleware.request_id import request_id_middleware
 from app.db.session import engine
+from app.events.publisher import EventPublisher
+from app.events.consumer import start_consumer as start_leave_consumer
+from app.scheduler.leave_accrual import run_leave_accrual_loop
 
 configure_logging()
 logger = logging.getLogger(__name__)
 from app.core.rate_limit import limiter
+
+event_publisher = EventPublisher(settings.RABBITMQ_URL)
 
 
 @asynccontextmanager
@@ -35,8 +40,14 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning(f"Database unreachable at startup: {exc}", extra={"service_task": "startup"})
 
+    await event_publisher.connect()
+    app.state.event_publisher = event_publisher
+
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     set_redis(redis_client)
+
+    consumer_task = asyncio.create_task(start_leave_consumer())
+    accrual_task = asyncio.create_task(run_leave_accrual_loop())
     logger.info("Leave service started", extra={"service_task": "startup"})
     yield
 
@@ -44,7 +55,18 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down — waiting for in-flight requests…", extra={"service_task": "shutdown"})
     await asyncio.sleep(5)
 
+    consumer_task.cancel()
+    accrual_task.cancel()
+    try:
+        await consumer_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await accrual_task
+    except asyncio.CancelledError:
+        pass
     await redis_client.aclose()
+    await event_publisher.close()
     logger.info("Leave service stopped", extra={"service_task": "shutdown"})
 
 

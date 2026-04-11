@@ -3,13 +3,8 @@ set -e
 
 echo "=== Employee Service Startup ==="
 
-# Wait for PostgreSQL to accept connections (replaces brittle `sleep 5`)
-echo "Waiting for database..."
-until nc -z hrms-db 5432; do
-  sleep 0.5
-done
-echo "Database ready."
-
+# DB readiness is guaranteed by Docker Compose `depends_on: condition: service_healthy`
+# on the hrms-db service. No nc polling loop needed.
 echo "Running Alembic migrations..."
 alembic upgrade head
 echo "Migrations complete. Starting server..."

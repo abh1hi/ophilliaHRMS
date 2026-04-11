@@ -32,12 +32,10 @@ async def publish_event(event_type: str, payload: dict) -> None:
     event = {
         "event_id": str(uuid.uuid4()),
         "event_type": event_type,
-        "event_version": 1,
+        "event_version": "v1",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "service_source": "payroll-service",
-        "company_id": payload.get("company_id"),
-        "user_id": payload.get("user_id"),
-        "correlation_id": payload.get("correlation_id"),
+        "correlation_id": payload.get("correlation_id") or str(uuid.uuid4()),
         "payload": payload,
     }
 
@@ -122,3 +120,79 @@ async def _send_to_dlq(event: Dict[str, Any]) -> None:
             f"Failed to send event to DLQ: {str(e)}",
             extra={"event_id": event.get("event_id")},
         )
+
+
+class EventPublisher:
+    """Persistent connection-based EventPublisher for payroll-service.
+
+    Used by main.py lifespan and route handlers that need fire-and-forget publishing
+    without opening a new AMQP connection per event.
+    """
+
+    def __init__(self, rabbitmq_url: str, exchange_name: str = "hrms_events"):
+        self.rabbitmq_url = rabbitmq_url
+        self.exchange_name = exchange_name
+        self._connection = None
+        self._channel = None
+        self._exchange = None
+
+    async def connect(self) -> None:
+        try:
+            self._connection = await connect_robust(self.rabbitmq_url)
+            self._channel = await self._connection.channel()
+            self._exchange = await self._channel.declare_exchange(
+                self.exchange_name, type="topic", durable=True
+            )
+            logger.info("Connected to RabbitMQ", extra={"service_task": "rabbitmq_connect"})
+        except Exception as e:
+            logger.error(f"Failed to connect to RabbitMQ: {e}", extra={"service_task": "rabbitmq_connect"})
+            self._connection = None
+            self._channel = None
+            self._exchange = None
+
+    async def _reconnect(self) -> bool:
+        try:
+            await self.connect()
+            return self._exchange is not None
+        except Exception:
+            return False
+
+    async def publish(self, event_type: str, payload: dict, correlation_id: str | None = None) -> None:
+        event = {
+            "event_id": str(uuid.uuid4()),
+            "event_type": event_type,
+            "event_version": "v1",
+            "service_source": "payroll-service",
+            "correlation_id": correlation_id or str(uuid.uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "payload": payload,
+        }
+
+        for attempt in range(MAX_RETRIES):
+            if self._exchange is None:
+                await self._reconnect()
+            if self._exchange is None:
+                if attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(2 ** attempt)
+                continue
+            try:
+                message = Message(
+                    json.dumps(event).encode(),
+                    delivery_mode=DeliveryMode.PERSISTENT,
+                    content_type="application/json",
+                )
+                await self._exchange.publish(message, routing_key=event_type)
+                logger.info(f"Event published: {event_type}", extra={"service_task": "event_publish"})
+                return
+            except Exception as e:
+                logger.warning(f"Publish attempt {attempt + 1}/{MAX_RETRIES} failed for {event_type}: {e}")
+                self._exchange = None
+                if attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(2 ** attempt)
+
+        logger.error(f"Failed to publish event {event_type} after {MAX_RETRIES} attempts")
+
+    async def close(self) -> None:
+        if self._connection and not self._connection.is_closed:
+            await self._connection.close()
+            logger.info("RabbitMQ connection closed", extra={"service_task": "rabbitmq_close"})

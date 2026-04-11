@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     # Internal service auth
     INTERNAL_SERVICE_TOKEN: str = "CHANGE_THIS_INTERNAL_TOKEN_IN_PRODUCTION"
 
+    # Domain service URLs (for template application saga)
+    LEAVE_SERVICE_URL: str = "http://leave-service:8005"
+    PAYROLL_SERVICE_URL: str = "http://payroll-service:8004"
+
+    # Feature flags — default False; flip to True once verified in staging
+    ENABLE_EVENT_DRIVEN_ONBOARDING: bool = False
+    ENABLE_TEMPLATE_APPLICATION: bool = False
+
     @field_validator("JWT_PUBLIC_KEY", mode="before")
     @classmethod
     def unescape_pem(cls, v: str) -> str:

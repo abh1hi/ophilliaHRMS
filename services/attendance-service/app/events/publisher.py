@@ -53,9 +53,10 @@ class EventPublisher:
         event = {
             "event_id": str(uuid.uuid4()),
             "event_type": event_type,
+            "event_version": "v1",
             "service_source": "attendance-service",
+            "correlation_id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "company_id": payload.get("company_id"),
             "payload": payload,
         }
         if not HAS_AIOPIKA:

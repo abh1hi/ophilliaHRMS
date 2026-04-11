@@ -1,6 +1,7 @@
+import asyncio
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -24,11 +25,27 @@ def _get_service(db: AsyncSession = Depends(get_db_with_tenant)) -> DepartmentSe
 
 @router.post("", status_code=201)
 async def create_department(
+    request: Request,
     data: DepartmentCreate,
     current_user: TokenPayload = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.HR)),
     service: DepartmentService = Depends(_get_service),
 ):
-    return ok(DepartmentResponse.model_validate(await service.create_department(data)).model_dump(mode="json"))
+    dept = await service.create_department(data)
+
+    # Publish department.initialized on first department creation for this company
+    from app.core.config import settings as _s
+    _, total = await service.list_departments()
+    if _s.ENABLE_EVENT_DRIVEN_ONBOARDING and total == 1:
+        publisher = getattr(request.app.state, "event_publisher", None)
+        if publisher:
+            _task = asyncio.create_task(publisher.publish("department.initialized", {
+                "company_id": current_user.company_id,
+            }))
+            request.state._bg_tasks = getattr(request.state, "_bg_tasks", set())
+            request.state._bg_tasks.add(_task)
+            _task.add_done_callback(request.state._bg_tasks.discard)
+
+    return ok(DepartmentResponse.model_validate(dept).model_dump(mode="json"))
 
 
 @router.get("")

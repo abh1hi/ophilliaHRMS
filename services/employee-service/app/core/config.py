@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # RabbitMQ
     RABBITMQ_URL: str = "amqp://guest:guest@rabbitmq:5672/"
 
+    # Feature flags
+    ENABLE_EVENT_DRIVEN_ONBOARDING: bool = False
+
     # CORS
     ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost:3000"]
 

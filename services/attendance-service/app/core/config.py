@@ -41,6 +41,9 @@ OwIDAQAB
     # CORS
     ALLOWED_ORIGINS: Union[List[str], str] = ["http://localhost:3000"]
 
+    # Feature flags
+    ENABLE_EVENT_DRIVEN_ONBOARDING: bool = False
+
     # Attendance defaults
     DEFAULT_WORK_HOURS_PER_DAY: float = 8.0
     DEFAULT_WORK_START_TIME: str = "09:00"

@@ -1,3 +1,11 @@
+"""Class-based EventPublisher for leave-service.
+
+Used by main.py lifespan to maintain a persistent RabbitMQ connection
+and by route handlers to publish domain events.
+
+The existing standalone publish_event() in publishers.py is kept for
+backward compatibility with leave_service.py.
+"""
 import asyncio
 import json
 import uuid
@@ -14,14 +22,6 @@ except ImportError:
     logger.warning("aio-pika not installed. Event publishing will be disabled.")
 
 MAX_RETRIES = 3
-
-
-def _resolve_correlation_id(explicit: str | None) -> str:
-    try:
-        from app.middleware.request_id import correlation_id_var
-        return explicit or correlation_id_var.get("") or str(uuid.uuid4())
-    except Exception:
-        return explicit or str(uuid.uuid4())
 
 
 class EventPublisher:
@@ -62,14 +62,14 @@ class EventPublisher:
             "event_id": str(uuid.uuid4()),
             "event_type": event_type,
             "event_version": "v1",
-            "service_source": "onboarding-service",
-            "correlation_id": _resolve_correlation_id(correlation_id),
+            "service_source": "leave-service",
+            "correlation_id": correlation_id or str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "payload": payload,
         }
 
         if not HAS_AIOPIKA:
-            logger.warning(f"RabbitMQ unavailable — event not published: {event_type}", extra={"service_task": "event_publish"})
+            logger.warning(f"RabbitMQ unavailable — event not published: {event_type}")
             return
 
         for attempt in range(MAX_RETRIES):

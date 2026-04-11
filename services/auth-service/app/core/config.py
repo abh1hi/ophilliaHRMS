@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Internal service auth
     INTERNAL_SERVICE_TOKEN: str = "CHANGE_THIS_INTERNAL_TOKEN_IN_PRODUCTION"
 
+    # Onboarding service (for post-login context enrichment)
+    ONBOARDING_SERVICE_URL: str = "http://onboarding-service:8006"
+
     @field_validator("JWT_PRIVATE_KEY", "JWT_PUBLIC_KEY", mode="before")
     @classmethod
     def unescape_pem(cls, v: str) -> str:

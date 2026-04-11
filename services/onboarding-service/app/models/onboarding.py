@@ -7,6 +7,15 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
+class EventProcessingLog(Base):
+    """Consumer idempotency log — prevents duplicate event processing."""
+    __tablename__ = "event_processing_log"
+
+    event_id = Column(String(100), primary_key=True)
+    event_type = Column(String(100), nullable=False)
+    processed_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class OnboardingState(Base):
     """Tracks overall onboarding status per company."""
     __tablename__ = "onboarding_status"
@@ -14,6 +23,7 @@ class OnboardingState(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id = Column(UUID(as_uuid=True), nullable=False, unique=True, index=True)
     status = Column(String(30), nullable=False, default="NOT_STARTED")
+    version = Column(Integer, nullable=False, default=0)  # Optimistic locking
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -39,6 +49,21 @@ class OnboardingStep(Base):
     metadata_json = Column(Text, nullable=True)  # JSON string for step-specific data
 
     onboarding = relationship("OnboardingState", back_populates="steps")
+
+
+class TemplateApplicationLog(Base):
+    """Audit trail for template application sagas per company."""
+    __tablename__ = "template_application_log"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    template_region = Column(String(20), nullable=False)
+    status = Column(String(20), nullable=False, default="PENDING")  # PENDING/COMPLETED/FAILED/COMPENSATING/COMPENSATED
+    applied_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    result_json = Column(Text, nullable=True)   # JSON string
+    saga_steps_json = Column(Text, nullable=False, default="[]")  # JSON array of step states
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class OnboardingTemplate(Base):

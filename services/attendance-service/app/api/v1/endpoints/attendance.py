@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 from uuid import UUID
 from datetime import date
@@ -463,6 +464,7 @@ async def delete_geofence(
 
 @router.post("/policies", response_model=PolicyResponse, status_code=201)
 async def create_policy(
+    request: Request,
     data: PolicyCreate,
     current_user: TokenPayload = Depends(
         require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
@@ -472,7 +474,22 @@ async def create_policy(
     """Assign attendance method (manual/geofence/both) to dept or employee.
     Returns 409 if a policy for the same scope already exists.
     """
-    return await service.create_policy(data, changed_by=UUID(current_user.sub))
+    result = await service.create_policy(data, changed_by=UUID(current_user.sub))
+
+    # Publish attendance_policy.initialized on first policy creation for this company
+    from app.core.config import settings as _s
+    _, total = await service.list_policies(skip=0, limit=1)
+    if _s.ENABLE_EVENT_DRIVEN_ONBOARDING and total == 1:
+        publisher = getattr(request.app.state, "event_publisher", None)
+        if publisher:
+            _task = asyncio.create_task(publisher.publish("attendance_policy.initialized", {
+                "company_id": str(result.company_id) if result.company_id else None,
+            }))
+            request.state._bg_tasks = getattr(request.state, "_bg_tasks", set())
+            request.state._bg_tasks.add(_task)
+            _task.add_done_callback(request.state._bg_tasks.discard)
+
+    return result
 
 
 @router.get("/policies", response_model=PolicyListResponse)
