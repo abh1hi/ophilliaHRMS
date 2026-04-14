@@ -69,11 +69,11 @@ class TemplateApplicationError(Exception):
 
 
 async def _http_post(client: httpx.AsyncClient, url: str, payload: dict) -> httpx.Response:
-    return await client.post(url, json=payload, headers=_INTERNAL_HEADERS, timeout=_HTTP_TIMEOUT)
+    return await client.post(url, json=payload, headers=_internal_headers(), timeout=_HTTP_TIMEOUT)
 
 
 async def _http_delete(client: httpx.AsyncClient, url: str, payload: dict) -> httpx.Response:
-    return await client.request("DELETE", url, json=payload, headers=_INTERNAL_HEADERS, timeout=_HTTP_TIMEOUT)
+    return await client.request("DELETE", url, json=payload, headers=_internal_headers(), timeout=_HTTP_TIMEOUT)
 
 
 if HAS_CIRCUIT_BREAKER:

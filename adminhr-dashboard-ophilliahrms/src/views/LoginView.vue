@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { UserIcon, LockIcon, ArrowRightIcon } from 'lucide-vue-next'
-import { login } from '../services/auth.service'
+import { login, postLoginContext } from '../services/auth.service'
 
 const router = useRouter()
 const email = ref('')
@@ -10,16 +10,27 @@ const password = ref('')
 const isLoading = ref(false)
 const errorMsg = ref('')
 
+function routeByRole(role: string) {
+  if (role === 'super_admin') router.push('/select-company')
+  else router.push('/dashboard')
+}
+
 const handleLogin = async () => {
   isLoading.value = true
   errorMsg.value = ''
   try {
     const result = await login(email.value, password.value)
-    // Role is decoded from the JWT claims (not from response body)
-    if (result.claims.role === 'super_admin') {
-      router.push('/select-company')
-    } else {
-      router.push('/dashboard')
+    // Try backend-driven routing; fall back to JWT role if endpoint unavailable
+    try {
+      const ctx = await postLoginContext()
+      switch (ctx.next_action) {
+        case 'COMPLETE_ONBOARDING': router.push('/onboarding'); break
+        case 'SELECT_COMPANY':
+        case 'CREATE_COMPANY':      router.push('/select-company'); break
+        default:                    router.push('/dashboard')
+      }
+    } catch {
+      routeByRole(result.claims.role)
     }
   } catch (err: any) {
     errorMsg.value = err.message || 'Authentication failed'

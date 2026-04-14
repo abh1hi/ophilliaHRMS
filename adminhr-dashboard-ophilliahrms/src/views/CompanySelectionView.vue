@@ -4,24 +4,29 @@ import { useRouter } from 'vue-router'
 import { BuildingIcon, ArrowRightIcon, PlusIcon, LogOutIcon } from 'lucide-vue-next'
 import { companyApi } from '../services/api'
 import { clearTokens } from '../services/http'
+import CreateCompanyWizard from '../components/superadmin/CreateCompanyWizard.vue'
 
 const router = useRouter()
 const companies = ref<any[]>([])
 const isLoading = ref(true)
+const showCreateWizard = ref(false)
 
-onMounted(async () => {
+async function loadCompanies() {
+  isLoading.value = true
   try {
     const result = await companyApi.getCompanies()
     companies.value = result.data.companies.map((c: any) => ({
       ...c,
-      glow: 'bg-emerald-200/30' // Visual enhancement from guideline
+      glow: 'bg-emerald-200/30'
     }))
   } catch (err) {
     console.error('Failed to fetch companies', err)
   } finally {
     isLoading.value = false
   }
-})
+}
+
+onMounted(loadCompanies)
 
 const selectCompany = (company: any) => {
   localStorage.setItem('selected_company_id', company.id)
@@ -88,7 +93,9 @@ const logout = () => {
       </button>
 
       <!-- Add New Entity Card -->
-      <button class="min-h-[260px] border-2 border-dashed border-slate-300/70 hover:border-slate-400 bg-white/20 hover:bg-white/40 backdrop-blur-sm rounded-[24px] p-8 flex flex-col items-center justify-center text-slate-500 hover:text-slate-800 transition-all duration-300 group">
+      <button
+        @click="showCreateWizard = true"
+        class="min-h-[260px] border-2 border-dashed border-slate-300/70 hover:border-slate-400 bg-white/20 hover:bg-white/40 backdrop-blur-sm rounded-[24px] p-8 flex flex-col items-center justify-center text-slate-500 hover:text-slate-800 transition-all duration-300 group">
         <div class="w-14 h-14 rounded-full bg-slate-200/60 group-hover:bg-slate-200 flex items-center justify-center mb-4 transition-colors duration-300">
           <PlusIcon class="w-6 h-6" />
         </div>
@@ -97,4 +104,10 @@ const logout = () => {
 
     </div>
   </div>
+
+  <!-- Create Company Wizard -->
+  <CreateCompanyWizard
+    v-if="showCreateWizard"
+    @close="showCreateWizard = false; loadCompanies()"
+  />
 </template>

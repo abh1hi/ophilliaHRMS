@@ -45,7 +45,7 @@ async def create_policy(db: AsyncSession, data: LeavePolicyCreate) -> LeavePolic
     cid = _cid(db)
     obj = LeavePolicy(name=data.name, description=data.description, company_id=cid)
     for item in data.items:
-        obj.items.append(LeavePolicyItem(**item.model_dump()))
+        obj.items.append(LeavePolicyItem(**item.model_dump(), company_id=cid))
     db.add(obj)
     await db.commit()
     await db.refresh(obj)

@@ -34,8 +34,8 @@ const mainNav = [
 ]
 
 const employeesNav = [
-  { key: 'employees',         label: 'Directory',    icon: UsersIcon    },
-  { key: 'employees-import',  label: 'Bulk Import',  icon: DatabaseIcon },
+  { key: 'employees',               label: 'Directory',    icon: UsersIcon    },
+  { key: 'employees-import-queue',  label: 'Bulk Import',  icon: DatabaseIcon },
 ]
 
 const hrSetupNav = [

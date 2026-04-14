@@ -401,3 +401,73 @@ class SendInviteResponse(BaseModel):
     invite_url: str    # full URL for HR to share — raw token is never exposed
     expires_at: str    # ISO datetime string
     account_status: str
+
+
+# ──────────── BULK IMPORT — JOB TRACKING ────────────
+
+class AutoCorrectionOut(BaseModel):
+    row: int
+    field: str
+    original: str
+    fixed: str
+
+
+class RowIssueOut(BaseModel):
+    row: int
+    field: str
+    error: str
+    suggested_fix: str = ""
+    original_value: str = ""
+    is_warning: bool = False
+    is_cross_row: bool = False
+
+
+class PreviewRowOut(BaseModel):
+    index: int
+    data: dict
+    # "valid" | "warning" | "error" | "cross_row"
+    status: str
+    issues: List[RowIssueOut] = []
+
+
+class PreviewSummary(BaseModel):
+    valid: int
+    warnings: int
+    errors: int
+    auto_corrections: int
+    cross_row_duplicates: int
+
+
+class ImportPreviewResponse(BaseModel):
+    rows: List[PreviewRowOut]
+    summary: PreviewSummary
+    auto_corrections: List[AutoCorrectionOut] = []
+
+
+class ImportJobUploadResponse(BaseModel):
+    job_id: UUID
+    total_rows: int
+    auto_corrections: List[AutoCorrectionOut] = []
+    cross_row_warnings: List[RowIssueOut] = []
+    idempotent: bool = False   # True when returning a cached previous result
+
+
+class ImportJobResponse(BaseModel):
+    id: UUID
+    company_id: UUID
+    uploaded_by: UUID
+    file_name: str
+    file_size_bytes: Optional[int] = None
+    schema_version: str
+    status: str
+    duplicate_strategy: str
+    total_rows: int
+    succeeded_rows: int
+    failed_rows: int
+    skipped_rows: int
+    error_log: Optional[list] = []
+    auto_corrections: Optional[list] = []
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}

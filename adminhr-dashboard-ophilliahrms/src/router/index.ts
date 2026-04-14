@@ -32,6 +32,12 @@ const routes = [
     name: 'Payroll',
     component: () => import('../views/PayrollView.vue'),
     meta: { requiresAuth: true, roles: ['admin', 'hr', 'super_admin'] }
+  },
+  {
+    path: '/onboarding',
+    name: 'Onboarding',
+    component: () => import('../views/OnboardingView.vue'),
+    meta: { requiresAuth: true, roles: ['admin', 'super_admin', 'hr'] }
   }
 ]
 

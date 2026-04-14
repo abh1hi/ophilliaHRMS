@@ -47,9 +47,9 @@ async def create_block_list(db: AsyncSession, data: LeaveBlockListCreate) -> Lea
         company_id=cid,
     )
     for d in data.dates:
-        obj.dates.append(LeaveBlockListDate(**d.model_dump()))
+        obj.dates.append(LeaveBlockListDate(**d.model_dump(), company_id=cid))
     for u in data.allowed_users:
-        obj.allowed_users.append(LeaveBlockListAllowed(**u.model_dump()))
+        obj.allowed_users.append(LeaveBlockListAllowed(**u.model_dump(), company_id=cid))
     db.add(obj)
     await db.commit()
     await db.refresh(obj)

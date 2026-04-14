@@ -21,7 +21,10 @@
       "Bash(python -m pytest tests/integration/test_payroll_workflow.py::TestPayrollWorkflowStateTransitions::test_full_payroll_lifecycle -xvs --tb=short)",
       "Bash(npx playwright:*)",
       "Bash(docker restart:*)",
-      "mcp__MCP_DOCKER__mcp-exec"
+      "mcp__MCP_DOCKER__mcp-exec",
+      "Bash(grep -E \"\\\\.\\(ts|json\\)$\")",
+      "Bash(dir \"C:\\\\Users\\\\abhin\\\\Desktop\\\\ophilliaHRMS\")",
+      "WebSearch"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit",

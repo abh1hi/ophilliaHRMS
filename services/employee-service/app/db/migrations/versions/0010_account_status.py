@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "0010_add_account_status_nullable_user_id"
+revision = "0010_account_status"
 down_revision = "0009_add_employee_code"
 branch_labels = None
 depends_on = None

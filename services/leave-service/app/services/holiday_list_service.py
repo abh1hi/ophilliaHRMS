@@ -47,7 +47,7 @@ async def create_holiday_list(db: AsyncSession, data: HolidayListCreate) -> Holi
     payload = data.model_dump(exclude={"entries"})
     obj = HolidayList(**payload, company_id=cid)
     for entry in data.entries:
-        obj.entries.append(HolidayListEntry(**entry.model_dump()))
+        obj.entries.append(HolidayListEntry(**entry.model_dump(), company_id=cid))
     db.add(obj)
     await db.commit()
     await db.refresh(obj)
@@ -66,9 +66,10 @@ async def update_holiday_list(db: AsyncSession, list_id: UUID, data: HolidayList
 async def add_entries(
     db: AsyncSession, list_id: UUID, entries: List[HolidayListEntryCreate]
 ) -> HolidayList:
+    cid = _cid(db)
     obj = await get_holiday_list(db, list_id)
     for entry in entries:
-        obj.entries.append(HolidayListEntry(holiday_list_id=obj.id, **entry.model_dump()))
+        obj.entries.append(HolidayListEntry(holiday_list_id=obj.id, **entry.model_dump(), company_id=cid))
     await db.commit()
     await db.refresh(obj)
     return obj

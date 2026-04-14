@@ -118,6 +118,15 @@ class Employee(Base):
     # Comma-separated or JSON-serialised list of document URLs
     staff_documents_urls = Column(Text, nullable=True)
 
+    # ── Data Lineage ───────────────────────────────────────────────────────
+    # Set when employee is created via bulk import; NULL for manually-created employees
+    import_job_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("import_jobs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # ── Audit ──────────────────────────────────────────────────────────────
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(
