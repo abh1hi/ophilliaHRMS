@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Button } from './button'
+
 defineProps<{
   title: string
   subtitle?: string
@@ -11,20 +13,21 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex items-center justify-between mb-8">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
     <div>
-      <h2 class="text-2xl font-bold tracking-tight text-slate-900">{{ title }}</h2>
-      <p v-if="subtitle" class="text-slate-500 font-medium mt-1 text-sm">{{ subtitle }}</p>
+      <h2 class="text-3xl font-bold tracking-tight text-foreground">{{ title }}</h2>
+      <p v-if="subtitle" class="text-muted-foreground mt-1 text-sm font-medium">{{ subtitle }}</p>
     </div>
     <div class="flex items-center gap-3">
       <slot name="extra" />
-      <button
+      <Button
         v-if="actionLabel"
         @click="emit('action')"
-        class="bg-slate-900 text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-slate-800 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 flex items-center space-x-2"
+        size="sm"
+        class="rounded-full px-5"
       >
-        <span>{{ actionLabel }}</span>
-      </button>
+        {{ actionLabel }}
+      </Button>
     </div>
   </div>
 </template>

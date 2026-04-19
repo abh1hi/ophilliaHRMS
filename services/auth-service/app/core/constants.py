@@ -12,4 +12,4 @@ class UserRole(str, Enum):
 
 # System-wide role limits
 MAX_SUPER_ADMINS = 1
-MAX_ADMINS = 3
+# MAX_ADMINS removed — unlimited admins per company, controlled by is_company_owner invite permission

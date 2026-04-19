@@ -4,8 +4,10 @@ import PageHeader from '../ui/PageHeader.vue'
 import DataTable from '../ui/DataTable.vue'
 import SlideDrawer from '../ui/SlideDrawer.vue'
 import FormInput from '../ui/FormInput.vue'
+import FormSelect from '../ui/FormSelect.vue'
 import FormTextarea from '../ui/FormTextarea.vue'
-import { EyeIcon } from 'lucide-vue-next'
+import { Button } from '../ui/button'
+import { Eye, CheckCircle2, XCircle } from 'lucide-vue-next'
 import { listCompensatoryLeaveRequests, createCompensatoryLeaveRequest, reviewCompensatoryLeaveRequest } from '../../services/compensatory-leave.service'
 import type { CompensatoryLeaveRequest } from '../../services/compensatory-leave.service'
 
@@ -25,10 +27,10 @@ const reviewing = ref(false)
 const reviewError = ref('')
 
 const STATUS_CLASSES: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-700',
-  approved: 'bg-emerald-100 text-emerald-700',
-  rejected: 'bg-rose-100 text-rose-700',
-  cancelled: 'bg-slate-100 text-slate-500',
+  pending: 'bg-amber-100/50 text-amber-700 border-amber-200/50',
+  approved: 'bg-emerald-100/50 text-emerald-700 border-emerald-200/50',
+  rejected: 'bg-rose-100/50 text-rose-700 border-rose-200/50',
+  cancelled: 'bg-slate-100/50 text-slate-500 border-slate-200/50',
 }
 
 const columns = [
@@ -63,61 +65,126 @@ async function submitReview() {
   try { await reviewCompensatoryLeaveRequest(reviewTarget.value.id, reviewForm.value); reviewDrawer.value = false; load() }
   catch (e: any) { reviewError.value = e.message } finally { reviewing.value = false }
 }
+
+const decisionOptions = [
+  { value: 'approved', label: 'Approve Request' },
+  { value: 'rejected', label: 'Reject Request' },
+]
 </script>
 
 <template>
-  <div class="space-y-6">
-    <PageHeader title="Compensatory Leave Requests" subtitle="Employees claim leave for working on off-days" action-label="+ New Request" @action="openCreate" />
-    <DataTable :columns="columns" :rows="rows" :loading="loading" :searchable="true" empty-text="No requests yet.">
+  <div class="space-y-8">
+    <PageHeader 
+      title="Compensatory Leave" 
+      subtitle="Manage claims for leave earned by working on off-days" 
+      action-label="New Request" 
+      @action="openCreate" 
+    />
+    
+    <DataTable :columns="columns" :rows="rows" :loading="loading" :searchable="true" empty-text="No compensatory leave requests found.">
       <template #cell-status="{ value }">
-        <span :class="STATUS_CLASSES[value]" class="px-2 py-0.5 rounded-full text-xs font-medium capitalize">{{ value }}</span>
+        <span 
+          :class="STATUS_CLASSES[value]" 
+          class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm"
+        >
+          {{ value }}
+        </span>
       </template>
       <template #actions="{ row }">
-        <button v-if="row.status === 'pending'" @click="openReview(row)" class="p-2 rounded-[10px] hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"><EyeIcon class="w-4 h-4" /></button>
+        <Button 
+          v-if="row.status === 'pending'" 
+          variant="ghost" 
+          size="icon" 
+          @click="openReview(row)" 
+          class="h-8 w-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900"
+        >
+          <Eye class="w-4 h-4" />
+        </Button>
       </template>
     </DataTable>
 
     <!-- Create drawer -->
     <SlideDrawer :open="createDrawer" title="New Compensatory Leave Request" width="w-full max-w-lg" @close="createDrawer = false">
-      <div class="space-y-5">
-        <FormInput label="Leave Type ID" :modelValue="form.leave_type_id" @update:modelValue="form.leave_type_id = $event" required />
-        <FormInput label="Work From Date" type="date" :modelValue="form.work_from_date" @update:modelValue="form.work_from_date = $event" required />
-        <FormInput label="Work End Date" type="date" :modelValue="form.work_end_date" @update:modelValue="form.work_end_date = $event" required />
-        <FormTextarea label="Reason" :modelValue="form.reason" @update:modelValue="form.reason = $event" />
+      <div class="space-y-6">
+        <FormInput label="Leave Type ID" :modelValue="form.leave_type_id" @update:modelValue="form.leave_type_id = $event" placeholder="e.g. C-OFF" required />
+        <div class="grid grid-cols-2 gap-4">
+          <FormInput label="Work Start Date" type="date" :modelValue="form.work_from_date" @update:modelValue="form.work_from_date = $event" required />
+          <FormInput label="Work End Date" type="date" :modelValue="form.work_end_date" @update:modelValue="form.work_end_date = $event" required />
+        </div>
+        <FormTextarea label="Reason / Description" :modelValue="form.reason" @update:modelValue="form.reason = $event" placeholder="Briefly describe the work done..." />
       </div>
       <template #footer>
-        <div class="flex items-center justify-between">
-          <p v-if="saveError" class="text-sm text-rose-600">{{ saveError }}</p><div v-else></div>
-          <div class="flex space-x-3">
-            <button @click="createDrawer = false" class="px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-medium text-sm transition-colors">Cancel</button>
-            <button @click="save" :disabled="saving" class="px-6 py-2.5 bg-slate-900 text-white rounded-full font-medium text-sm hover:bg-slate-800 transition-all disabled:opacity-60">{{ saving ? 'Submitting...' : 'Submit' }}</button>
+        <div class="flex items-center justify-between w-full">
+          <p v-if="saveError" class="text-xs text-destructive font-medium">{{ saveError }}</p>
+          <div v-else></div>
+          <div class="flex items-center gap-3">
+            <Button variant="outline" @click="createDrawer = false" class="rounded-full px-6">Cancel</Button>
+            <Button @click="save" :disabled="saving" class="rounded-full px-8 bg-slate-900 text-white hover:bg-slate-800">
+              {{ saving ? 'Submitting...' : 'Submit Request' }}
+            </Button>
           </div>
         </div>
       </template>
     </SlideDrawer>
 
     <!-- Review drawer -->
-    <SlideDrawer :open="reviewDrawer" title="Review Request" width="w-full max-w-md" @close="reviewDrawer = false">
-      <div class="space-y-4">
-        <div v-if="reviewTarget" class="rounded-[16px] bg-slate-50 p-4 text-sm space-y-1">
-          <div class="text-slate-500">Employee: <span class="text-slate-900 font-medium">{{ reviewTarget.employee_id }}</span></div>
-          <div class="text-slate-500">Period: <span class="text-slate-900 font-medium">{{ reviewTarget.work_from_date }} → {{ reviewTarget.work_end_date }}</span></div>
+    <SlideDrawer :open="reviewDrawer" title="Review Compensatory Request" width="w-full max-w-lg" @close="reviewDrawer = false">
+      <div class="space-y-6">
+        <div v-if="reviewTarget" class="p-4 rounded-2xl bg-muted/30 border border-dashed text-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Request Details</span>
+            <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/50 uppercase">Pending Review</span>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-[11px] text-muted-foreground mb-0.5">Employee</p>
+              <p class="font-semibold text-slate-900">{{ reviewTarget.employee_id }}</p>
+            </div>
+            <div>
+              <p class="text-[11px] text-muted-foreground mb-0.5">Leave Type</p>
+              <p class="font-semibold text-slate-900">{{ reviewTarget.leave_type_id }}</p>
+            </div>
+            <div class="col-span-2">
+              <p class="text-[11px] text-muted-foreground mb-0.5">Work Period</p>
+              <p class="font-semibold text-slate-900">{{ reviewTarget.work_from_date }} — {{ reviewTarget.work_end_date }}</p>
+            </div>
+          </div>
         </div>
-        <div>
-          <label class="block text-xs text-slate-500 mb-1">Decision</label>
-          <select v-model="reviewForm.status" class="w-full bg-slate-50/50 border border-slate-200/60 text-slate-900 text-sm rounded-[12px] px-3 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10">
-            <option value="approved">Approve</option>
-            <option value="rejected">Reject</option>
-          </select>
-        </div>
-        <FormInput label="Review Note" :modelValue="reviewForm.review_note" @update:modelValue="reviewForm.review_note = $event" />
+
+        <FormSelect 
+          label="Review Decision" 
+          :modelValue="reviewForm.status" 
+          @update:modelValue="reviewForm.status = $event as any" 
+          :options="decisionOptions"
+        />
+        
+        <FormTextarea 
+          label="Internal Review Note" 
+          :modelValue="reviewForm.review_note" 
+          @update:modelValue="reviewForm.review_note = $event" 
+          placeholder="Add a comment regarding this decision..."
+        />
       </div>
       <template #footer>
-        <div class="flex items-center justify-between">
-          <p v-if="reviewError" class="text-sm text-rose-600">{{ reviewError }}</p><div v-else></div>
-          <div class="flex space-x-3">
-            <button @click="reviewDrawer = false" class="px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-medium text-sm transition-colors">Cancel</button>
-            <button @click="submitReview" :disabled="reviewing" :class="reviewForm.status === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'" class="px-6 py-2.5 text-white rounded-full font-medium text-sm transition-all disabled:opacity-60">{{ reviewing ? 'Submitting...' : reviewForm.status === 'approved' ? 'Approve' : 'Reject' }}</button>
+        <div class="flex items-center justify-between w-full">
+          <p v-if="reviewError" class="text-xs text-destructive font-medium">{{ reviewError }}</p>
+          <div v-else></div>
+          <div class="flex items-center gap-3">
+            <Button variant="outline" @click="reviewDrawer = false" class="rounded-full px-6">Cancel</Button>
+            <Button 
+              @click="submitReview" 
+              :disabled="reviewing" 
+              class="rounded-full px-8 text-white min-w-[140px]"
+              :class="reviewForm.status === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-destructive hover:bg-destructive/90 shadow-rose-200'"
+            >
+              <template v-if="reviewing">Processing...</template>
+              <template v-else-if="reviewForm.status === 'approved'">
+                <CheckCircle2 class="w-4 h-4 mr-2" /> Approve
+              </template>
+              <template v-else>
+                <XCircle class="w-4 h-4 mr-2" /> Reject
+              </template>
+            </Button>
           </div>
         </div>
       </template>

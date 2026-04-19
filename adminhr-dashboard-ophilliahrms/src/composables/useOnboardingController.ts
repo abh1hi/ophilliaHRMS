@@ -15,7 +15,7 @@ export function useOnboardingController() {
 
   const canAccessStep = (stepKey: string): boolean => {
     // Permissions enforced per-step in stepConfig.ts
-    // attendance_policy and salary_structure are admin/super_admin only
+    // attendance_policy and salary_structure are admin-only
     const adminOnly = ['attendance_policy', 'salary_structure']
     if (adminOnly.includes(stepKey) && userRole === 'hr') return false
     return true

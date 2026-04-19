@@ -1,167 +1,25 @@
-<template>
-  <Teleport to="body">
-    <Transition name="drawer">
-      <div v-if="open" class="fixed inset-0 z-50 flex justify-end">
-        <div class="absolute inset-0 bg-black/40" @click="emit('close')" />
-        <div class="relative w-full max-w-lg bg-white h-full shadow-xl flex flex-col">
-          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-            <h2 class="text-lg font-semibold text-slate-800">{{ isEdit ? 'Edit Event' : 'New Event' }}</h2>
-            <button @click="emit('close')" class="p-1.5 rounded-lg hover:bg-slate-100">
-              <XIcon class="w-5 h-5 text-slate-500" />
-            </button>
-          </div>
-
-          <form class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-            <!-- Title -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Title <span class="text-red-500">*</span></label>
-              <input
-                v-model="form.title"
-                type="text"
-                required
-                placeholder="Event title"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
-            </div>
-
-            <!-- Calendar -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Calendar <span class="text-red-500">*</span></label>
-              <select
-                v-model="form.calendar_id"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              >
-                <option value="">Select calendar</option>
-                <option v-for="cal in calendars" :key="cal.id" :value="cal.id">{{ cal.name }}</option>
-              </select>
-            </div>
-
-            <!-- Type -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Event Type</label>
-              <select
-                v-model="form.event_type"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              >
-                <option value="meeting">Meeting</option>
-                <option value="deadline">Deadline</option>
-                <option value="reminder">Reminder</option>
-                <option value="block">Block</option>
-              </select>
-            </div>
-
-            <!-- All day toggle -->
-            <div class="flex items-center gap-3">
-              <input v-model="form.all_day" type="checkbox" id="all-day" class="rounded border-slate-300" />
-              <label for="all-day" class="text-sm text-slate-700">All day</label>
-            </div>
-
-            <!-- Start / End -->
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">Start</label>
-                <input
-                  v-model="form.start_time"
-                  :type="form.all_day ? 'date' : 'datetime-local'"
-                  class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">End</label>
-                <input
-                  v-model="form.end_time"
-                  :type="form.all_day ? 'date' : 'datetime-local'"
-                  class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <!-- Location -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
-              <input
-                v-model="form.location"
-                type="text"
-                placeholder="Office, Zoom, etc."
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              />
-            </div>
-
-            <!-- Description -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
-              <textarea
-                v-model="form.description"
-                rows="3"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none resize-none"
-              />
-            </div>
-
-            <!-- Recurrence -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Recurrence</label>
-              <select
-                v-model="rrulePreset"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              >
-                <option value="">None</option>
-                <option value="RRULE:FREQ=DAILY">Daily</option>
-                <option value="RRULE:FREQ=WEEKLY">Weekly</option>
-                <option value="RRULE:FREQ=MONTHLY">Monthly</option>
-                <option value="RRULE:FREQ=YEARLY">Yearly</option>
-                <option value="custom">Custom…</option>
-              </select>
-              <input
-                v-if="rrulePreset === 'custom'"
-                v-model="form.rrule"
-                type="text"
-                placeholder="RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
-                class="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none"
-              />
-            </div>
-
-            <!-- Color -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Color</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="c in colors"
-                  :key="c"
-                  type="button"
-                  @click="form.color = c"
-                  :style="{ backgroundColor: c }"
-                  :class="[
-                    'w-7 h-7 rounded-full border-2 transition-all',
-                    form.color === c ? 'border-slate-900 scale-110' : 'border-transparent',
-                  ]"
-                />
-              </div>
-            </div>
-
-            <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-          </form>
-
-          <div class="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-            <button type="button" @click="emit('close')" class="px-4 py-2 text-sm text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
-              Cancel
-            </button>
-            <button
-              @click="submit"
-              :disabled="saving || !form.title.trim() || !form.calendar_id"
-              class="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-700 disabled:opacity-50"
-            >
-              {{ saving ? 'Saving…' : isEdit ? 'Update' : 'Create' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { XIcon } from 'lucide-vue-next'
+import SlideDrawer from '../ui/SlideDrawer.vue'
+import FormInput from '../ui/FormInput.vue'
+import FormTextarea from '../ui/FormTextarea.vue'
+import FormSelect from '../ui/FormSelect.vue'
+import { Button } from '@/components/ui/button'
+import { 
+  X, 
+  Calendar, 
+  MapPin, 
+  RotateCw, 
+  Clock, 
+  Palette, 
+  Info, 
+  Hash, 
+  Users, 
+  Check,
+  Zap,
+  Activity,
+  Layers
+} from 'lucide-vue-next'
 import { useCalendarStore } from '@/stores/calendar.store'
 import type { CalendarItem, CalendarEvent } from '@/services/calendar-events.service'
 
@@ -260,9 +118,166 @@ async function submit() {
     saving.value = false
   }
 }
+
+const calendarOptions = computed(() => 
+  props.calendars.map(c => ({ value: c.id, label: c.name }))
+)
+
+const eventTypeOptions = [
+  { value: 'meeting', label: 'Synchronous Meeting' },
+  { value: 'deadline', label: 'Critical Deadline' },
+  { value: 'reminder', label: 'Task Reminder' },
+  { value: 'block', label: 'Availability Block' }
+]
+
+const recurrenceOptions = [
+  { value: '', label: 'Single Execution' },
+  { value: 'RRULE:FREQ=DAILY', label: 'Daily Cadence' },
+  { value: 'RRULE:FREQ=WEEKLY', label: 'Weekly Iteration' },
+  { value: 'RRULE:FREQ=MONTHLY', label: 'Monthly Cycle' },
+  { value: 'RRULE:FREQ=YEARLY', label: 'Annual Phase' },
+  { value: 'custom', label: 'Custom R-Rule...' }
+]
 </script>
 
-<style scoped>
-.drawer-enter-active, .drawer-leave-active { transition: opacity 0.25s; }
-.drawer-enter-from, .drawer-leave-to { opacity: 0; }
-</style>
+<template>
+  <SlideDrawer 
+    :open="open" 
+    :title="isEdit ? 'Event Recalibration' : 'Temporal Event Synchronization'" 
+    width="w-full max-w-lg" 
+    @close="emit('close')"
+  >
+    <div class="space-y-8 py-4">
+      <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50 mb-2">
+         <Info class="w-4 h-4 text-indigo-500 mt-0.5" />
+         <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
+           Events represent scheduled temporal intersections. Configure duration and recurrence to optimize environmental synchronization and resource availability.
+         </p>
+      </div>
+
+      <FormInput label="Event Identity" v-model="form.title" required placeholder="Describe the intersection objective..." />
+      
+      <div class="grid grid-cols-2 gap-6">
+        <FormSelect label="Target temporal node" v-model="form.calendar_id" :options="calendarOptions" />
+        <FormSelect label="Event Taxonomy" v-model="form.event_type" :options="eventTypeOptions" />
+      </div>
+
+      <div class="space-y-6">
+        <div class="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-white/10">
+           <div class="flex items-center gap-3">
+              <Clock class="w-4 h-4 text-slate-400" />
+              <span class="text-[11px] font-bold text-slate-900 tracking-tight">Full-cycle temporal span</span>
+           </div>
+           <div class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none" :class="form.all_day ? 'bg-indigo-600' : 'bg-slate-200'" @click="form.all_day = !form.all_day">
+              <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" :class="form.all_day ? 'translate-x-6' : 'translate-x-1'" />
+           </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2">
+          <div class="space-y-2">
+            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Initialization</label>
+            <div class="relative group">
+               <Calendar class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
+               <input
+                 v-model="form.start_time"
+                 :type="form.all_day ? 'date' : 'datetime-local'"
+                 class="w-full pl-10 pr-4 py-3 bg-slate-50/50 border border-slate-200/60 text-slate-900 text-sm rounded-2xl outline-none focus:ring-4 focus:ring-slate-900/5 transition-all"
+               />
+            </div>
+          </div>
+          <div class="space-y-2">
+            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Termination</label>
+            <div class="relative group">
+               <Calendar class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
+               <input
+                 v-model="form.end_time"
+                 :type="form.all_day ? 'date' : 'datetime-local'"
+                 class="w-full pl-10 pr-4 py-3 bg-slate-50/50 border border-slate-200/60 text-slate-900 text-sm rounded-2xl outline-none focus:ring-4 focus:ring-slate-900/5 transition-all"
+               />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+         <div class="flex items-center gap-2 mb-2">
+            <Activity class="w-4 h-4 text-slate-400" />
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Contextual Metadata</span>
+         </div>
+         
+         <div class="p-6 bg-slate-50/50 rounded-[32px] border border-white/10 space-y-6">
+            <div class="space-y-3">
+               <div class="flex items-center gap-2">
+                  <MapPin class="w-3.5 h-3.5 text-slate-400" />
+                  <label class="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Geospatial / Virtual Location</label>
+               </div>
+               <input
+                 v-model="form.location"
+                 type="text"
+                 placeholder="e.g. Virtual HQ, War Room 4..."
+                 class="w-full bg-white border border-slate-200/60 text-slate-900 text-sm rounded-2xl px-4 py-3 outline-none focus:ring-4 focus:ring-slate-900/5 transition-all shadow-sm"
+               />
+            </div>
+
+            <FormTextarea label="Operational Brief" v-model="form.description" placeholder="Specify depth and constraints..." />
+
+            <div class="space-y-4">
+              <FormSelect label="Recurrence Protocol" v-model="rrulePreset" :options="recurrenceOptions" />
+              <div v-if="rrulePreset === 'custom'" class="animate-in fade-in zoom-in-95 space-y-2">
+                 <div class="flex items-center gap-2">
+                    <Hash class="w-3.5 h-3.5 text-slate-400" />
+                    <label class="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Raw R-Rule String</label>
+                 </div>
+                 <input
+                   v-model="form.rrule"
+                   type="text"
+                   placeholder="RRULE:FREQ=WEEKLY;BYDAY=MO..."
+                   class="w-full bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl px-4 py-3 outline-none shadow-xl"
+                 />
+              </div>
+            </div>
+         </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 mb-2">
+           <Palette class="w-4 h-4 text-slate-400" />
+           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Aesthetic Focus</span>
+        </div>
+        <div class="p-6 bg-slate-50/50 rounded-[32px] border border-white/10 flex flex-wrap gap-3">
+          <button
+            v-for="c in colors"
+            :key="c"
+            type="button"
+            @click="form.color = c"
+            :style="{ backgroundColor: c }"
+            class="w-8 h-8 rounded-full border-2 transition-all duration-300 relative group"
+            :class="[
+              form.color === c ? 'border-slate-900 scale-125' : 'border-white/40 hover:scale-110 shadow-sm',
+            ]"
+          >
+             <Check v-if="form.color === c" class="absolute inset-0 m-auto w-3 h-3 text-white" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex-1">
+           <p v-if="error" class="text-[10px] font-bold text-destructive uppercase tracking-tight animate-in fade-in">{{ error }}</p>
+        </div>
+        <div class="flex gap-3">
+          <Button variant="outline" @click="emit('close')" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[11px]">Cancel</Button>
+          <Button 
+            @click="submit" 
+            :disabled="saving || !form.title.trim() || !form.calendar_id" 
+            class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
+          >
+            {{ saving ? 'Syncing...' : isEdit ? 'Deploy Update' : 'Initialize Sequence' }}
+          </Button>
+        </div>
+      </div>
+    </template>
+  </SlideDrawer>
+</template>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { Activity, Layers, ArrowUpRight, Monitor, Zap } from 'lucide-vue-next'
 import StatCard from '../ui/StatCard.vue'
 import RecentActivityList from './RecentActivityList.vue'
 import { apiFetchData } from '../../services/http'
+import { Button } from '@/components/ui/button'
 
 interface StatsResponse {
   total_employees: number
@@ -27,38 +29,52 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <!-- Stat Cards -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="space-y-12 animate-in fade-in slide-in-from-bottom-5 duration-700">
+    <!-- Telemetry Clusters -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <StatCard
-        label="Total Employees"
+        label="Entity Population"
         :value="loading ? '…' : stats.total_employees"
-        sub="registered in the system"
-        glow-color="bg-emerald-100/50"
+        sub="Registered Manifests"
+        glow-color="#6366f1"
       />
       <StatCard
-        label="Active Employees"
+        label="Operational Nodes"
         :value="loading ? '…' : stats.active_employees"
-        sub="currently active"
-        glow-color="bg-blue-100/50"
+        sub="Active Session Layer"
+        glow-color="#10b981"
       />
       <StatCard
-        label="Departments"
+        label="Domain Units"
         :value="loading ? '…' : stats.total_departments"
-        sub="across the company"
-        glow-color="bg-purple-100/50"
+        sub="Operational Clusters"
+        glow-color="#a855f7"
       />
     </div>
 
-    <!-- Recent Activity -->
-    <div class="bg-white/70 backdrop-blur-md border border-slate-200/60 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] rounded-[24px] p-8">
-      <div class="flex items-center justify-between mb-8">
-        <h3 class="text-xl font-bold text-slate-900">Recent Activity</h3>
-        <button class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full px-5 py-2 text-sm font-medium transition-colors shadow-sm">
-          View All
-        </button>
+    <!-- Activity Stream Manifest -->
+    <div class="bg-white/30 backdrop-blur-2xl border border-white/60 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.05)] rounded-[48px] p-12 lg:p-16 relative overflow-hidden group">
+      <div class="absolute -right-20 -top-20 w-80 h-80 bg-slate-50 rounded-full blur-[100px] opacity-20 group-hover:opacity-40 transition-opacity" />
+      
+      <div class="relative z-10">
+        <div class="flex flex-col sm:flex-row items-center justify-between mb-12 gap-6">
+          <div class="space-y-1">
+            <h3 class="text-3xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+              <Activity class="w-8 h-8 text-slate-400" />
+              Real-time Ingestion Feed
+            </h3>
+            <p class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 pl-1">Asynchronous system telemetry</p>
+          </div>
+          <Button variant="outline" class="rounded-full h-12 px-8 border-slate-100 text-[10px] font-black uppercase tracking-widest hover:border-indigo-100 hover:text-indigo-600 transition-all shadow-sm">
+            Access Full Logs
+            <ArrowUpRight class="w-3.5 h-3.5 ml-2" />
+          </Button>
+        </div>
+
+        <div class="min-h-[400px]">
+          <RecentActivityList :activities="activities" :loading="loading" />
+        </div>
       </div>
-      <RecentActivityList :activities="activities" :loading="loading" />
     </div>
   </div>
 </template>

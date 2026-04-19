@@ -9,18 +9,25 @@ _ALGORITHM = "HS256"
 _TOKEN_TTL_SECONDS = 300
 
 
-def create_service_token(issuer: str) -> str:
+def create_service_token(issuer: str, audience: str = "leave-service") -> str:
     now = datetime.now(timezone.utc)
     return jwt.encode(
-        {"iss": issuer, "aud": "internal", "iat": now, "exp": now + timedelta(seconds=_TOKEN_TTL_SECONDS)},
+        {"iss": issuer, "aud": audience, "service": issuer, "iat": now, "exp": now + timedelta(seconds=_TOKEN_TTL_SECONDS)},
         settings.INTERNAL_SERVICE_TOKEN, algorithm=_ALGORITHM,
     )
 
 
 def verify_service_jwt(x_service_token: str = Header(...)) -> None:
-    if x_service_token == settings.INTERNAL_SERVICE_TOKEN:
-        return
+    """Validate internal service JWT. audience must be 'leave-service' or legacy 'internal'."""
     try:
-        jwt.decode(x_service_token, settings.INTERNAL_SERVICE_TOKEN, algorithms=[_ALGORITHM], audience="internal")
+        payload = jwt.decode(
+            x_service_token,
+            settings.INTERNAL_SERVICE_TOKEN,
+            algorithms=[_ALGORITHM],
+            options={"verify_aud": False},
+        )
+        aud = payload.get("aud", "")
+        if aud not in ("leave-service", "internal"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token audience invalid for leave-service")
     except JWTError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid internal token: {exc}")

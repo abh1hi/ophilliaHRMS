@@ -4,16 +4,34 @@ import SlideDrawer from '../ui/SlideDrawer.vue'
 import EmployeeStatusBadge from './EmployeeStatusBadge.vue'
 import AccountStatusBadge from './AccountStatusBadge.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
+import { Button } from '../ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '../ui/tabs'
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
+import { Card, CardContent } from '../ui/card'
+import { Textarea } from '../ui/textarea'
 import {
   sendEmployeeInvite, resendEmployeeInvite, revokeEmployeeInvite,
   disableEmployeeAccount, deleteEmployee,
 } from '../../services/employee.service'
 import type { Employee, SendInviteResponse } from '../../services/employee.service'
 import {
-  PencilIcon, Trash2Icon, MailIcon, RefreshCwIcon, XCircleIcon,
-  ShieldOffIcon, UserIcon, PhoneIcon, BriefcaseIcon, BuildingIcon,
-  BookOpenIcon, HeartPulseIcon, CreditCardIcon, ShieldAlertIcon,
-  BadgeCheckIcon, ClipboardListIcon, CopyIcon, CheckIcon,
+  Pencil, Trash2, Mail, RefreshCw, XCircle,
+  ShieldOff, User, Phone, Briefcase, Building,
+  BookOpen, HeartPulse, CreditCard, ShieldAlert,
+  BadgeCheck, ClipboardList, Copy, Check as CheckIcon,
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -47,15 +65,15 @@ const actionError = ref('')
 // Active section tab
 const activeSection = ref('overview')
 const sections = [
-  { key: 'overview',   label: 'Overview',        icon: UserIcon         },
-  { key: 'job',        label: 'Job & Joining',   icon: BriefcaseIcon    },
-  { key: 'contact',    label: 'Contact',          icon: PhoneIcon        },
-  { key: 'banking',    label: 'Banking',          icon: CreditCardIcon   },
-  { key: 'ids',        label: 'Gov. IDs',         icon: BadgeCheckIcon   },
-  { key: 'emergency',  label: 'Emergency',        icon: ShieldAlertIcon  },
-  { key: 'education',  label: 'Education',        icon: BookOpenIcon     },
-  { key: 'experience', label: 'Experience',       icon: ClipboardListIcon },
-  { key: 'health',     label: 'Health',           icon: HeartPulseIcon   },
+  { key: 'overview',   label: 'Overview',        icon: User         },
+  { key: 'job',        label: 'Job & Joining',   icon: Briefcase    },
+  { key: 'contact',    label: 'Contact',          icon: Phone        },
+  { key: 'banking',    label: 'Banking',          icon: CreditCard   },
+  { key: 'ids',        label: 'Gov. IDs',         icon: BadgeCheck   },
+  { key: 'emergency',  label: 'Emergency',        icon: ShieldAlert  },
+  { key: 'education',  label: 'Education',        icon: BookOpen     },
+  { key: 'experience', label: 'Experience',       icon: ClipboardList },
+  { key: 'health',     label: 'Health',           icon: HeartPulse   },
 ]
 
 watch(() => props.open, (val) => {
@@ -158,251 +176,259 @@ async function copyInviteUrl() {
     @close="emit('close')"
   >
     <template #default>
-      <div v-if="emp" class="space-y-6 -mt-2">
+      <div v-if="emp" class="space-y-8 -mt-2">
 
         <!-- ── Profile header ─────────────────────────────────────── -->
-        <div class="flex items-start gap-5">
-          <!-- Avatar -->
-          <div v-if="emp.staff_photo_url" class="w-20 h-20 rounded-2xl overflow-hidden shrink-0 border border-slate-200">
-            <img :src="emp.staff_photo_url" :alt="fullName(emp)" class="w-full h-full object-cover" />
-          </div>
-          <div v-else class="w-20 h-20 rounded-2xl bg-slate-100 flex items-center justify-center text-2xl font-bold text-slate-500 shrink-0 border border-slate-200">
-            {{ initials(emp) }}
-          </div>
+        <div class="flex flex-col sm:flex-row items-start gap-6">
+          <Avatar class="w-24 h-24 rounded-2xl border border-border shadow-sm">
+            <AvatarImage v-if="emp.staff_photo_url" :src="emp.staff_photo_url" :alt="fullName(emp)" class="object-cover" />
+            <AvatarFallback class="bg-muted text-2xl font-bold text-muted-foreground rounded-2xl">
+              {{ initials(emp) }}
+            </AvatarFallback>
+          </Avatar>
 
-          <div class="flex-1 min-w-0">
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <h2 class="text-xl font-bold text-slate-900 leading-tight">{{ fullName(emp) }}</h2>
-                <p class="text-sm text-slate-500 mt-0.5">{{ fmt(emp.designation) }}</p>
+          <div class="flex-1 min-w-0 w-full">
+            <div class="flex items-start justify-between gap-4">
+              <div class="space-y-1">
+                <h2 class="text-3xl font-bold tracking-tight text-foreground leading-none">{{ fullName(emp) }}</h2>
+                <p class="text-sm font-medium text-muted-foreground">{{ fmt(emp.designation) }}</p>
               </div>
-              <!-- Edit button -->
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 @click="emit('edit', emp)"
-                class="flex items-center gap-1.5 px-3.5 py-1.5 border border-slate-200 rounded-full text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
+                class="rounded-full gap-2 px-4 shadow-sm"
               >
-                <PencilIcon class="w-3.5 h-3.5" /> Edit Profile
-              </button>
+                <Pencil class="w-3.5 h-3.5" /> 
+                <span class="hidden sm:inline">Edit Profile</span>
+                <span class="sm:hidden text-[10px]">Edit</span>
+              </Button>
             </div>
 
             <!-- Badges & meta -->
-            <div class="flex flex-wrap items-center gap-2 mt-3">
-              <span v-if="emp.employee_code" class="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-mono font-semibold">
+            <div class="flex flex-wrap items-center gap-2 mt-4">
+              <span v-if="emp.employee_code" class="px-2.5 py-1 rounded-md bg-muted text-muted-foreground text-[10px] font-mono font-bold">
                 {{ emp.employee_code }}
               </span>
               <EmployeeStatusBadge :status="emp.employment_status" />
               <AccountStatusBadge :status="emp.account_status" :expires-at="emp.invite_expires_at" />
             </div>
 
-            <p class="text-xs text-slate-400 mt-2">{{ fmt(emp.email) }}</p>
+            <p class="text-[11px] font-medium text-muted-foreground/60 mt-2 uppercase tracking-tight">{{ fmt(emp.email) }}</p>
           </div>
         </div>
 
-        <!-- ── Action buttons ─────────────────────────────────────── -->
-        <div class="flex flex-wrap gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-200/70">
-          <p class="w-full text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Account Actions</p>
+        <!-- ── Account Actions Card ─────────────────────────────────────── -->
+        <Card class="bg-muted/30 border-dashed">
+          <CardContent class="p-5">
+            <h4 class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Account Administration</h4>
+            
+            <div class="flex flex-wrap gap-3">
+              <!-- Invites -->
+              <Button
+                v-if="emp.account_status === 'not_registered'"
+                @click="sendInvite(false)"
+                :disabled="inviting"
+                size="sm"
+                class="rounded-full gap-2 bg-blue-600 hover:bg-blue-700"
+              >
+                <Mail class="w-3.5 h-3.5" />
+                {{ inviting ? 'Sending…' : 'Send Invite' }}
+              </Button>
 
-          <!-- Send Invite -->
-          <button
-            v-if="emp.account_status === 'not_registered'"
-            @click="sendInvite(false)"
-            :disabled="inviting"
-            class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            <MailIcon class="w-3.5 h-3.5" />
-            {{ inviting ? 'Sending…' : 'Send Invite' }}
-          </button>
+              <Button
+                v-if="emp.account_status === 'invited'"
+                @click="sendInvite(true)"
+                :disabled="inviting"
+                size="sm"
+                class="rounded-full gap-2 bg-blue-600 hover:bg-blue-700"
+              >
+                <RefreshCw class="w-3.5 h-3.5" :class="inviting ? 'animate-spin' : ''" />
+                {{ inviting ? 'Sending…' : 'Resend Invite' }}
+              </Button>
 
-          <!-- Resend Invite -->
-          <button
-            v-if="emp.account_status === 'invited'"
-            @click="sendInvite(true)"
-            :disabled="inviting"
-            class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            <RefreshCwIcon class="w-3.5 h-3.5" />
-            {{ inviting ? 'Sending…' : 'Resend Invite' }}
-          </button>
+              <Button
+                v-if="emp.account_status === 'invited'"
+                variant="outline"
+                @click="showRevoke = true"
+                size="sm"
+                class="rounded-full gap-2 border-amber-200 text-amber-600 hover:bg-amber-50"
+              >
+                <XCircle class="w-3.5 h-3.5" /> Revoke Invite
+              </Button>
 
-          <!-- Revoke Invite -->
-          <button
-            v-if="emp.account_status === 'invited'"
-            @click="showRevoke = true"
-            class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors"
-          >
-            <XCircleIcon class="w-3.5 h-3.5" /> Revoke Invite
-          </button>
+              <!-- Access Control -->
+              <Button
+                v-if="emp.account_status === 'active'"
+                variant="outline"
+                @click="showDisable = true"
+                size="sm"
+                class="rounded-full gap-2 border-destructive/30 text-destructive hover:bg-destructive/5"
+              >
+                <ShieldOff class="w-3.5 h-3.5" /> Disable Access
+              </Button>
 
-          <!-- Disable Account -->
-          <button
-            v-if="emp.account_status === 'active'"
-            @click="showDisable = true"
-            class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium border border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors"
-          >
-            <ShieldOffIcon class="w-3.5 h-3.5" /> Disable Account
-          </button>
+              <div
+                v-if="emp.account_status === 'suspended'"
+                class="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold text-muted-foreground bg-background border shadow-sm"
+              >
+                <ShieldOff class="w-3.5 h-3.5" /> Account Suspended
+              </div>
 
-          <!-- Suspended label -->
-          <span
-            v-if="emp.account_status === 'suspended'"
-            class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium text-slate-500 bg-white border border-slate-200"
-          >
-            <ShieldOffIcon class="w-3.5 h-3.5" /> Account Suspended
-          </span>
-
-          <!-- Debug: if no status matches -->
-          <span
-            v-if="!['not_registered', 'invited', 'active', 'suspended'].includes(emp.account_status)"
-            class="text-xs text-rose-600"
-          >
-            Account Status: {{ emp.account_status || '(not set)' }}
-          </span>
-
-          <!-- Delete -->
-          <button
-            @click="showDelete = true"
-            class="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium border border-rose-200 text-rose-600 bg-white hover:bg-rose-50 transition-colors ml-auto"
-          >
-            <Trash2Icon class="w-3.5 h-3.5" /> Delete
-          </button>
-
-          <!-- Error -->
-          <p v-if="actionError" class="w-full text-xs text-rose-600 mt-1">{{ actionError }}</p>
-        </div>
-
-        <!-- ── Section Tabs ────────────────────────────────────────── -->
-        <div class="flex flex-wrap gap-1.5 -mb-2">
-          <button
-            v-for="s in sections"
-            :key="s.key"
-            @click="activeSection = s.key"
-            :class="[
-              'flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all',
-              activeSection === s.key
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-            ]"
-          >
-            <component :is="s.icon" class="w-3.5 h-3.5" />
-            {{ s.label }}
-          </button>
-        </div>
-
-        <!-- ── OVERVIEW ────────────────────────────────────────────── -->
-        <div v-if="activeSection === 'overview'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="info-card"><p class="info-label">Full Name</p><p class="info-value">{{ fullName(emp) }}</p></div>
-            <div class="info-card"><p class="info-label">Work Email</p><p class="info-value break-all">{{ fmt(emp.email) }}</p></div>
-            <div class="info-card"><p class="info-label">Gender</p><p class="info-value capitalize">{{ fmt(emp.gender) }}</p></div>
-            <div class="info-card"><p class="info-label">Date of Birth</p><p class="info-value">{{ fmtDate(emp.date_of_birth) }}</p></div>
-            <div class="info-card"><p class="info-label">Phone</p><p class="info-value">{{ fmt(emp.phone) }}</p></div>
-            <div class="info-card"><p class="info-label">Personal Email</p><p class="info-value break-all">{{ fmt(emp.personal_email) }}</p></div>
-            <div class="info-card col-span-2"><p class="info-label">Address</p>
-              <p class="info-value">{{ [emp.door_no, emp.street, emp.village_town, emp.pin_code].filter(Boolean).join(', ') || '—' }}</p>
+              <!-- Delete (Dangerous) -->
+              <Button
+                variant="ghost"
+                @click="showDelete = true"
+                size="sm"
+                class="rounded-full gap-2 text-destructive hover:bg-destructive/10 ml-auto"
+              >
+                <Trash2 class="w-3.5 h-3.5" /> Delete Record
+              </Button>
             </div>
-          </div>
-        </div>
+            
+            <p v-if="actionError" class="text-[10px] text-destructive font-medium mt-3 px-1">{{ actionError }}</p>
+          </CardContent>
+        </Card>
 
-        <!-- ── JOB & JOINING ──────────────────────────────────────── -->
-        <div v-if="activeSection === 'job'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="info-card"><p class="info-label">Date Joined</p><p class="info-value">{{ fmtDate(emp.date_joined) }}</p></div>
-            <div class="info-card"><p class="info-label">Designation</p><p class="info-value">{{ fmt(emp.designation) }}</p></div>
-            <div class="info-card"><p class="info-label">Department</p><p class="info-value">{{ fmt(emp.department) }}</p></div>
-            <div class="info-card"><p class="info-label">Employment Status</p>
-              <EmployeeStatusBadge :status="emp.employment_status" />
-            </div>
-            <div class="info-card"><p class="info-label">Role</p><p class="info-value capitalize">{{ fmt(emp.role) }}</p></div>
-            <div class="info-card"><p class="info-label">Project</p><p class="info-value">{{ fmt(emp.project) }}</p></div>
-            <div class="info-card"><p class="info-label">Joining Salary</p><p class="info-value">{{ fmtCurrency(emp.joining_salary) }}</p></div>
-            <div class="info-card"><p class="info-label">Employee Code</p><p class="info-value font-mono">{{ fmt(emp.employee_code) }}</p></div>
+        <!-- ── Segmented Navigation ────────────────────────────────────────── -->
+        <Tabs v-model="activeSection" class="w-full">
+          <div class="sticky top-0 bg-background/95 backdrop-blur z-20 -mx-6 px-6 pb-2 border-b">
+            <TabsList class="flex w-full justify-start h-auto p-1 bg-muted/50 rounded-lg overflow-x-auto no-scrollbar">
+              <TabsTrigger
+                v-for="s in sections"
+                :key="s.key"
+                :value="s.key"
+                class="gap-1.5 px-4 py-2 text-xs font-semibold rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                <component :is="s.icon" class="w-3 h-3" />
+                {{ s.label }}
+              </TabsTrigger>
+            </TabsList>
           </div>
-        </div>
 
-        <!-- ── CONTACT ─────────────────────────────────────────────── -->
-        <div v-if="activeSection === 'contact'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="info-card"><p class="info-label">Primary Phone</p><p class="info-value">{{ fmt(emp.phone) }}</p></div>
-            <div class="info-card"><p class="info-label">Secondary Phone</p><p class="info-value">{{ fmt(emp.phone_2) }}</p></div>
-            <div class="info-card col-span-2"><p class="info-label">Personal Email</p><p class="info-value break-all">{{ fmt(emp.personal_email) }}</p></div>
-            <div class="info-card"><p class="info-label">Door No.</p><p class="info-value">{{ fmt(emp.door_no) }}</p></div>
-            <div class="info-card"><p class="info-label">Street</p><p class="info-value">{{ fmt(emp.street) }}</p></div>
-            <div class="info-card"><p class="info-label">Village / Town</p><p class="info-value">{{ fmt(emp.village_town) }}</p></div>
-            <div class="info-card"><p class="info-label">PIN Code</p><p class="info-value font-mono">{{ fmt(emp.pin_code) }}</p></div>
-          </div>
-        </div>
+          <div class="mt-8">
+            <!-- OVERVIEW -->
+            <TabsContent value="overview">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="info-item"><p class="info-label">Full Name</p><p class="info-value">{{ fullName(emp) }}</p></div>
+                <div class="info-item"><p class="info-label">Work Email</p><p class="info-value break-all">{{ fmt(emp.email) }}</p></div>
+                <div class="info-item"><p class="info-label">Gender</p><p class="info-value capitalize">{{ fmt(emp.gender) }}</p></div>
+                <div class="info-item"><p class="info-label">Date of Birth</p><p class="info-value">{{ fmtDate(emp.date_of_birth) }}</p></div>
+                <div class="info-item"><p class="info-label">Primary Phone</p><p class="info-value">{{ fmt(emp.phone) }}</p></div>
+                <div class="info-item"><p class="info-label">Personal Email</p><p class="info-value break-all">{{ fmt(emp.personal_email) }}</p></div>
+                <div class="info-item sm:col-span-2">
+                  <p class="info-label">Current Address</p>
+                  <p class="info-value">{{ [emp.door_no, emp.street, emp.village_town, emp.pin_code].filter(Boolean).join(', ') || '—' }}</p>
+                </div>
+              </div>
+            </TabsContent>
 
-        <!-- ── BANKING ─────────────────────────────────────────────── -->
-        <div v-if="activeSection === 'banking'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="info-card col-span-2"><p class="info-label">Bank Name</p><p class="info-value">{{ fmt(emp.bank_name) }}</p></div>
-            <div class="info-card"><p class="info-label">Branch</p><p class="info-value">{{ fmt(emp.bank_branch) }}</p></div>
-            <div class="info-card"><p class="info-label">IFSC Code</p><p class="info-value font-mono">{{ fmt(emp.ifsc_code) }}</p></div>
-            <div class="info-card col-span-2"><p class="info-label">Account Number</p>
-              <p class="info-value font-mono tracking-wider">{{ mask(emp.bank_account_number) }}</p>
-            </div>
-          </div>
-        </div>
+            <!-- JOB & JOINING -->
+            <TabsContent value="job">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="info-item"><p class="info-label">Date Joined</p><p class="info-value">{{ fmtDate(emp.date_joined) }}</p></div>
+                <div class="info-item"><p class="info-label">Designation</p><p class="info-value">{{ fmt(emp.designation) }}</p></div>
+                <div class="info-item"><p class="info-label">Department</p><p class="info-value">{{ fmt(emp.department) }}</p></div>
+                <div class="info-item">
+                  <p class="info-label">Employment Status</p>
+                  <EmployeeStatusBadge :status="emp.employment_status" />
+                </div>
+                <div class="info-item"><p class="info-label">Role Authority</p><p class="info-value capitalize">{{ fmt(emp.role) }}</p></div>
+                <div class="info-item"><p class="info-label">Primary Project</p><p class="info-value">{{ fmt(emp.project) }}</p></div>
+                <div class="info-item"><p class="info-label">Starting Salary</p><p class="info-value">{{ fmtCurrency(emp.joining_salary) }}</p></div>
+                <div class="info-item"><p class="info-label">Internal Code</p><p class="info-value font-mono">{{ fmt(emp.employee_code) }}</p></div>
+              </div>
+            </TabsContent>
 
-        <!-- ── GOVERNMENT IDs ──────────────────────────────────────── -->
-        <div v-if="activeSection === 'ids'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="info-card"><p class="info-label">Aadhaar Number</p><p class="info-value font-mono">{{ mask(emp.aadhaar_number) }}</p></div>
-            <div class="info-card"><p class="info-label">PAN Number</p><p class="info-value font-mono">{{ fmt(emp.pan_number) }}</p></div>
-            <div class="info-card"><p class="info-label">UAN Number</p><p class="info-value font-mono">{{ fmt(emp.uan_number) }}</p></div>
-            <div class="info-card"><p class="info-label">ESI Number</p><p class="info-value font-mono">{{ fmt(emp.esi_number) }}</p></div>
-            <div class="info-card col-span-2"><p class="info-label">Driving License</p><p class="info-value font-mono">{{ fmt(emp.driving_license_number) }}</p></div>
-          </div>
-        </div>
+            <!-- CONTACT -->
+            <TabsContent value="contact">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="info-item"><p class="info-label">Primary Phone</p><p class="info-value">{{ fmt(emp.phone) }}</p></div>
+                <div class="info-item"><p class="info-label">Secondary Phone</p><p class="info-value">{{ fmt(emp.phone_2) }}</p></div>
+                <div class="info-item sm:col-span-2"><p class="info-label">Personal Email</p><p class="info-value break-all">{{ fmt(emp.personal_email) }}</p></div>
+                <div class="info-item"><p class="info-label">Door No.</p><p class="info-value">{{ fmt(emp.door_no) }}</p></div>
+                <div class="info-item"><p class="info-label">Street</p><p class="info-value">{{ fmt(emp.street) }}</p></div>
+                <div class="info-item"><p class="info-label">Village / Town</p><p class="info-value">{{ fmt(emp.village_town) }}</p></div>
+                <div class="info-item"><p class="info-label">PIN Code</p><p class="info-value font-mono">{{ fmt(emp.pin_code) }}</p></div>
+              </div>
+            </TabsContent>
 
-        <!-- ── EMERGENCY ───────────────────────────────────────────── -->
-        <div v-if="activeSection === 'emergency'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="info-card col-span-2"><p class="info-label">Contact Name</p><p class="info-value">{{ fmt(emp.emergency_contact_name) }}</p></div>
-            <div class="info-card"><p class="info-label">Phone</p><p class="info-value">{{ fmt(emp.emergency_contact_number) }}</p></div>
-            <div class="info-card"><p class="info-label">Relation</p><p class="info-value capitalize">{{ fmt(emp.emergency_contact_relation) }}</p></div>
-          </div>
-        </div>
+            <!-- BANKING -->
+            <TabsContent value="banking">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="info-item sm:col-span-2"><p class="info-label">Financial Institution</p><p class="info-value">{{ fmt(emp.bank_name) }}</p></div>
+                <div class="info-item"><p class="info-label">Branch Location</p><p class="info-value">{{ fmt(emp.bank_branch) }}</p></div>
+                <div class="info-item"><p class="info-label">IFSC Routine Code</p><p class="info-value font-mono">{{ fmt(emp.ifsc_code) }}</p></div>
+                <div class="info-item sm:col-span-2">
+                  <p class="info-label">Account Number (Secured)</p>
+                  <p class="info-value font-mono tracking-widest">{{ mask(emp.bank_account_number) }}</p>
+                </div>
+              </div>
+            </TabsContent>
 
-        <!-- ── EDUCATION ───────────────────────────────────────────── -->
-        <div v-if="activeSection === 'education'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="info-card col-span-2"><p class="info-label">Highest Qualification</p><p class="info-value">{{ fmt(emp.highest_qualification) }}</p></div>
-            <div class="info-card col-span-2"><p class="info-label">Institute / University</p><p class="info-value">{{ fmt(emp.institute_name) }}</p></div>
-            <div class="info-card"><p class="info-label">Year of Passing</p><p class="info-value">{{ fmt(emp.year_of_passing) }}</p></div>
-            <div class="info-card"><p class="info-label">Percentage / CGPA</p><p class="info-value">{{ fmt(emp.percentage) }}</p></div>
-          </div>
-        </div>
+            <!-- GOV IDs -->
+            <TabsContent value="ids">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="info-item"><p class="info-label">Aadhaar (Secured)</p><p class="info-value font-mono">{{ mask(emp.aadhaar_number) }}</p></div>
+                <div class="info-item"><p class="info-label">Permanent Account No (PAN)</p><p class="info-value font-mono">{{ fmt(emp.pan_number) }}</p></div>
+                <div class="info-item"><p class="info-label">UAN Registration</p><p class="info-value font-mono">{{ fmt(emp.uan_number) }}</p></div>
+                <div class="info-item"><p class="info-label">ESI Coverage No.</p><p class="info-value font-mono">{{ fmt(emp.esi_number) }}</p></div>
+                <div class="info-item sm:col-span-2"><p class="info-label">Driver License</p><p class="info-value font-mono">{{ fmt(emp.driving_license_number) }}</p></div>
+              </div>
+            </TabsContent>
 
-        <!-- ── EXPERIENCE ──────────────────────────────────────────── -->
-        <div v-if="activeSection === 'experience'" class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="info-card col-span-2"><p class="info-label">Previous Employer</p><p class="info-value">{{ fmt(emp.last_firm_name) }}</p></div>
-            <div class="info-card"><p class="info-label">Last Designation</p><p class="info-value">{{ fmt(emp.last_designation) }}</p></div>
-            <div class="info-card"><p class="info-label">Years of Experience</p><p class="info-value">{{ fmt(emp.years_of_experience) }}</p></div>
-            <div class="info-card"><p class="info-label">Last Drawn Salary</p><p class="info-value">{{ fmtCurrency(emp.last_drawn_salary) }}</p></div>
-            <div class="info-card"><p class="info-label">Referred By</p><p class="info-value">{{ fmt(emp.referred_by) }}</p></div>
-            <div class="info-card col-span-2"><p class="info-label">Reason to Quit</p><p class="info-value">{{ fmt(emp.reason_to_quit) }}</p></div>
-          </div>
-        </div>
+            <!-- EMERGENCY -->
+            <TabsContent value="emergency">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="info-item sm:col-span-2"><p class="info-label">Emergency Contact Name</p><p class="info-value">{{ fmt(emp.emergency_contact_name) }}</p></div>
+                <div class="info-item"><p class="info-label">Contact Phone</p><p class="info-value">{{ fmt(emp.emergency_contact_number) }}</p></div>
+                <div class="info-item"><p class="info-label">Relationship</p><p class="info-value capitalize">{{ fmt(emp.emergency_contact_relation) }}</p></div>
+              </div>
+            </TabsContent>
 
-        <!-- ── HEALTH ──────────────────────────────────────────────── -->
-        <div v-if="activeSection === 'health'" class="space-y-4">
-          <div class="grid grid-cols-1 gap-3">
-            <div class="info-card"><p class="info-label">Health Issues</p><p class="info-value whitespace-pre-line">{{ fmt(emp.health_issues) }}</p></div>
-            <div class="info-card"><p class="info-label">Allergies</p><p class="info-value whitespace-pre-line">{{ fmt(emp.allergies) }}</p></div>
+            <!-- EDUCATION -->
+            <TabsContent value="education">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="info-item sm:col-span-2"><p class="info-label">Highest Credential</p><p class="info-value">{{ fmt(emp.highest_qualification) }}</p></div>
+                <div class="info-item sm:col-span-2"><p class="info-label">Institution / University</p><p class="info-value">{{ fmt(emp.institute_name) }}</p></div>
+                <div class="info-item"><p class="info-label">Passing Year</p><p class="info-value">{{ fmt(emp.year_of_passing) }}</p></div>
+                <div class="info-item"><p class="info-label">Score (Grade/%)</p><p class="info-value">{{ fmt(emp.percentage) }}</p></div>
+              </div>
+            </TabsContent>
+
+            <!-- EXPERIENCE -->
+            <TabsContent value="experience">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="info-item sm:col-span-2"><p class="info-label">Last Organization</p><p class="info-value">{{ fmt(emp.last_firm_name) }}</p></div>
+                <div class="info-item"><p class="info-label">Last Designation</p><p class="info-value">{{ fmt(emp.last_designation) }}</p></div>
+                <div class="info-item"><p class="info-label">Tenure (Years)</p><p class="info-value">{{ fmt(emp.years_of_experience) }}</p></div>
+                <div class="info-item"><p class="info-label">Final Drawn Salary</p><p class="info-value">{{ fmtCurrency(emp.last_drawn_salary) }}</p></div>
+                <div class="info-item"><p class="info-label">Internal Referral</p><p class="info-value">{{ fmt(emp.referred_by) }}</p></div>
+                <div class="info-item sm:col-span-2"><p class="info-label">Transition Context</p><p class="info-value">{{ fmt(emp.reason_to_quit) }}</p></div>
+              </div>
+            </TabsContent>
+
+            <!-- HEALTH -->
+            <TabsContent value="health">
+              <div class="grid grid-cols-1 gap-4">
+                <div class="info-item"><p class="info-label">Known Health Conditions</p><p class="info-value whitespace-pre-line">{{ fmt(emp.health_issues) }}</p></div>
+                <div class="info-item"><p class="info-label">Allergies / Critical Alerts</p><p class="info-value whitespace-pre-line text-destructive font-semibold">{{ fmt(emp.allergies) }}</p></div>
+              </div>
+            </TabsContent>
           </div>
-        </div>
+        </Tabs>
 
         <!-- Timestamps -->
-        <p class="text-[11px] text-slate-300 text-right">
-          Added {{ fmtDate(emp.created_at) }} · Updated {{ fmtDate(emp.updated_at) }}
-        </p>
+        <div class="pt-8 border-t flex justify-between items-center text-[10px] text-muted-foreground/50 italic tracking-tight">
+          <span>Added: {{ fmtDate(emp.created_at) }}</span>
+          <span>Last Synchronized: {{ fmtDate(emp.updated_at) }}</span>
+        </div>
       </div>
 
       <!-- Empty state -->
-      <div v-else class="flex items-center justify-center h-48 text-slate-400 text-sm">
-        No employee selected.
+      <div v-else class="flex flex-col items-center justify-center h-64 text-muted-foreground opacity-50 space-y-2">
+        <User class="w-12 h-12 stroke-[1]" />
+        <p class="text-sm">No profile data currently available</p>
       </div>
     </template>
   </SlideDrawer>
@@ -410,72 +436,75 @@ async function copyInviteUrl() {
   <!-- Confirm Dialogs -->
   <ConfirmDialog
     :open="showRevoke"
-    title="Revoke Invite?"
-    :message="`Cancel the pending invite for ${fullName(emp!)}. They won't be able to use the current invite link.`"
+    title="Revoke Identity Invite?"
+    :message="`This will invalidate the current invitation for ${fullName(emp!)}. Are you sure?`"
     :loading="revoking"
     @confirm="doRevoke"
     @cancel="showRevoke = false"
   />
   <ConfirmDialog
     :open="showDisable"
-    title="Disable Portal Access?"
-    :message="`This will revoke ${fullName(emp!)}'s login access. Their HR record will remain intact.`"
+    title="Disable Platform Access?"
+    :message="`This will immediately revoke login access for ${fullName(emp!)}. Core records will be preserved.`"
     :loading="disabling"
     @confirm="doDisable"
     @cancel="showDisable = false"
   />
   <ConfirmDialog
     :open="showDelete"
-    title="Delete Employee?"
-    :message="`This will permanently delete ${fullName(emp!)} and all associated records. This cannot be undone.`"
+    title="Permanent Deletion"
+    :message="`Deleting ${fullName(emp!)} is irreversible. All attendance, leave, and payroll history will be purged.`"
     :loading="deleting"
-    confirm-label="Delete"
+    confirm-label="Confirm Purge"
     @confirm="doDelete"
     @cancel="showDelete = false"
   />
 
-  <!-- Invite Link Modal -->
-  <div
-    v-if="showInviteModal && inviteResult"
-    class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
-    @click.self="showInviteModal = false"
-  >
-    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 space-y-4">
-      <h3 class="text-base font-semibold text-slate-800">Invite Link Ready</h3>
-      <p class="text-sm text-slate-500">
-        Share this link with <strong>{{ inviteResult.email }}</strong>. Expires on
-        <strong>{{ inviteResult.expires_at ? new Date(inviteResult.expires_at).toLocaleDateString() : '7 days from now' }}</strong>.
-      </p>
-      <textarea
-        readonly
-        :value="inviteResult.invite_url"
-        rows="3"
-        class="w-full text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl p-3 resize-none text-slate-700 focus:outline-none"
-      />
-      <div class="flex justify-end gap-3">
-        <button @click="showInviteModal = false" class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
-          Close
-        </button>
-        <button
-          @click="copyInviteUrl"
-          class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-slate-900 text-white rounded-full hover:bg-slate-700 transition-colors"
-        >
-          <component :is="copySuccess ? CheckIcon : CopyIcon" class="w-4 h-4" />
-          {{ copySuccess ? 'Copied!' : 'Copy Link' }}
-        </button>
+  <!-- Invite Link Modal (Shadcn Dialog) -->
+  <Dialog :open="showInviteModal" @update:open="showInviteModal = $event">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>Invite Securely Generated</DialogTitle>
+        <DialogDescription v-if="inviteResult">
+          Transmit this secure token to <span class="font-bold text-foreground">{{ inviteResult.email }}</span>. 
+          Availability expires on <span class="text-foreground">{{ inviteResult.expires_at ? new Date(inviteResult.expires_at).toLocaleDateString() : '7 days from now' }}</span>.
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div class="mt-4" v-if="inviteResult">
+        <Textarea
+          readonly
+          :value="inviteResult.invite_url"
+          rows="3"
+          class="font-mono text-xs bg-muted resize-none focus-visible:ring-0"
+        />
       </div>
-    </div>
-  </div>
+
+      <DialogFooter class="flex flex-col sm:flex-row justify-end gap-2 mt-4">
+        <Button variant="ghost" @click="showInviteModal = false">
+          Dismiss
+        </Button>
+        <Button @click="copyInviteUrl" class="gap-2 px-6">
+          <CheckIcon v-if="copySuccess" class="w-4 h-4" />
+          <Copy v-else class="w-4 h-4" />
+          {{ copySuccess ? 'Copied Token' : 'Copy Access Link' }}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
-.info-card {
-  @apply bg-slate-50/80 border border-slate-100 rounded-[14px] px-4 py-3;
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.info-item {
+  @apply p-4 rounded-xl border border-transparent bg-muted/30 transition-colors hover:bg-muted/50 select-none;
 }
 .info-label {
-  @apply text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1;
+  @apply text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 opacity-70;
 }
 .info-value {
-  @apply text-sm text-slate-800 font-medium;
+  @apply text-sm font-semibold text-foreground leading-tight;
 }
 </style>

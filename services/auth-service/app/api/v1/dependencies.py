@@ -1,10 +1,11 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 from jose import jwt, JWTError
 
 from app.core.config import settings
-from app.db.session import get_db
+from app.db.session import get_db, get_db_superadmin
 from app.repositories.user_repository import UserRepository
 from app.models.user import User
 from app.core.constants import UserRole
@@ -56,13 +57,70 @@ def require_role(*roles: UserRole):
     return role_checker
 
 
+async def apply_tenant_context(db: AsyncSession, company_id: str) -> None:
+    """Set company_id in both session info dict and PostgreSQL session variable for RLS."""
+    db.info["company_id"] = company_id
+    await db.execute(text("SET LOCAL app.company_id = :cid"), {"cid": company_id})
+
+
+async def get_db_with_tenant(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AsyncSession:
+    """DB session with tenant context set — for all non-super-admin routes."""
+    jwt_company_id = str(current_user.company_id)
+
+    # Cross-check: gateway-injected header must match JWT claim (3-layer isolation)
+    gateway_company_id = request.headers.get("X-Company-ID")
+    if gateway_company_id and gateway_company_id != jwt_company_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant context mismatch")
+
+    await apply_tenant_context(db, jwt_company_id)
+    return db
+
+
+async def get_super_admin_db(
+    _sa: User = Depends(require_role(UserRole.SUPER_ADMIN)),
+    db: AsyncSession = Depends(get_db_superadmin),
+) -> AsyncSession:
+    """DB session using restricted super admin PostgreSQL role — companies + users tables only."""
+    return db
+
+
 def verify_internal_token(request: Request) -> None:
     """Validate the internal service-to-service X-Service-Token header.
 
-    Use as a dependency on internal-only endpoints:
-        @router.patch("/...", dependencies=[Depends(verify_internal_token)])
+    Accepts either a signed JWT (preferred) or the raw secret string (legacy fallback).
+    For JWT tokens: validates signature, 'audience' claim must be 'auth-service',
+    and 'service' claim must identify the calling service.
     """
     token = request.headers.get("X-Service-Token", "")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Missing internal service token",
+        )
+
+    # Try JWT validation first (audience + service identity check)
+    try:
+        payload = jwt.decode(
+            token,
+            settings.INTERNAL_SERVICE_TOKEN,
+            algorithms=["HS256"],
+            audience="auth-service",
+        )
+        service_name = payload.get("service")
+        if not service_name:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Internal token missing service identity claim",
+            )
+        return  # JWT valid
+    except JWTError:
+        pass
+
+    # Legacy fallback: raw shared secret comparison
     if token != settings.INTERNAL_SERVICE_TOKEN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

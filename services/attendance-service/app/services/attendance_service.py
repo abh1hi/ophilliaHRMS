@@ -1,6 +1,4 @@
-import json
 import logging
-from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
 from datetime import date, datetime, timezone, time, timedelta
@@ -10,11 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attendance_record import AttendanceRecord
 from app.models.geofence_location import GeofenceLocation
-from app.models.attendance_policy import AttendancePolicy
 from app.repositories.attendance_repository import AttendanceRepository
 from app.repositories.geofence_repository import GeofenceRepository
 from app.repositories.policy_repository import PolicyRepository
-from app.repositories.policy_exception_repository import PolicyExceptionRepository
 from app.repositories.task_repository import TaskRepository
 from app.schemas.attendance import (
     ClockInRequest,
@@ -36,192 +32,39 @@ from app.schemas.attendance import (
     PerformersResponse,
 )
 from app.events.publisher import EventPublisher
-from app.utils.geofence import is_within_geofence
 from app.core.config import settings
 from app.core.employee_validator import validate_employee_tenant
+from app.services.policy_resolver import PolicyResolver
+from app.services.geofence_validator import GeofenceValidator
+from app.services.overtime_calculator import OvertimeCalculator
+from app.repositories.overtime_policy_repository import OvertimePolicyRepository
+from app.repositories.shift_type_repository import ShiftTypeRepository
+from app.repositories.holiday_calendar_repository import HolidayCalendarRepository
+from app.repositories.geofence_consent_repository import GeofenceConsentRepository
 
 logger = logging.getLogger(__name__)
 
-_POLICY_CACHE_TTL = 300  # seconds
-
-
-@dataclass
-class _CachedGeofence:
-    """Lightweight stand-in for GeofenceLocation when deserializing from Redis."""
-    id: str
-    name: str
-    latitude: float
-    longitude: float
-    radius_meters: int
-
-
-def _serialize_geofence(geofence) -> Optional[dict]:
-    if geofence is None:
-        return None
-    return {
-        "id": str(geofence.id),
-        "name": geofence.name,
-        "latitude": geofence.latitude,
-        "longitude": geofence.longitude,
-        "radius_meters": geofence.radius_meters,
-    }
-
-
-def _deserialize_geofence(data: Optional[dict]) -> Optional[_CachedGeofence]:
-    if data is None:
-        return None
-    return _CachedGeofence(**data)
-
-
-def _parse_time(value: Optional[str]) -> Optional[time]:
-    if not value:
-        return None
-    try:
-        parts = value.split(":")
-        return time(int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 0)
-    except Exception:
-        return None
-
 
 class AttendanceService:
-    """Business logic for attendance: clock-in/out, geofence, overtime."""
+    """Orchestrates clock-in/out, manual entry, and reporting.
+
+    Delegates policy resolution to PolicyResolver, geofence checks to
+    GeofenceValidator, and overtime math to OvertimeCalculator.
+    """
 
     def __init__(self, db: AsyncSession, event_publisher: Optional[EventPublisher] = None):
         self.attendance_repo = AttendanceRepository(db)
         self.geofence_repo = GeofenceRepository(db)
         self.policy_repo = PolicyRepository(db)
-        self.exception_repo = PolicyExceptionRepository(db)
         self.task_repo = TaskRepository(db)
         self.event_publisher = event_publisher
-
-    # ──────────── POLICY RESOLUTION ────────────
-
-    async def _resolve_policy(
-        self, employee_id: UUID, department_id: Optional[UUID] = None
-    ) -> tuple[str, Optional[object], float, Optional[time], int]:
-        """Resolve attendance policy for an employee.
-
-        Checks (in order):
-          1. Redis cache
-          2. Active PolicyException (employee-level temporary override)
-          3. Normal cascade: employee-policy → department-policy → global → defaults
-
-        Returns:
-          (method, geofence, work_hours_per_day, work_start_time, late_grace_period_minutes)
-        """
-        company_id = self.attendance_repo.db.info.get("company_id")
-        cache_key = f"policy:resolve:{company_id}:{employee_id}:{department_id or 'none'}"
-
-        # ── 1. Try Redis cache ──
-        try:
-            from app.core.token_blacklist import _redis
-            if _redis is not None:
-                cached = await _redis.get(cache_key)
-                if cached:
-                    data = json.loads(cached)
-                    return (
-                        data["method"],
-                        _deserialize_geofence(data.get("geofence")),
-                        data["work_hours_per_day"],
-                        _parse_time(data.get("work_start_time")),
-                        data.get("late_grace_period_minutes", 0),
-                    )
-        except Exception:
-            logger.debug("Policy cache read failed — falling back to DB", exc_info=True)
-
-        # ── 2. Active exemption overrides normal policy ──
-        exception = await self.exception_repo.get_active_for_employee(
-            employee_id, date.today()
-        )
-        if exception:
-            geofence = None
-            if exception.override_geofence_id:
-                geofence = await self.geofence_repo.get_by_id(exception.override_geofence_id)
-            method = exception.override_method or "manual"
-            work_hours = exception.override_work_hours or settings.DEFAULT_WORK_HOURS_PER_DAY
-            result = (method, geofence, work_hours, None, 0)
-            await self._cache_policy_result(cache_key, result)
-            return result
-
-        # ── 3. Normal policy cascade ──
-        policy = await self.policy_repo.get_for_employee(employee_id, department_id)
-
-        if policy is None:
-            result = ("manual", None, settings.DEFAULT_WORK_HOURS_PER_DAY, None, 0)
-            await self._cache_policy_result(cache_key, result)
-            return result
-
-        geofence = None
-        if policy.geofence_id:
-            geofence = await self.geofence_repo.get_by_id(policy.geofence_id)
-
-        result = (
-            policy.method,
-            geofence,
-            policy.work_hours_per_day,
-            policy.work_start_time,
-            policy.late_grace_period_minutes,
-        )
-        await self._cache_policy_result(cache_key, result)
-        return result
-
-    async def _cache_policy_result(self, cache_key: str, result: tuple) -> None:
-        """Serialize and store a policy resolution result in Redis."""
-        try:
-            from app.core.token_blacklist import _redis
-            if _redis is None:
-                return
-            method, geofence, work_hours, work_start, grace = result
-            payload = {
-                "method": method,
-                "work_hours_per_day": work_hours,
-                "work_start_time": work_start.isoformat() if work_start else None,
-                "late_grace_period_minutes": grace,
-                "geofence": _serialize_geofence(geofence),
-            }
-            await _redis.set(cache_key, json.dumps(payload), ex=_POLICY_CACHE_TTL)
-        except Exception:
-            logger.debug("Policy cache write failed — continuing", exc_info=True)
-
-    # ──────────── GEOFENCE VALIDATION ────────────
-
-    def _validate_geofence(
-        self,
-        method: str,
-        geofence,
-        lat: Optional[float],
-        lng: Optional[float],
-        accuracy_meters: Optional[float] = None,
-    ) -> None:
-        """Validate location against geofence if required by policy.
-
-        accuracy_meters: GPS accuracy radius reported by the device.
-        When provided, the effective radius is expanded by this amount to
-        prevent false rejections from GPS jitter.
-        """
-        if method in ("geofence", "both"):
-            if lat is None or lng is None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Location (latitude, longitude) is required for geofence-based attendance",
-                )
-            if geofence is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Geofence location not configured. Contact admin.",
-                )
-            effective_radius = geofence.radius_meters + (accuracy_meters or 0.0)
-            is_within, distance = is_within_geofence(
-                lat, lng,
-                geofence.latitude, geofence.longitude,
-                effective_radius,
-            )
-            if not is_within:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"You are {distance:.0f}m away from '{geofence.name}'. "
-                           f"Allowed radius: {geofence.radius_meters}m.",
-                )
+        self._policy_resolver = PolicyResolver(db)
+        self._geofence_validator = GeofenceValidator()
+        self._ot_calculator = OvertimeCalculator()
+        self._ot_policy_repo = OvertimePolicyRepository(db)
+        self._shift_type_repo = ShiftTypeRepository(db)
+        self._holiday_repo = HolidayCalendarRepository(db)
+        self._consent_repo = GeofenceConsentRepository(db)
 
     # ──────────── CLOCK IN (idempotent) ────────────
 
@@ -248,10 +91,11 @@ class AttendanceService:
             await validate_employee_tenant(employee_id, company_id)
 
         # Resolve policy and validate geofence
-        method, geofence, work_hours, work_start, late_grace = await self._resolve_policy(
+        method, geofences, work_hours, work_start, late_grace, _ = await self._policy_resolver.resolve(
             employee_id, department_id
         )
-        self._validate_geofence(method, geofence, data.latitude, data.longitude, data.accuracy_meters)
+        self._geofence_validator.validate(method, geofences, data.latitude, data.longitude, data.accuracy_meters)
+        await self._assert_geofence_consent(employee_id, method)
 
         # ── Locked read: prevent two concurrent clock-ins from racing ──
         existing = await self.attendance_repo.get_by_employee_and_date_for_update(
@@ -343,6 +187,70 @@ class AttendanceService:
         )
         return record
 
+    # ──────────── OVERTIME PARAMS ────────────
+
+    async def _resolve_ot_params(
+        self, employee_id: UUID, department_id: Optional[UUID]
+    ) -> tuple[float, float, bool, float]:
+        """Return (daily_ot_threshold, daily_ot_multiplier, is_holiday, holiday_multiplier).
+
+        Priority for threshold:
+          1. Assigned ShiftType.work_hours_per_day  (shift-aware OT)
+          2. OvertimePolicy.daily_ot_threshold_hours
+          3. Hard default 8.0
+        """
+        ot_policy = await self._ot_policy_repo.get_for_employee(employee_id, department_id=department_id)
+        threshold = ot_policy.daily_ot_threshold_hours if ot_policy else 8.0
+        multiplier = ot_policy.daily_ot_multiplier if ot_policy else 1.0
+        holiday_mult = ot_policy.holiday_multiplier if ot_policy else 2.0
+
+        # Shift-aware: override threshold with actual shift hours when assigned
+        shift = await self._shift_type_repo.get_active_for_employee(employee_id)
+        if shift:
+            threshold = shift.work_hours_per_day
+
+        # Holiday detection: location-aware calendar lookup
+        company_id = self.attendance_repo.db.info.get("company_id")
+        if company_id:
+            from uuid import UUID as _UUID
+            holiday = await self._holiday_repo.get_for_date(
+                _UUID(company_id) if isinstance(company_id, str) else company_id,
+                date.today(),
+            )
+        else:
+            holiday = None
+
+        return threshold, multiplier, holiday is not None, holiday_mult
+
+    async def _assert_geofence_consent(self, employee_id: UUID, method: str) -> None:
+        """Raise HTTP 451 if employee hasn't consented to geofence tracking (GDPR)."""
+        if method not in ("geofence", "both"):
+            return
+        consent = await self._consent_repo.get_for_employee(employee_id)
+        if not consent or not consent.consented:
+            raise HTTPException(
+                status_code=status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS,
+                detail=(
+                    "Geofence-based attendance requires your explicit consent to location tracking. "
+                    "Submit consent at POST /api/v1/attendance/geofence/consent before clocking in."
+                ),
+            )
+
+    # ──────────── NIGHT SHIFT CHECK ────────────
+
+    @staticmethod
+    def _check_night_shift(record: "AttendanceRecord", allow_night_shift: bool) -> None:
+        """Reject clock-out if the shift spans midnight but night shifts are disabled."""
+        now = datetime.now(timezone.utc)
+        if record.clock_in.date() != now.date() and not allow_night_shift:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Night shifts (shifts spanning midnight) are not allowed by your attendance policy. "
+                    "Contact your administrator if this is incorrect."
+                ),
+            )
+
     # ──────────── PRODUCTIVITY SCORE ────────────
 
     @staticmethod
@@ -413,10 +321,11 @@ class AttendanceService:
             )
 
         # Validate geofence on clock-out too
-        method, geofence, work_hours_per_day, _, _ = await self._resolve_policy(
+        method, geofences, work_hours_per_day, _, _, allow_night_shift = await self._policy_resolver.resolve(
             employee_id, department_id
         )
-        self._validate_geofence(method, geofence, data.latitude, data.longitude)
+        self._geofence_validator.validate(method, geofences, data.latitude, data.longitude)
+        self._check_night_shift(record, allow_night_shift)
 
         # Process task completions supplied inline with punch-out FIRST
         if data.task_completions:
@@ -449,16 +358,16 @@ class AttendanceService:
                        "Update all tasks before punching out.",
             )
 
-        # Compute work hours and overtime
+        # Compute work hours, overtime, and half-day/holiday status
         now = datetime.now(timezone.utc)
-        delta = now - record.clock_in
-        total_hours = round(delta.total_seconds() / 3600, 2)
-        overtime = max(0.0, round(total_hours - work_hours_per_day, 2))
-
-        # Detect half-day
-        current_status = record.status
-        if total_hours < (work_hours_per_day / 2):
-            current_status = "half_day"
+        ot_threshold, ot_multiplier, is_holiday, holiday_mult = await self._resolve_ot_params(
+            employee_id, department_id
+        )
+        total_hours, overtime, status_update = self._ot_calculator.compute(
+            record.clock_in, now, work_hours_per_day,
+            ot_threshold, ot_multiplier, is_holiday, holiday_mult,
+        )
+        current_status = status_update if status_update else record.status
 
         # Calculate productivity score
         productivity = self._calculate_productivity_score(
@@ -482,7 +391,7 @@ class AttendanceService:
         record = await self.attendance_repo.update(record, update_data)
         await self.attendance_repo.commit()
 
-        # Publish event (after commit — fire-and-forget)
+        # Publish events (after commit — fire-and-forget)
         if self.event_publisher:
             company_id = self.attendance_repo.db.info.get("company_id")
             await self.event_publisher.publish("attendance.clock_out", {
@@ -494,6 +403,25 @@ class AttendanceService:
                 "productivity_score": productivity,
                 "timestamp": now.isoformat(),
             })
+            if overtime > 0:
+                await self.event_publisher.publish("attendance.overtime_flagged", {
+                    "company_id": str(company_id) if company_id else None,
+                    "employee_id": str(employee_id),
+                    "record_id": str(record.id),
+                    "overtime_hours": overtime,
+                    "timestamp": now.isoformat(),
+                })
+            if overtime > 0 or is_holiday:
+                await self.event_publisher.publish("payroll.adjustment_required", {
+                    "company_id": str(company_id) if company_id else None,
+                    "employee_id": str(employee_id),
+                    "record_id": str(record.id),
+                    "date": str(date.today()),
+                    "adjustment_type": "holiday_work" if is_holiday else "overtime",
+                    "hours": total_hours if is_holiday else overtime,
+                    "multiplier": holiday_mult if is_holiday else ot_multiplier,
+                    "timestamp": now.isoformat(),
+                })
 
         logger.info(
             f"Clock-out: employee={employee_id}, hours={total_hours}, overtime={overtime}, "
@@ -793,8 +721,10 @@ class AttendanceService:
         tasks = await self.task_repo.get_by_record(record_id)
         new_state = record.state
 
-        if record.state == "punched_in" and len(tasks) > 0:
+        first_task_added = record.state == "punched_in" and len(tasks) > 0
+        if first_task_added:
             new_state = "active"
+            await self._flag_late_task_entry(record)
         elif record.state == "pending_tasks" and len(tasks) > 0:
             new_state = "active"
 
@@ -803,6 +733,19 @@ class AttendanceService:
 
         await self.attendance_repo.commit()
         return record
+
+    async def _flag_late_task_entry(self, record: "AttendanceRecord") -> None:
+        """Flag the record if the first task was added past the grace window."""
+        policy = await self.policy_repo.get_for_employee(record.employee_id, None)
+        grace_minutes = policy.task_planning_grace_minutes if policy else 30.0
+        elapsed = (datetime.now(timezone.utc) - record.clock_in).total_seconds() / 60
+        if elapsed > grace_minutes:
+            flag = f" [LATE_TASK_ENTRY: {int(elapsed)}m after clock-in, grace={int(grace_minutes)}m]"
+            await self.attendance_repo.update(record, {"notes": (record.notes or "") + flag})
+            logger.info(
+                f"Late task entry flagged: employee={record.employee_id}, elapsed={elapsed:.1f}m, grace={grace_minutes}m",
+                extra={"user_id": str(record.employee_id), "service_task": "task_grace"},
+            )
 
     # ──────────── CSV TEMPLATE ────────────
 

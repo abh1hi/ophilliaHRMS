@@ -1,132 +1,24 @@
-<template>
-  <Teleport to="body">
-    <Transition name="drawer">
-      <div v-if="open" class="fixed inset-0 z-50 flex justify-end">
-        <div class="absolute inset-0 bg-black/40" @click="emit('close')" />
-        <div class="relative w-full max-w-lg bg-white h-full shadow-xl flex flex-col">
-          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-            <h2 class="text-lg font-semibold text-slate-800">{{ isEdit ? 'Edit Task' : 'New Task' }}</h2>
-            <button @click="emit('close')" class="p-1.5 rounded-lg hover:bg-slate-100">
-              <XIcon class="w-5 h-5 text-slate-500" />
-            </button>
-          </div>
-
-          <form class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-            <!-- Title -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Title <span class="text-red-500">*</span></label>
-              <input
-                v-model="form.title"
-                type="text"
-                required
-                placeholder="Task title"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
-            </div>
-
-            <!-- Description -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
-              <textarea
-                v-model="form.description"
-                rows="3"
-                placeholder="Describe the task…"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none resize-none"
-              />
-            </div>
-
-            <!-- Priority + Status -->
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">Priority</label>
-                <select v-model="form.priority" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none">
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-                <select v-model="form.status" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none">
-                  <option value="todo">To Do</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="blocked">Blocked</option>
-                  <option value="in_review">In Review</option>
-                  <option value="done">Done</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Due date -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Due Date</label>
-              <input
-                v-model="form.due_date"
-                type="datetime-local"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              />
-            </div>
-
-            <!-- Estimated hours -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Estimated Hours</label>
-              <input
-                v-model.number="form.estimated_hours"
-                type="number"
-                min="0"
-                step="0.5"
-                placeholder="e.g. 2.5"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              />
-            </div>
-
-            <!-- Assignees -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Assignees (Employee IDs, comma separated)</label>
-              <input
-                v-model="assigneesRaw"
-                type="text"
-                placeholder="emp-001, emp-002"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              />
-            </div>
-
-            <!-- Tags -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Tags (comma separated)</label>
-              <input
-                v-model="tagsRaw"
-                type="text"
-                placeholder="frontend, bug, sprint-1"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              />
-            </div>
-
-            <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-          </form>
-
-          <div class="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-            <button type="button" @click="emit('close')" class="px-4 py-2 text-sm text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
-              Cancel
-            </button>
-            <button
-              @click="submit"
-              :disabled="saving || !form.title.trim()"
-              class="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-700 disabled:opacity-50"
-            >
-              {{ saving ? 'Saving…' : isEdit ? 'Update' : 'Create' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { XIcon } from 'lucide-vue-next'
+import SlideDrawer from '../ui/SlideDrawer.vue'
+import FormInput from '../ui/FormInput.vue'
+import FormTextarea from '../ui/FormTextarea.vue'
+import FormSelect from '../ui/FormSelect.vue'
+import { Button } from '@/components/ui/button'
+import { 
+  X, 
+  CheckCircle, 
+  Calendar, 
+  Clock, 
+  User, 
+  Tag, 
+  AlertCircle, 
+  Info,
+  Layers,
+  Zap,
+  Target,
+  BarChart3
+} from 'lucide-vue-next'
 import { useTaskStore } from '@/stores/task.store'
 import type { CalendarTask } from '@/services/calendar-tasks.service'
 
@@ -225,9 +117,128 @@ async function submit() {
     saving.value = false
   }
 }
+
+const priorityOptions = [
+  { value: 'low', label: 'Low Intensity' },
+  { value: 'medium', label: 'Medium Priority' },
+  { value: 'high', label: 'High Priority' },
+  { value: 'urgent', label: 'Mission Critical' }
+]
+
+const statusOptions = [
+  { value: 'todo', label: 'Initial Queue' },
+  { value: 'in_progress', label: 'Active Execution' },
+  { value: 'blocked', label: 'Synchronous Block' },
+  { value: 'in_review', label: 'Validation Phase' },
+  { value: 'done', label: 'Finalized' }
+]
 </script>
 
-<style scoped>
-.drawer-enter-active, .drawer-leave-active { transition: opacity 0.25s; }
-.drawer-enter-from, .drawer-leave-to { opacity: 0; }
-</style>
+<template>
+  <SlideDrawer 
+    :open="open" 
+    :title="isEdit ? 'Task Reprogramming' : 'Initialize Task Sequence'" 
+    width="w-full max-w-lg" 
+    @close="emit('close')"
+  >
+    <div class="space-y-8 py-4">
+      <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50 mb-2">
+         <Info class="w-4 h-4 text-indigo-500 mt-0.5" />
+         <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
+           Tasks represent atomic units of work within the workspace engine. Configure priority and resource allotment to optimize the execution flow.
+         </p>
+      </div>
+
+      <FormInput label="Sequence Title" v-model="form.title" required placeholder="Describe the objective..." />
+      <FormTextarea label="Operational Brief" v-model="form.description" placeholder="Specify depth and constraints..." />
+
+      <div class="grid grid-cols-2 gap-6">
+        <FormSelect label="Intensity Protocol" v-model="form.priority" :options="priorityOptions" />
+        <FormSelect label="Execution Status" v-model="form.status" :options="statusOptions" />
+      </div>
+
+      <div class="grid grid-cols-2 gap-6">
+        <div class="space-y-2">
+          <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Temporal Deadline</label>
+          <div class="relative group">
+             <Calendar class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
+             <input
+               v-model="form.due_date"
+               type="datetime-local"
+               class="w-full pl-10 pr-4 py-3 bg-slate-50/50 border border-slate-200/60 text-slate-900 text-sm rounded-2xl outline-none focus:ring-4 focus:ring-slate-900/5 transition-all"
+             />
+          </div>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Resource Hours (EST)</label>
+          <div class="relative group">
+             <Clock class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
+             <input
+               v-model.number="form.estimated_hours"
+               type="number"
+               min="0"
+               step="0.5"
+               placeholder="Hours..."
+               class="w-full pl-10 pr-4 py-3 bg-slate-50/50 border border-slate-200/60 text-slate-900 text-sm rounded-2xl outline-none focus:ring-4 focus:ring-slate-900/5 transition-all"
+             />
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+         <div class="flex items-center gap-2 mb-2">
+            <Zap class="w-4 h-4 text-slate-400" />
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Advanced Parameters</span>
+         </div>
+         
+         <div class="p-6 bg-slate-50/50 rounded-[32px] border border-white/10 space-y-6 relative overflow-hidden">
+            <Layers class="absolute -right-4 -top-4 w-16 h-16 text-slate-900/5 -rotate-12" />
+            
+            <div class="space-y-3">
+               <div class="flex items-center gap-2">
+                  <User class="w-3.5 h-3.5 text-slate-400" />
+                  <label class="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Resource Allotment</label>
+               </div>
+               <input
+                 v-model="assigneesRaw"
+                 type="text"
+                 placeholder="e.g. EMP-001, EMP-088"
+                 class="w-full bg-white border border-slate-200/60 text-slate-900 text-sm rounded-2xl px-4 py-3 outline-none focus:ring-4 focus:ring-slate-900/5 transition-all shadow-sm"
+               />
+            </div>
+
+            <div class="space-y-3">
+               <div class="flex items-center gap-2">
+                  <Tag class="w-3.5 h-3.5 text-slate-400" />
+                  <label class="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Taxonomy Tags</label>
+               </div>
+               <input
+                 v-model="tagsRaw"
+                 type="text"
+                 placeholder="e.g. backend, urgency-l1"
+                 class="w-full bg-white border border-slate-200/60 text-slate-900 text-sm rounded-2xl px-4 py-3 outline-none focus:ring-4 focus:ring-slate-900/5 transition-all shadow-sm"
+               />
+            </div>
+         </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex-1">
+           <p v-if="error" class="text-[10px] font-bold text-destructive uppercase tracking-tight animate-in fade-in">{{ error }}</p>
+        </div>
+        <div class="flex gap-3">
+          <Button variant="outline" @click="emit('close')" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[11px]">Cancel</Button>
+          <Button 
+            @click="submit" 
+            :disabled="saving || !form.title.trim()" 
+            class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
+          >
+            {{ saving ? 'Syncing...' : isEdit ? 'Deploy Update' : 'Initialize Sequence' }}
+          </Button>
+        </div>
+      </div>
+    </template>
+  </SlideDrawer>
+</template>

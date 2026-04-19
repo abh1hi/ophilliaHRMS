@@ -7,7 +7,7 @@ from uuid import UUID
 from app.repositories.user_repository import UserRepository
 from app.repositories.token_repository import TokenRepository
 from app.repositories.magic_token_repository import MagicTokenRepository
-from app.schemas.request_response_models import UserCreate, AdminUserCreate, UserLogin, Token, CompanyCreate
+from app.schemas.request_response_models import UserCreate, AdminUserCreate, UserLogin, Token, CompanyCreate, AdminCreate
 from app.services.email_service import EmailService
 from app.core.security import (
     get_password_hash,
@@ -16,7 +16,7 @@ from app.core.security import (
     create_refresh_token,
 )
 from app.core.config import settings
-from app.core.constants import UserRole, MAX_SUPER_ADMINS, MAX_ADMINS
+from app.core.constants import UserRole, MAX_SUPER_ADMINS
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,70 @@ class AuthService:
         await self.db.commit()
         await self.db.refresh(new_co)
         return new_co
+
+    async def create_company_with_admin(self, company_name: str, company_domain, admin_in: AdminCreate):
+        """Super-admin-only: atomically create a new tenant company and its first (power) admin.
+
+        The created admin has is_company_owner=True, meaning they can invite other admins
+        within their own company.
+        """
+        from app.models.user import Company, User as UserModel
+        from sqlalchemy.future import select
+
+        # Check company name uniqueness
+        res = await self.db.execute(select(Company).filter(Company.name == company_name))
+        if res.scalars().first():
+            raise HTTPException(status_code=400, detail="Company name already registered")
+
+        # Check domain uniqueness
+        if company_domain:
+            res = await self.db.execute(select(Company).filter(Company.domain == company_domain))
+            if res.scalars().first():
+                raise HTTPException(status_code=400, detail="Domain already registered")
+
+        # Check admin email uniqueness
+        existing = await self.user_repository.get_by_email(admin_in.email)
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create company
+        company = Company(name=company_name, domain=company_domain)
+        self.db.add(company)
+        await self.db.flush()  # get company.id without committing
+
+        # Create first admin with is_company_owner=True
+        hashed_password = get_password_hash(admin_in.password)
+        admin_user = UserModel(
+            email=admin_in.email,
+            hashed_password=hashed_password,
+            company_id=company.id,
+            role=UserRole.ADMIN.value,
+            is_company_owner=True,
+            is_active=True,
+        )
+        self.db.add(admin_user)
+
+        # Write audit event to outbox (transactional — same commit)
+        from app.models.outbox import OutboxEvent
+        import json as _json
+        outbox = OutboxEvent(
+            event_type="superadmin.company_created",
+            payload_json=_json.dumps({
+                "company_name": company_name,
+                "admin_email": admin_in.email,
+            }),
+        )
+        self.db.add(outbox)
+
+        await self.db.commit()
+        await self.db.refresh(company)
+        await self.db.refresh(admin_user)
+
+        logger.info(
+            "Super admin provisioned company",
+            extra={"company_id": str(company.id), "admin_email": admin_in.email},
+        )
+        return company, admin_user
 
     async def list_companies(self) -> list:
         from app.models.user import Company
@@ -79,6 +143,8 @@ class AuthService:
                 if dup.scalars().first():
                     raise HTTPException(status_code=400, detail="Domain already registered")
             company.domain = data.domain
+        if data.is_active is not None:
+            company.is_active = data.is_active
 
         self.db.add(company)
         await self.db.commit()
@@ -152,29 +218,37 @@ class AuthService:
         # Resolve target role
         target_role = user_in.role.value if isinstance(user_in.role, UserRole) else user_in.role
 
-        # Admin actors can only create employee/hr/manager — not admin or super_admin
-        if acting_admin.role == UserRole.ADMIN.value:
-            if target_role in (UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value):
+        # Role creation guards
+        if target_role == UserRole.SUPER_ADMIN.value:
+            # Only the system can create super_admin (via bootstrap) — not via this endpoint
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="super_admin cannot be created via this endpoint",
+            )
+
+        if target_role == UserRole.ADMIN.value:
+            # Only super_admin OR a company-owner admin can create other admins
+            if acting_admin.role == UserRole.ADMIN.value and not getattr(acting_admin, "is_company_owner", False):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Admin cannot create admin or super_admin accounts",
+                    detail="Only the company owner admin can create other admin accounts",
                 )
 
-        # Enforce system-wide role limits
+        # Non-admin actors cannot create admins (hr, manager, employee cannot create admins)
+        if acting_admin.role not in (UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value):
+            if target_role == UserRole.ADMIN.value:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions to create admin accounts",
+                )
+
+        # Enforce super_admin count limit at DB level (trigger also catches this)
         if target_role == UserRole.SUPER_ADMIN.value:
             count = await self.user_repository.count_active_by_role(UserRole.SUPER_ADMIN.value)
             if count >= MAX_SUPER_ADMINS:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Maximum of {MAX_SUPER_ADMINS} super_admin account(s) allowed",
-                )
-
-        if target_role == UserRole.ADMIN.value:
-            count = await self.user_repository.count_active_by_role(UserRole.ADMIN.value)
-            if count >= MAX_ADMINS:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Maximum of {MAX_ADMINS} admin account(s) allowed",
                 )
 
         # Enforce tenant isolation: admin can only create users in their own company

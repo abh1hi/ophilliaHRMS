@@ -8,18 +8,24 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.db.base import Base
-from app.models.attendance_record import AttendanceRecord    # noqa: F401
-from app.models.geofence_location import GeofenceLocation    # noqa: F401
-from app.models.attendance_policy import AttendancePolicy     # noqa: F401
-from app.models.policy_audit_log import PolicyAuditLog        # noqa: F401
-from app.models.policy_template import PolicyTemplate         # noqa: F401
-from app.models.policy_exception import PolicyException           # noqa: F401
-from app.models.shift_schedule import ShiftSchedule               # noqa: F401
+from app.models.attendance_record import AttendanceRecord              # noqa: F401
+from app.models.geofence_location import GeofenceLocation              # noqa: F401
+from app.models.attendance_policy import AttendancePolicy              # noqa: F401
+from app.models.policy_geofence import PolicyGeofence                  # noqa: F401
+from app.models.policy_audit_log import PolicyAuditLog                 # noqa: F401
+from app.models.policy_template import PolicyTemplate                  # noqa: F401
+from app.models.policy_exception import PolicyException                # noqa: F401
+from app.models.overtime_policy import OvertimePolicy, OvertimePolicyAudit  # noqa: F401
+from app.models.shift_type import ShiftType                            # noqa: F401
+from app.models.holiday_calendar import HolidayCalendar, Holiday       # noqa: F401
+from app.models.geofence_consent import GeofenceConsent                # noqa: F401
+from app.models.shift_schedule import ShiftSchedule                    # noqa: F401
 from app.models.shift_schedule_assignment import ShiftScheduleAssignment  # noqa: F401
-from app.models.shift_assignment import ShiftAssignment           # noqa: F401
-from app.models.shift_request import ShiftRequest                 # noqa: F401
-from app.models.employee_checkin import EmployeeCheckin           # noqa: F401
-from app.models.attendance_request import AttendanceRequest        # noqa: F401
+from app.models.shift_assignment import ShiftAssignment                # noqa: F401
+from app.models.shift_request import ShiftRequest                      # noqa: F401
+from app.models.employee_checkin import EmployeeCheckin                # noqa: F401
+from app.models.attendance_request import AttendanceRequest            # noqa: F401
+from app.models.overtime_request import OvertimeRequest                # noqa: F401
 from app.core.config import settings
 
 config = context.config

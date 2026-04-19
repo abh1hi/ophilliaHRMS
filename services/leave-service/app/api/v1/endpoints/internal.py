@@ -43,13 +43,13 @@ class HolidayInternalResponse(BaseModel):
     response_model=List[HolidayInternalResponse],
     dependencies=[Depends(_verify_internal_token)],
 )
-async def list_all_holidays(year: Optional[int] = None):
-    """Return all active holidays across all companies for a given year.
+async def list_all_holidays(company_id: UUID, year: Optional[int] = None):
+    """Return active holidays for a specific company.
 
-    Used by calendar-service holiday sync scheduler.
+    company_id is required — prevents cross-tenant holiday data leakage.
     """
     async with AsyncSessionLocal() as db:
-        query = select(Holiday).where(Holiday.is_active == 1)
+        query = select(Holiday).where(Holiday.is_active == 1, Holiday.company_id == company_id)
         if year:
             query = query.where(
                 Holiday.date >= date(year, 1, 1),

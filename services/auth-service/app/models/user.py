@@ -32,6 +32,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=True)  # nullable for magic-link-only accounts
     role = Column(String, nullable=False, default=UserRole.EMPLOYEE.value, index=True)
+    is_company_owner = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)
     updated_at = Column(

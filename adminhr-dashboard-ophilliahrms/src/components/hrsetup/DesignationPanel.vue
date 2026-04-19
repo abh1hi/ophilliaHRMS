@@ -6,26 +6,51 @@ import SlideDrawer from '../ui/SlideDrawer.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import FormInput from '../ui/FormInput.vue'
 import FormTextarea from '../ui/FormTextarea.vue'
-import { PencilIcon, Trash2Icon, XIcon } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Pencil, Trash2, X, Briefcase } from 'lucide-vue-next'
 import { listDesignations, createDesignation, updateDesignation, deleteDesignation } from '../../services/designation.service'
 import type { Designation } from '../../services/designation.service'
 
-const rows = ref<Designation[]>([]); const loading = ref(false)
-const drawerOpen = ref(false); const form = ref<Partial<Designation>>({})
-const selected = ref<Designation | null>(null); const deleteTarget = ref<Designation | null>(null)
-const saving = ref(false); const deleting = ref(false); const errorMsg = ref('')
+const rows       = ref<Designation[]>([])
+const loading    = ref(false)
+const drawerOpen = ref(false)
+const form       = ref<Partial<Designation>>({})
+const selected   = ref<Designation | null>(null)
+const deleteTarget = ref<Designation | null>(null)
+const saving     = ref(false)
+const deleting   = ref(false)
+const errorMsg   = ref('')
 const skillInput = ref('')
 
 const columns = [
-  { key: 'name',        label: 'Designation'    },
-  { key: 'description', label: 'Description'   },
+  { key: 'name',        label: 'Designation'  },
+  { key: 'description', label: 'Description'  },
 ]
 
-async function load() { loading.value = true; try { rows.value = await listDesignations() } catch {} finally { loading.value = false } }
+async function load() {
+  loading.value = true
+  try { rows.value = await listDesignations() }
+  catch (e) { console.error(e) }
+  finally { loading.value = false }
+}
 onMounted(load)
 
-function openCreate() { selected.value = null; form.value = { required_skills: [] }; skillInput.value = ''; errorMsg.value = ''; drawerOpen.value = true }
-function openEdit(row: Designation) { selected.value = row; form.value = { ...row, required_skills: [...(row.required_skills ?? [])] }; skillInput.value = ''; errorMsg.value = ''; drawerOpen.value = true }
+function openCreate() {
+  selected.value = null
+  form.value = { required_skills: [] }
+  skillInput.value = ''
+  errorMsg.value = ''
+  drawerOpen.value = true
+}
+
+function openEdit(row: Designation) {
+  selected.value = row
+  form.value = { ...row, required_skills: [...(row.required_skills ?? [])] }
+  skillInput.value = ''
+  errorMsg.value = ''
+  drawerOpen.value = true
+}
 
 function addSkill() {
   const s = skillInput.value.trim()
@@ -39,68 +64,142 @@ function removeSkill(i: number) {
 }
 
 async function save() {
+  if (!form.value.name?.trim()) { errorMsg.value = 'Designation name is required.'; return }
   saving.value = true; errorMsg.value = ''
-  try { if (selected.value) await updateDesignation(selected.value.id, form.value); else await createDesignation(form.value); drawerOpen.value = false; load() }
-  catch (e: any) { errorMsg.value = e.message } finally { saving.value = false }
+  try {
+    if (selected.value) await updateDesignation(selected.value.id, form.value)
+    else await createDesignation(form.value)
+    drawerOpen.value = false; load()
+  } catch (e: any) { errorMsg.value = e.message }
+  finally { saving.value = false }
 }
+
 async function confirmDelete() {
-  if (!deleteTarget.value) return; deleting.value = true
-  try { await deleteDesignation(deleteTarget.value.id); deleteTarget.value = null; load() } catch {} finally { deleting.value = false }
+  if (!deleteTarget.value) return
+  deleting.value = true
+  try { await deleteDesignation(deleteTarget.value.id); deleteTarget.value = null; load() }
+  catch (e) { console.error(e) }
+  finally { deleting.value = false }
 }
 </script>
 
 <template>
   <div class="space-y-6">
-    <PageHeader title="Designations" subtitle="Define job titles and required skills" action-label="+ New Designation" @action="openCreate" />
-    <DataTable :columns="columns" :rows="rows" :loading="loading" :searchable="true" empty-text="No designations yet.">
+    <PageHeader
+      title="Designations"
+      subtitle="Define job titles, roles, and required skills for your organization"
+      action-label="Add Designation"
+      @action="openCreate"
+    />
+
+    <DataTable
+      :columns="columns"
+      :rows="rows"
+      :loading="loading"
+      :searchable="true"
+      empty-text="No designations found. Add your first designation to get started."
+    >
+      <template #cell-name="{ value }">
+        <div class="flex items-center gap-3">
+          <div class="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+            <Briefcase class="w-4 h-4 text-slate-500" />
+          </div>
+          <span class="font-medium text-slate-900">{{ value }}</span>
+        </div>
+      </template>
+
+      <template #cell-description="{ value }">
+        <span class="text-sm text-slate-500 line-clamp-1 max-w-sm">{{ value || '—' }}</span>
+      </template>
+
       <template #actions="{ row }">
-        <div class="flex items-center justify-end space-x-2">
-          <button @click="openEdit(row)" class="p-2 rounded-[10px] hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"><PencilIcon class="w-4 h-4" /></button>
-          <button @click="deleteTarget = row" class="p-2 rounded-[10px] hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"><Trash2Icon class="w-4 h-4" /></button>
+        <div class="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="icon" @click="openEdit(row)" class="h-8 w-8 text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+            <Pencil class="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" @click="deleteTarget = row" class="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-red-50">
+            <Trash2 class="w-3.5 h-3.5" />
+          </Button>
         </div>
       </template>
     </DataTable>
 
-    <SlideDrawer :open="drawerOpen" :title="selected ? 'Edit Designation' : 'New Designation'" width="w-full max-w-lg" @close="drawerOpen = false">
-      <div class="space-y-5">
-        <FormInput label="Designation Name" :modelValue="form.name" @update:modelValue="form.name = $event" required />
-        <FormTextarea label="Description" :modelValue="form.description" @update:modelValue="form.description = $event" />
+    <!-- Create / Edit drawer -->
+    <SlideDrawer
+      :open="drawerOpen"
+      :title="selected ? 'Edit Designation' : 'Add Designation'"
+      width="w-full max-w-lg"
+      @close="drawerOpen = false"
+    >
+      <div class="space-y-5 py-2">
+        <p class="text-sm text-slate-500">
+          {{ selected ? 'Update the designation details below.' : 'Create a new job title or role for your organization.' }}
+        </p>
+
+        <FormInput
+          label="Designation Name"
+          v-model="form.name"
+          required
+          placeholder="e.g. Software Engineer, HR Manager"
+        />
+
+        <FormTextarea
+          label="Description"
+          v-model="form.description"
+          placeholder="Briefly describe the responsibilities of this role (optional)"
+        />
 
         <!-- Required Skills -->
-        <div class="space-y-2">
-          <label class="block text-sm font-semibold text-slate-700">Required Skills</label>
+        <div class="space-y-3">
+          <label class="block text-sm font-medium text-slate-700">Required Skills</label>
           <div class="flex gap-2">
             <input
               v-model="skillInput"
               @keydown.enter.prevent="addSkill"
               type="text"
-              placeholder="Type a skill and press Enter"
-              class="flex-1 bg-slate-50/50 border border-slate-200/60 text-slate-900 text-sm rounded-[12px] px-3 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/10"
+              placeholder="Type a skill and press Enter or click Add"
+              class="flex-1 border border-slate-200 bg-white text-slate-900 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
             />
-            <button @click="addSkill" type="button" class="px-4 py-2.5 bg-slate-900 text-white text-sm rounded-[12px] hover:bg-slate-800 transition-colors font-medium">Add</button>
+            <Button @click="addSkill" type="button" variant="outline" class="shrink-0">Add</Button>
           </div>
-          <div v-if="form.required_skills?.length" class="flex flex-wrap gap-2 pt-1">
-            <span
+
+          <div v-if="form.required_skills?.length" class="flex flex-wrap gap-2">
+            <Badge
               v-for="(skill, i) in form.required_skills"
               :key="i"
-              class="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-full"
+              variant="secondary"
+              class="flex items-center gap-1.5 px-3 py-1 text-sm"
             >
               {{ skill }}
-              <button @click="removeSkill(i)" class="text-slate-400 hover:text-rose-500 transition-colors"><XIcon class="w-3 h-3" /></button>
-            </span>
+              <button @click="removeSkill(i)" class="text-slate-400 hover:text-destructive transition-colors ml-1">
+                <X class="w-3 h-3" />
+              </button>
+            </Badge>
           </div>
+          <p v-else class="text-xs text-slate-400">No skills added yet.</p>
         </div>
       </div>
+
       <template #footer>
-        <div class="flex items-center justify-between">
-          <p v-if="errorMsg" class="text-sm text-rose-600">{{ errorMsg }}</p><div v-else></div>
-          <div class="flex space-x-3">
-            <button @click="drawerOpen = false" class="px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-medium text-sm transition-colors">Cancel</button>
-            <button @click="save" :disabled="saving" class="px-6 py-2.5 bg-slate-900 text-white rounded-full font-medium text-sm hover:bg-slate-800 transition-all disabled:opacity-60">{{ saving ? 'Saving...' : 'Save' }}</button>
+        <div class="flex items-center justify-between gap-3">
+          <p v-if="errorMsg" class="text-sm text-destructive">{{ errorMsg }}</p>
+          <div class="flex gap-2 ml-auto">
+            <Button variant="outline" @click="drawerOpen = false">Cancel</Button>
+            <Button @click="save" :disabled="saving">
+              {{ saving ? 'Saving…' : selected ? 'Save Changes' : 'Add Designation' }}
+            </Button>
           </div>
         </div>
       </template>
     </SlideDrawer>
-    <ConfirmDialog :open="!!deleteTarget" title="Delete Designation?" :message="`Delete '${deleteTarget?.name}'?`" :loading="deleting" @confirm="confirmDelete" @cancel="deleteTarget = null" />
+
+    <ConfirmDialog
+      :open="!!deleteTarget"
+      title="Delete Designation?"
+      :message="`Are you sure you want to delete the designation '${deleteTarget?.name}'? This action cannot be undone.`"
+      :loading="deleting"
+      @confirm="confirmDelete"
+      @cancel="deleteTarget = null"
+    />
   </div>
 </template>

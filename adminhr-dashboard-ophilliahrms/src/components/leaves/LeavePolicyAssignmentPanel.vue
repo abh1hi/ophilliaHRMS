@@ -5,7 +5,8 @@ import DataTable from '../ui/DataTable.vue'
 import SlideDrawer from '../ui/SlideDrawer.vue'
 import FormInput from '../ui/FormInput.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
-import { XCircleIcon } from 'lucide-vue-next'
+import { Button } from '../ui/button'
+import { CircleX } from 'lucide-vue-next'
 import { listLeavePolicyAssignments, assignLeavePolicy, cancelLeavePolicyAssignment } from '../../services/leave-policy.service'
 import type { LeavePolicyAssignment } from '../../services/leave-policy.service'
 
@@ -49,31 +50,57 @@ async function confirmCancel() {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <PageHeader title="Policy Assignments" subtitle="Assign leave policies to employees" action-label="+ Assign Policy" @action="openCreate" />
+  <div class="space-y-8">
+    <PageHeader 
+      title="Policy Assignments" 
+      subtitle="Assign leave policies to employees" 
+      action-label="Assign Policy" 
+      @action="openCreate" 
+    />
+    
     <DataTable :columns="columns" :rows="rows" :loading="loading" :searchable="true" empty-text="No assignments yet.">
       <template #cell-status="{ value }">
-        <span :class="value === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'" class="px-2 py-0.5 rounded-full text-xs font-medium capitalize">{{ value }}</span>
+        <span 
+          :class="value === 'active' ? 'bg-emerald-100/50 text-emerald-700 border-emerald-200/50' : 'bg-slate-100/50 text-slate-500 border-slate-200/50'" 
+          class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm"
+        >
+          {{ value }}
+        </span>
       </template>
       <template #actions="{ row }">
-        <button v-if="row.status === 'active'" @click="cancelTarget = row" class="p-2 rounded-[10px] hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"><XCircleIcon class="w-4 h-4" /></button>
+        <Button 
+          v-if="row.status === 'active'" 
+          variant="ghost" 
+          size="icon" 
+          @click="cancelTarget = row" 
+          class="h-8 w-8 rounded-lg hover:bg-destructive/10 text-slate-400 hover:text-destructive"
+        >
+          <CircleX class="w-4 h-4" />
+        </Button>
       </template>
     </DataTable>
 
     <SlideDrawer :open="drawerOpen" title="Assign Leave Policy" width="w-full max-w-lg" @close="drawerOpen = false">
-      <div class="space-y-5">
-        <FormInput label="Employee ID" :modelValue="form.employee_id" @update:modelValue="form.employee_id = $event" required />
-        <FormInput label="Policy ID" :modelValue="form.policy_id" @update:modelValue="form.policy_id = $event" required />
-        <FormInput label="Leave Period ID" :modelValue="form.leave_period_id" @update:modelValue="form.leave_period_id = $event" />
-        <FormInput label="Effective From" type="date" :modelValue="form.effective_from" @update:modelValue="form.effective_from = $event" />
-        <FormInput label="Effective To" type="date" :modelValue="form.effective_to" @update:modelValue="form.effective_to = $event" />
+      <div class="space-y-6">
+        <div class="grid grid-cols-2 gap-4">
+          <FormInput label="Employee ID" :modelValue="form.employee_id" @update:modelValue="form.employee_id = $event" placeholder="e.g. EMP001" required />
+          <FormInput label="Policy ID" :modelValue="form.policy_id" @update:modelValue="form.policy_id = $event" placeholder="e.g. LP001" required />
+        </div>
+        <FormInput label="Leave Period ID" :modelValue="form.leave_period_id" @update:modelValue="form.leave_period_id = $event" placeholder="e.g. FY24" />
+        <div class="grid grid-cols-2 gap-4">
+          <FormInput label="Effective From" type="date" :modelValue="form.effective_from" @update:modelValue="form.effective_from = $event" />
+          <FormInput label="Effective To" type="date" :modelValue="form.effective_to" @update:modelValue="form.effective_to = $event" />
+        </div>
       </div>
       <template #footer>
-        <div class="flex items-center justify-between">
-          <p v-if="errorMsg" class="text-sm text-rose-600">{{ errorMsg }}</p><div v-else></div>
-          <div class="flex space-x-3">
-            <button @click="drawerOpen = false" class="px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-medium text-sm transition-colors">Cancel</button>
-            <button @click="save" :disabled="saving" class="px-6 py-2.5 bg-slate-900 text-white rounded-full font-medium text-sm hover:bg-slate-800 transition-all disabled:opacity-60">{{ saving ? 'Saving...' : 'Assign' }}</button>
+        <div class="flex items-center justify-between w-full">
+          <p v-if="errorMsg" class="text-xs text-destructive font-medium">{{ errorMsg }}</p>
+          <div v-else></div>
+          <div class="flex items-center gap-3">
+            <Button variant="outline" @click="drawerOpen = false" class="rounded-full px-6">Cancel</Button>
+            <Button @click="save" :disabled="saving" class="rounded-full px-8 bg-slate-900 text-white hover:bg-slate-800">
+              {{ saving ? 'Saving...' : 'Assign Policy' }}
+            </Button>
           </div>
         </div>
       </template>

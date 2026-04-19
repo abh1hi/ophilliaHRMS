@@ -35,3 +35,10 @@ class UserRole(str, Enum):
     HR = "hr"
     MANAGER = "manager"
     EMPLOYEE = "employee"
+
+
+class ComplianceProfile(str, Enum):
+    """Pre-built overtime compliance profiles."""
+    INDIA_FACTORIES_ACT = "INDIA_FACTORIES_ACT"
+    EU_WTD_48H = "EU_WTD_48H"
+    CUSTOM = "CUSTOM"

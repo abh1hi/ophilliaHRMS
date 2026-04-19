@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Card, CardContent } from './card'
+
 defineProps<{
   class?: string
   noPadding?: boolean
@@ -6,13 +8,9 @@ defineProps<{
 </script>
 
 <template>
-  <div
-    :class="[
-      'bg-white/70 backdrop-blur-md border border-slate-200/60 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] rounded-[24px] relative overflow-hidden',
-      noPadding ? '' : 'p-8',
-      $props.class
-    ]"
-  >
-    <slot />
-  </div>
+  <Card :class="['overflow-hidden', $props.class]">
+    <CardContent :class="[noPadding ? 'p-0' : 'p-6 sm:p-8']">
+      <slot />
+    </CardContent>
+  </Card>
 </template>

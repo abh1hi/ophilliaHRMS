@@ -11,7 +11,9 @@ from app.core.security import get_current_user, require_role, TokenPayload
 from app.api.v1.dependencies import get_db_with_tenant
 from app.core.constants import UserRole
 from app.services.attendance_service import AttendanceService, GeofenceService
-from app.services.policy_service import PolicyService, PolicyTemplateService, PolicyExceptionService
+from app.services.policy_service import PolicyService
+from app.services.policy_template_service import PolicyTemplateService
+from app.services.policy_exception_service import PolicyExceptionService
 from app.services.task_service import TaskService
 from app.schemas.attendance import (
     ClockInRequest,

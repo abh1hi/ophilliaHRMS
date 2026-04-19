@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str = "auth_db"
     DATABASE_URL: str
+    SUPERADMIN_DATABASE_URL: str = ""  # Restricted role for super admin — same host, limited table access
 
     # Security — keys are required, must be supplied via env (no hardcoded defaults)
     JWT_PRIVATE_KEY: str

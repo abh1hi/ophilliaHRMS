@@ -44,12 +44,6 @@ export const authApi = {
   getProfile: () => apiFetch<any>('/auth/profile'),
 }
 
-export const companyApi = {
-  getCompanies: () => apiFetch<any[]>('/auth/companies'),
-  getStats: (companyId: string | number) => apiFetch<any>(`/auth/companies/${companyId}/stats`),
-  getRecentActivity: (companyId: string | number) => apiFetch<any[]>(`/auth/companies/${companyId}/activity`),
-}
-
 export const employeeApi = {
   getEmployees: (params: Record<string, string> = {}) => {
     const query = new URLSearchParams(params).toString()

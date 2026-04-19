@@ -1,103 +1,23 @@
-<template>
-  <Teleport to="body">
-    <Transition name="drawer">
-      <div v-if="open" class="fixed inset-0 z-50 flex justify-end">
-        <div class="absolute inset-0 bg-black/40" @click="emit('close')" />
-        <div class="relative w-full max-w-md bg-white h-full shadow-xl flex flex-col">
-          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-            <h2 class="text-lg font-semibold text-slate-800">
-              {{ isEdit ? 'Edit Calendar' : 'New Calendar' }}
-            </h2>
-            <button @click="emit('close')" class="p-1.5 rounded-lg hover:bg-slate-100">
-              <XIcon class="w-5 h-5 text-slate-500" />
-            </button>
-          </div>
-
-          <form @submit.prevent="submit" class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Name <span class="text-red-500">*</span></label>
-              <input
-                v-model="form.name"
-                type="text"
-                required
-                maxlength="200"
-                placeholder="Calendar name"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
-              <textarea
-                v-model="form.description"
-                rows="2"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Type</label>
-              <select
-                v-model="form.calendar_type"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-              >
-                <option value="personal">Personal</option>
-                <option value="team">Team</option>
-                <option value="company">Company-wide</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Color</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="c in colors"
-                  :key="c"
-                  type="button"
-                  @click="form.color = c"
-                  :style="{ backgroundColor: c }"
-                  :class="[
-                    'w-8 h-8 rounded-full border-2 transition-all',
-                    form.color === c ? 'border-slate-900 scale-110' : 'border-transparent',
-                  ]"
-                />
-              </div>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <input
-                v-model="form.is_public"
-                type="checkbox"
-                id="cal-public"
-                class="rounded border-slate-300"
-              />
-              <label for="cal-public" class="text-sm text-slate-700">Make this calendar publicly viewable (via share link)</label>
-            </div>
-
-            <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-          </form>
-
-          <div class="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-            <button type="button" @click="emit('close')" class="px-4 py-2 text-sm text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
-              Cancel
-            </button>
-            <button
-              @click="submit"
-              :disabled="saving || !form.name.trim()"
-              class="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-700 disabled:opacity-50"
-            >
-              {{ saving ? 'Saving…' : isEdit ? 'Update' : 'Create' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { XIcon } from 'lucide-vue-next'
+import SlideDrawer from '../ui/SlideDrawer.vue'
+import FormInput from '../ui/FormInput.vue'
+import FormTextarea from '../ui/FormTextarea.vue'
+import FormSelect from '../ui/FormSelect.vue'
+import { Button } from '@/components/ui/button'
+import { 
+  X, 
+  Calendar, 
+  Globe, 
+  Palette, 
+  Info, 
+  Lock, 
+  Unlock, 
+  Layers, 
+  Activity,
+  Zap,
+  Check
+} from 'lucide-vue-next'
 import { useCalendarStore } from '@/stores/calendar.store'
 import type { CalendarItem } from '@/services/calendar-events.service'
 
@@ -175,9 +95,92 @@ async function submit() {
     saving.value = false
   }
 }
+
+const typeOptions = [
+  { value: 'personal', label: 'Individual Focus' },
+  { value: 'team', label: 'Collective Sync' },
+  { value: 'company', label: 'Global Topology' }
+]
 </script>
 
-<style scoped>
-.drawer-enter-active, .drawer-leave-active { transition: opacity 0.25s; }
-.drawer-enter-from, .drawer-leave-to { opacity: 0; }
-</style>
+<template>
+  <SlideDrawer 
+    :open="open" 
+    :title="isEdit ? 'Recalibrate Temporal Node' : 'Initialize Temporal Axis'" 
+    width="w-full max-w-md" 
+    @close="emit('close')"
+  >
+    <div class="space-y-8 py-4">
+      <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50 mb-2">
+         <Info class="w-4 h-4 text-indigo-500 mt-0.5" />
+         <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
+           Calendars serve as temporal containers for event orchestration. Selection of type and visibility calibration defines the reach of this temporal instance.
+         </p>
+      </div>
+
+      <FormInput label="Node Identity" v-model="form.name" required maxlength="200" placeholder="e.g. Sprint Cadence Beta" />
+      <FormTextarea label="Operational Brief" v-model="form.description" placeholder="Specify depth and temporal constraints..." />
+      <FormSelect label="Topology Type" v-model="form.calendar_type" :options="typeOptions" />
+
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 mb-2">
+           <Palette class="w-4 h-4 text-slate-400" />
+           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Aesthetic Focus</span>
+        </div>
+        <div class="p-6 bg-slate-50/50 rounded-[32px] border border-white/10 flex flex-wrap gap-3">
+          <button
+            v-for="c in colors"
+            :key="c"
+            type="button"
+            @click="form.color = c"
+            :style="{ backgroundColor: c }"
+            class="w-8 h-8 rounded-full border-2 transition-all duration-300 relative group"
+            :class="[
+              form.color === c ? 'border-slate-900 scale-125' : 'border-white/40 hover:scale-110 shadow-sm',
+            ]"
+          >
+             <Check v-if="form.color === c" class="absolute inset-0 m-auto w-3 h-3 text-white" />
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 mb-2">
+           <Unlock class="w-4 h-4 text-slate-400" />
+           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Visibility Calibration</span>
+        </div>
+        <div class="p-6 bg-slate-50/50 rounded-[32px] border border-white/10 flex items-center gap-4 group cursor-pointer" @click="form.is_public = !form.is_public">
+           <div class="h-10 w-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center transition-all group-hover:scale-110 shadow-sm">
+              <component :is="form.is_public ? Globe : Lock" class="w-5 h-5" :class="form.is_public ? 'text-blue-500' : 'text-slate-400'" />
+           </div>
+           <div class="flex-1">
+              <p class="text-[11px] font-bold text-slate-900 tracking-tight">Public Temporal Broadcast</p>
+              <p class="text-[10px] text-slate-400 font-medium">Expose this calendar to external data consumption</p>
+           </div>
+           <div class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none" :class="form.is_public ? 'bg-blue-600' : 'bg-slate-200'">
+              <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" :class="form.is_public ? 'translate-x-6' : 'translate-x-1'" />
+           </div>
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex-1">
+           <p v-if="error" class="text-[10px] font-bold text-destructive uppercase tracking-tight animate-in fade-in">{{ error }}</p>
+        </div>
+        <div class="flex gap-3">
+          <Button variant="outline" @click="emit('close')" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[11px]">Cancel</Button>
+          <Button 
+            @click="submit" 
+            :disabled="saving || !form.name.trim()" 
+            class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
+          >
+            {{ saving ? 'Syncing...' : isEdit ? 'Deploy Update' : 'Initialize Node' }}
+          </Button>
+        </div>
+      </div>
+    </template>
+  </SlideDrawer>
+</template>
+

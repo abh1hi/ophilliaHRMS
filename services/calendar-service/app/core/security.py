@@ -69,8 +69,20 @@ def require_role(*allowed_roles: UserRole):
 
 
 def verify_internal_token(x_internal_token: str = Header(...)) -> None:
-    if x_internal_token != settings.INTERNAL_SERVICE_TOKEN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid internal service token",
+    """Accept either a signed JWT (audience=calendar-service or internal) or raw secret fallback."""
+    from jose import jwt as _jwt, JWTError as _JWTError
+    try:
+        payload = _jwt.decode(
+            x_internal_token,
+            settings.INTERNAL_SERVICE_TOKEN,
+            algorithms=["HS256"],
+            options={"verify_aud": False},
         )
+        aud = payload.get("aud", "")
+        if aud not in ("calendar-service", "internal"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token audience invalid for this service")
+        return
+    except _JWTError:
+        pass
+    if x_internal_token != settings.INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid internal service token")

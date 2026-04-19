@@ -24,7 +24,9 @@
       "mcp__MCP_DOCKER__mcp-exec",
       "Bash(grep -E \"\\\\.\\(ts|json\\)$\")",
       "Bash(dir \"C:\\\\Users\\\\abhin\\\\Desktop\\\\ophilliaHRMS\")",
-      "WebSearch"
+      "WebSearch",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/services/payroll-service/app/repositories/**)",
+      "Bash(xargs ls *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit",

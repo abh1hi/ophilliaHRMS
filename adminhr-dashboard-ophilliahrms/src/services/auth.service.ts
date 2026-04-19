@@ -91,32 +91,13 @@ export interface Company {
 
 export interface PostLoginContext {
   role: string
-  next_action: 'COMPLETE_ONBOARDING' | 'SELECT_COMPANY' | 'ENTER_DASHBOARD' | 'CREATE_COMPANY'
+  next_action: 'COMPLETE_ONBOARDING' | 'ENTER_DASHBOARD'
   onboarding_status?: string
-  companies?: Company[]
   selected_company?: string
 }
 
 export async function postLoginContext(): Promise<PostLoginContext> {
   return apiFetchAuth<PostLoginContext>('/auth/post-login-context')
-}
-
-// ─── Company Management (Super Admin) ────────────────────────────────────────
-export async function createCompany(name: string, domain?: string): Promise<Company> {
-  return apiFetchDirect<Company>('/auth/companies', {
-    method: 'POST',
-    body: JSON.stringify({ name, ...(domain ? { domain } : {}) }),
-  })
-}
-
-export async function selectCompany(companyId: string): Promise<LoginResponse> {
-  const data = await apiFetchDirect<LoginResponse>('/auth/select-company', {
-    method: 'POST',
-    body: JSON.stringify({ company_id: companyId }),
-  })
-  saveTokens(data.access_token, data.refresh_token ?? '')
-  localStorage.setItem('selected_company_id', companyId)
-  return data
 }
 
 // ─── User Management (Admin / Super Admin) ────────────────────────────────────

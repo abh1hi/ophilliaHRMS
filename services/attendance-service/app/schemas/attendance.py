@@ -326,27 +326,35 @@ class GeofenceListResponse(BaseModel):
 class PolicyCreate(BaseModel):
     department_id: Optional[UUID] = None
     employee_id: Optional[UUID] = None
+    location_id: Optional[UUID] = None
     method: AttendanceMethod = AttendanceMethod.MANUAL
-    geofence_id: Optional[UUID] = None
+    geofence_ids: List[UUID] = []
     work_start_time: Optional[time] = None
     work_hours_per_day: float = 8.0
     auto_close_time: Optional[time] = None
     task_planning_grace_minutes: float = 30.0
-    allow_night_shift: str = "false"
+    allow_night_shift: bool = False
     max_shifts_per_day: float = 2
     late_grace_period_minutes: int = 0
+
+    @model_validator(mode="after")
+    def geofence_required_for_location_method(self) -> "PolicyCreate":
+        if self.method in (AttendanceMethod.GEOFENCE, AttendanceMethod.BOTH) and not self.geofence_ids:
+            raise ValueError("geofence_ids must contain at least one entry when method is 'geofence' or 'both'")
+        return self
 
 
 class PolicyUpdate(BaseModel):
     department_id: Optional[UUID] = None
     employee_id: Optional[UUID] = None
+    location_id: Optional[UUID] = None
     method: Optional[AttendanceMethod] = None
-    geofence_id: Optional[UUID] = None
+    geofence_ids: Optional[List[UUID]] = None
     work_start_time: Optional[time] = None
     work_hours_per_day: Optional[float] = None
     auto_close_time: Optional[time] = None
     task_planning_grace_minutes: Optional[float] = None
-    allow_night_shift: Optional[str] = None
+    allow_night_shift: Optional[bool] = None
     max_shifts_per_day: Optional[float] = None
     late_grace_period_minutes: Optional[int] = None
 
@@ -356,13 +364,13 @@ class PolicyResponse(BaseModel):
     company_id: Optional[UUID] = None
     department_id: Optional[UUID] = None
     employee_id: Optional[UUID] = None
+    location_id: Optional[UUID] = None
     method: str
-    geofence_id: Optional[UUID] = None
     work_start_time: Optional[time] = None
     work_hours_per_day: float
     auto_close_time: Optional[time] = None
     task_planning_grace_minutes: float = 30.0
-    allow_night_shift: str = "false"
+    allow_night_shift: bool = False
     max_shifts_per_day: float = 2
     late_grace_period_minutes: int = 0
     created_at: datetime
@@ -405,7 +413,7 @@ class PolicyTemplateCreate(BaseModel):
     work_hours_per_day: float = 8.0
     auto_close_time: Optional[time] = None
     task_planning_grace_minutes: float = 30.0
-    allow_night_shift: str = "false"
+    allow_night_shift: bool = False
     max_shifts_per_day: float = 2
     late_grace_period_minutes: int = 0
 
@@ -426,7 +434,7 @@ class PolicyTemplateUpdate(BaseModel):
     work_hours_per_day: Optional[float] = None
     auto_close_time: Optional[time] = None
     task_planning_grace_minutes: Optional[float] = None
-    allow_night_shift: Optional[str] = None
+    allow_night_shift: Optional[bool] = None
     max_shifts_per_day: Optional[float] = None
     late_grace_period_minutes: Optional[int] = None
 
@@ -442,7 +450,7 @@ class PolicyTemplateResponse(BaseModel):
     work_hours_per_day: float
     auto_close_time: Optional[time] = None
     task_planning_grace_minutes: float
-    allow_night_shift: str
+    allow_night_shift: bool
     max_shifts_per_day: float
     late_grace_period_minutes: int
     is_active: bool
@@ -462,21 +470,24 @@ class ApplyTemplateRequest(BaseModel):
 
 
 # ──────────── POLICY EXCEPTIONS ────────────
+_VALID_REASON_CATEGORIES = {"medical_leave", "client_visit", "training", "custom"}
+_VALID_OVERRIDE_METHODS = {"manual", "geofence", "both"}
+
+
 class PolicyExceptionCreate(BaseModel):
     employee_id: UUID
     reason: str
+    reason_category: Optional[str] = None
     from_date: date
     to_date: Optional[date] = None
+
     override_method: Optional[str] = None
     override_work_hours: Optional[float] = None
+    override_work_start_time: Optional[time] = None
+    override_late_grace_minutes: Optional[int] = None
     override_geofence_id: Optional[UUID] = None
-
-    @field_validator("override_method")
-    @classmethod
-    def valid_method(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in {"manual", "geofence", "both"}:
-            raise ValueError("override_method must be manual, geofence, or both")
-        return v
+    override_geofence_ids: Optional[List[UUID]] = None
+    override_overtime_policy_id: Optional[UUID] = None
 
     @field_validator("reason")
     @classmethod
@@ -485,15 +496,59 @@ class PolicyExceptionCreate(BaseModel):
             raise ValueError("Reason must not be empty")
         return v.strip()
 
+    @field_validator("override_method")
+    @classmethod
+    def valid_method(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_OVERRIDE_METHODS:
+            raise ValueError("override_method must be manual, geofence, or both")
+        return v
+
+    @field_validator("reason_category")
+    @classmethod
+    def valid_reason_category(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_REASON_CATEGORIES:
+            raise ValueError(f"reason_category must be one of: {sorted(_VALID_REASON_CATEGORIES)}")
+        return v
+
+    @model_validator(mode="after")
+    def geofence_required_when_method_is_geofence(self) -> "PolicyExceptionCreate":
+        if self.override_method in ("geofence", "both"):
+            has_geofence = self.override_geofence_ids or self.override_geofence_id
+            if not has_geofence:
+                raise ValueError(
+                    "override_geofence_ids (or override_geofence_id) is required "
+                    "when override_method is 'geofence' or 'both'"
+                )
+        return self
+
 
 class PolicyExceptionUpdate(BaseModel):
     reason: Optional[str] = None
+    reason_category: Optional[str] = None
     from_date: Optional[date] = None
     to_date: Optional[date] = None
     override_method: Optional[str] = None
     override_work_hours: Optional[float] = None
+    override_work_start_time: Optional[time] = None
+    override_late_grace_minutes: Optional[int] = None
     override_geofence_id: Optional[UUID] = None
+    override_geofence_ids: Optional[List[UUID]] = None
+    override_overtime_policy_id: Optional[UUID] = None
     is_active: Optional[bool] = None
+
+    @field_validator("override_method")
+    @classmethod
+    def valid_method(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_OVERRIDE_METHODS:
+            raise ValueError("override_method must be manual, geofence, or both")
+        return v
+
+    @field_validator("reason_category")
+    @classmethod
+    def valid_reason_category(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_REASON_CATEGORIES:
+            raise ValueError(f"reason_category must be one of: {sorted(_VALID_REASON_CATEGORIES)}")
+        return v
 
 
 class PolicyExceptionResponse(BaseModel):
@@ -501,11 +556,16 @@ class PolicyExceptionResponse(BaseModel):
     company_id: Optional[UUID] = None
     employee_id: UUID
     reason: str
+    reason_category: Optional[str] = None
     from_date: date
     to_date: Optional[date] = None
     override_method: Optional[str] = None
     override_work_hours: Optional[float] = None
+    override_work_start_time: Optional[time] = None
+    override_late_grace_minutes: Optional[int] = None
     override_geofence_id: Optional[UUID] = None
+    override_geofence_ids: Optional[List[UUID]] = None
+    override_overtime_policy_id: Optional[UUID] = None
     approved_by: UUID
     is_active: bool
     created_at: datetime
@@ -642,3 +702,31 @@ class EmployeeProductivitySummary(BaseModel):
 class PerformersResponse(BaseModel):
     top_performers: List[EmployeeProductivitySummary]
     low_performers: List[EmployeeProductivitySummary]
+
+
+# ─────────────────────────── GeofenceConsent ───────────────────────────
+
+class GeofenceConsentResponse(BaseModel):
+    id: UUID
+    company_id: UUID
+    employee_id: UUID
+    consented: bool
+    consent_given_at: Optional[datetime] = None
+    consent_withdrawn_at: Optional[datetime] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class GeofenceConsentStatusResponse(BaseModel):
+    consented: bool
+    consent_given_at: Optional[datetime] = None
+    consent_withdrawn_at: Optional[datetime] = None
+
+
+class GeofenceConsentListResponse(BaseModel):
+    items: List[GeofenceConsentResponse]
+    total: int

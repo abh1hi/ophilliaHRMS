@@ -104,11 +104,19 @@ async def export_audit_logs_csv(
         except ValueError:
             return None
 
+    # super_admin can query any company; all others are scoped to their own company
+    effective_company_id = company_id
+    if _user.get("role") != "super_admin":
+        jwt_company_id = _user.get("company_id")
+        if not jwt_company_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No company context in token")
+        effective_company_id = UUID(jwt_company_id)
+
     filters = AuditLogFilter(
         event_type=event_type,
         service_source=service_source,
         user_id=user_id,
-        company_id=company_id,
+        company_id=effective_company_id,
         date_from=_parse_dt(date_from),
         date_to=_parse_dt(date_to),
         skip=0,

@@ -1,114 +1,22 @@
-<template>
-  <div class="flex flex-col h-[calc(100vh-12rem)]">
-    <!-- Board toolbar -->
-    <div class="flex items-center justify-between mb-4 flex-shrink-0">
-      <div class="flex items-center gap-3">
-        <select
-          v-model="activeWorkspaceId"
-          @change="loadTasks"
-          class="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-        >
-          <option value="">All Workspaces</option>
-          <option v-for="ws in workspaceStore.workspaces" :key="ws.id" :value="ws.id">
-            {{ ws.name }}
-          </option>
-        </select>
-        <div class="flex items-center gap-1.5">
-          <select v-model="filterStatus" class="px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none">
-            <option value="">All Status</option>
-            <option v-for="col in store.COLUMNS" :key="col" :value="col" class="capitalize">{{ col.replace('_', ' ') }}</option>
-          </select>
-          <select v-model="filterPriority" class="px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none">
-            <option value="">All Priority</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
-      </div>
-      <button
-        @click="showCreate = true"
-        class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-sm rounded-lg hover:bg-slate-700"
-      >
-        <PlusIcon class="w-4 h-4" />
-        New Task
-      </button>
-    </div>
-
-    <!-- Kanban board -->
-    <div class="flex-1 overflow-x-auto">
-      <div class="flex gap-4 h-full min-w-max">
-        <div
-          v-for="col in displayColumns"
-          :key="col.key"
-          class="w-72 flex flex-col flex-shrink-0"
-        >
-          <!-- Column header -->
-          <div :class="['flex items-center justify-between px-3 py-2 rounded-xl mb-2', col.headerClass]">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-semibold capitalize">{{ col.label }}</span>
-              <span class="text-xs bg-white/50 px-1.5 py-0.5 rounded-full font-medium">
-                {{ filteredKanban[col.key]?.length ?? 0 }}
-              </span>
-            </div>
-            <button
-              @click="openCreate(col.key)"
-              class="p-1 rounded hover:bg-white/50 transition-colors"
-            >
-              <PlusIcon class="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <!-- Task cards -->
-          <div
-            class="flex-1 overflow-y-auto space-y-2 min-h-16 rounded-xl p-1"
-            @dragover.prevent
-            @drop="onDrop($event, col.key)"
-          >
-            <div
-              v-for="task in filteredKanban[col.key]"
-              :key="task.id"
-              draggable="true"
-              @dragstart="onDragStart($event, task.id)"
-            >
-              <TaskCard :task="task" @click="openDetail(task.id)" />
-            </div>
-            <div
-              v-if="!filteredKanban[col.key]?.length"
-              class="flex items-center justify-center h-16 text-xs text-slate-300 rounded-xl border-2 border-dashed border-slate-100"
-            >
-              Drop here
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Create / Edit task -->
-    <TaskPanel
-      :open="showCreate || showEdit"
-      :task="editTask"
-      :workspace-id="activeWorkspaceId || undefined"
-      @close="showCreate = false; showEdit = false; editTask = null"
-      @saved="loadTasks"
-    />
-
-    <!-- Task detail drawer -->
-    <TaskDetailDrawer
-      :open="showDetail"
-      :task="store.activeTask"
-      @close="showDetail = false"
-      @edit="onEditFromDetail"
-    />
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { PlusIcon } from 'lucide-vue-next'
+import { 
+  Plus, 
+  Layers, 
+  Activity, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle, 
+  MoreVertical,
+  Kanban,
+  Zap,
+  Box,
+  Monitor
+} from 'lucide-vue-next'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useTaskStore } from '@/stores/task.store'
+import { Button } from '@/components/ui/button'
+import FormSelect from '../ui/FormSelect.vue'
 import TaskCard from './TaskCard.vue'
 import TaskPanel from './TaskPanel.vue'
 import TaskDetailDrawer from './TaskDetailDrawer.vue'
@@ -127,11 +35,11 @@ const editTask = ref<CalendarTask | null>(null)
 const draggedTaskId = ref<string | null>(null)
 
 const displayColumns = [
-  { key: 'todo',       label: 'To Do',      headerClass: 'bg-slate-100 text-slate-600' },
-  { key: 'in_progress', label: 'In Progress', headerClass: 'bg-blue-100 text-blue-700'  },
-  { key: 'blocked',    label: 'Blocked',    headerClass: 'bg-red-100 text-red-700'    },
-  { key: 'in_review',  label: 'In Review',  headerClass: 'bg-yellow-100 text-yellow-700' },
-  { key: 'done',       label: 'Done',       headerClass: 'bg-green-100 text-green-700' },
+  { key: 'todo',        label: 'Activation Queue',  icon: Clock,        accent: 'bg-slate-400' },
+  { key: 'in_progress', label: 'Active Processing', icon: Activity,     accent: 'bg-blue-500' },
+  { key: 'in_review',   label: 'Validation Layer',  icon: Monitor,      accent: 'bg-yellow-500' },
+  { key: 'blocked',     label: 'Node Latency',      icon: AlertCircle,  accent: 'bg-rose-500' },
+  { key: 'done',        label: 'Commit Complete',   icon: CheckCircle2, accent: 'bg-emerald-500' },
 ]
 
 const filteredKanban = computed(() => {
@@ -188,4 +96,129 @@ async function onDrop(e: DragEvent, targetStatus: string) {
   if (!id) return
   await store.moveStatus(id, targetStatus)
 }
+
+const workspaceOptions = computed(() => [
+  { value: '', label: 'Global Topology (All Nodes)' },
+  ...workspaceStore.workspaces.map(ws => ({ value: ws.id, label: ws.name }))
+])
+
+const statusOptions = computed(() => [
+  { value: '', label: 'Full Spectrum Status' },
+  ...displayColumns.map(col => ({ value: col.key, label: col.label }))
+])
+
+const priorityOptions = [
+  { value: '', label: 'Unified Priority' },
+  { value: 'urgent', label: 'L0: Critical' },
+  { value: 'high', label: 'L1: High' },
+  { value: 'medium', label: 'L2: Standard' },
+  { value: 'low', label: 'L3: Auxiliary' }
+]
 </script>
+
+<template>
+  <div class="flex flex-col h-[calc(100vh-10rem)] space-y-8 animate-in fade-in duration-700">
+    <!-- Matrix Orchestration Toolbar -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
+      <div class="flex flex-col sm:flex-row items-end gap-4 flex-1">
+        <div class="w-full sm:w-64">
+           <FormSelect label="Hub Environment" v-model="activeWorkspaceId" :options="workspaceOptions" @update:model-value="loadTasks" />
+        </div>
+        <div class="w-full sm:w-48">
+           <FormSelect label="Status Filter" v-model="filterStatus" :options="statusOptions" />
+        </div>
+        <div class="w-full sm:w-48">
+           <FormSelect label="Priority Grade" v-model="filterPriority" :options="priorityOptions" />
+        </div>
+      </div>
+      <Button
+        @click="showCreate = true"
+        class="h-11 rounded-full px-8 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
+      >
+        <Plus class="w-4 h-4 mr-2" />
+        Initialize Process
+      </Button>
+    </div>
+
+    <!-- Orchestration Matrix -->
+    <div class="flex-1 overflow-x-auto no-scrollbar pb-6">
+      <div class="flex gap-6 h-full min-w-max pb-2">
+        <div
+          v-for="col in displayColumns"
+          :key="col.key"
+          class="w-80 flex flex-col flex-shrink-0 relative"
+          @dragover.prevent
+          @drop="onDrop($event, col.key)"
+        >
+          <!-- Column Calibration -->
+          <div class="flex items-center justify-between mb-4 group/header">
+             <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center group-hover/header:scale-110 transition-transform">
+                   <component :is="col.icon" class="w-4 h-4 text-slate-400 group-hover/header:text-slate-900 transition-colors" />
+                </div>
+                <div>
+                  <h4 class="text-[11px] font-black text-slate-900 uppercase tracking-widest leading-none">{{ col.label }}</h4>
+                  <p class="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-tight">{{ filteredKanban[col.key]?.length ?? 0 }} Instances</p>
+                </div>
+             </div>
+             <Button variant="ghost" size="icon" @click="openCreate(col.key)" class="h-8 w-8 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 transition-all">
+                <Plus class="w-3.5 h-3.5" />
+             </Button>
+             
+             <!-- Accent Strip -->
+             <div class="absolute -top-1 left-0 right-0 h-0.5 rounded-full" :class="col.accent" />
+          </div>
+
+          <!-- Processing Lane -->
+          <div
+            class="flex-1 overflow-y-auto space-y-4 p-2 rounded-[32px] bg-slate-50/30 backdrop-blur-sm border border-slate-100 transition-all hover:bg-slate-50/50"
+          >
+            <div
+              v-for="task in filteredKanban[col.key]"
+              :key="task.id"
+              draggable="true"
+              @dragstart="onDragStart($event, task.id)"
+              class="animate-in fade-in slide-in-from-bottom-2 duration-300"
+            >
+              <TaskCard :task="task" @click="openDetail(task.id)" />
+            </div>
+            
+            <div
+              v-if="!filteredKanban[col.key]?.length"
+              class="flex flex-col items-center justify-center py-12 px-6 rounded-[24px] border border-dashed border-slate-200/60 transition-all group/empty"
+            >
+               <Zap class="w-6 h-6 text-slate-200 mb-2 group-hover/empty:scale-110 transition-transform" />
+               <p class="text-[9px] font-bold text-slate-300 uppercase tracking-widest text-center">Awaiting Node Allocation</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interface Modulation Layers -->
+    <TaskPanel
+      :open="showCreate || showEdit"
+      :task="editTask"
+      :workspace-id="activeWorkspaceId || undefined"
+      @close="showCreate = false; showEdit = false; editTask = null"
+      @saved="loadTasks"
+    />
+
+    <TaskDetailDrawer
+      :open="showDetail"
+      :task="store.activeTask"
+      @close="showDetail = false"
+      @edit="onEditFromDetail"
+    />
+  </div>
+</template>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+</style>

@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, Float, Date, Boolean, DateTime, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Float, Integer, Time, Date, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 from datetime import datetime, timezone
 
@@ -25,23 +25,35 @@ class PolicyException(Base):
     company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     employee_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
-    reason = Column(String(500), nullable=False)  # medical | personal | project | other
+    reason = Column(String(500), nullable=False)
+    reason_category = Column(String(50), nullable=True)  # medical_leave | client_visit | training | custom
 
     from_date = Column(Date, nullable=False)
-    to_date = Column(Date, nullable=True)  # null = indefinite / open-ended
+    to_date = Column(Date, nullable=True)
 
-    # Override fields — null means "use whatever the policy says"
-    override_method = Column(String(20), nullable=True)       # manual | geofence | both
-    override_work_hours = Column(Float, nullable=True)         # e.g. 6.0 for reduced hours
+    # Override fields — null means "inherit from the underlying policy"
+    override_method = Column(String(20), nullable=True)
+    override_work_hours = Column(Float, nullable=True)
+    override_work_start_time = Column(Time, nullable=True)
+    override_late_grace_minutes = Column(Integer, nullable=True)
 
-    # If set, use this geofence instead of the policy's geofence (SET NULL on delete)
+    # Single geofence override (kept for backward compat; superseded by override_geofence_ids)
     override_geofence_id = Column(
         UUID(as_uuid=True),
         ForeignKey("geofence_locations.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Multi-geofence override: list of UUID strings — replaces all policy geofences during exception
+    override_geofence_ids = Column(JSONB, nullable=True)
 
-    approved_by = Column(UUID(as_uuid=True), nullable=False)  # user_id of approver
+    # Overtime policy override for this exception window
+    override_overtime_policy_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("overtime_policies.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    approved_by = Column(UUID(as_uuid=True), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
 
     created_at = Column(DateTime, default=naive_utcnow, nullable=False)
@@ -56,4 +68,5 @@ class PolicyException(Base):
         Index("ix_policy_exception_employee_id", "employee_id"),
         Index("ix_policy_exception_company_id", "company_id"),
         Index("ix_policy_exception_dates", "from_date", "to_date"),
+        Index("ix_exception_employee_dates", "employee_id", "from_date", "to_date"),
     )

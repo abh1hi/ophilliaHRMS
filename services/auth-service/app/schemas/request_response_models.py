@@ -78,6 +78,7 @@ class UserResponse(UserBase):
     id: UUID
     company_id: UUID
     role: UserRole
+    is_company_owner: bool = False
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -94,9 +95,35 @@ class CompanyCreate(CompanyBase):
 class CompanyUpdate(BaseModel):
     name: Optional[str] = None
     domain: Optional[str] = None
+    is_active: Optional[bool] = None  # super admin can reactivate a deactivated company
 
-class SelectCompanyRequest(BaseModel):
-    company_id: UUID
+
+class AdminCreate(BaseModel):
+    """Credentials for the first (power) admin of a new company."""
+    email: EmailStr
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _PasswordMixin._validate_password(v)
+
+    @field_validator("email")
+    @classmethod
+    def email_normalization(cls, v: str) -> str:
+        return v.lower().strip()
+
+
+class CompanyWithAdminCreate(BaseModel):
+    """Super-admin endpoint: provision a new tenant company + its first (power) admin."""
+    name: str
+    domain: Optional[str] = None
+    admin: AdminCreate
+
+
+class CompanyWithAdminResponse(BaseModel):
+    company: "CompanyResponse"
+    admin: UserResponse
 
 class CompanyResponse(CompanyBase):
     id: UUID

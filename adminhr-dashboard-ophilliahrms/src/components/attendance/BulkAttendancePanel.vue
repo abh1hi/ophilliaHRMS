@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { UsersIcon, CheckSquareIcon } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import PageHeader from '../ui/PageHeader.vue'
+import FormInput from '../ui/FormInput.vue'
+import FormSelect from '../ui/FormSelect.vue'
+import { Button } from '../ui/button'
+import { Checkbox } from '../ui/checkbox'
+import { Label } from '../ui/label'
+import { Users, CheckSquare, Search, Hash, AlertCircle, CheckCircle2, UserCircle2 } from 'lucide-vue-next'
 import { getEmployeesForBulk } from '../../services/attendance.service'
 import { apiFetchData } from '../../services/http'
 
@@ -56,89 +62,135 @@ async function submitBulk() {
   finally { submitting.value = false }
 }
 
-const allChecked = () => employees.value.length > 0 && employees.value.every((e: any) => selectedIds.value.has(e.id))
+const isAllChecked = computed(() => employees.value.length > 0 && employees.value.every((e: any) => selectedIds.value.has(e.id)))
+
+const attStatusOptions = [
+  { value: 'present', label: 'Present' },
+  { value: 'absent', label: 'Absent' },
+  { value: 'half_day', label: 'Half Day' },
+]
+
+const resultStats = computed(() => {
+  if (!results.value) return null
+  return {
+    total: results.value.length,
+    success: results.value.filter((r: any) => r.success).length,
+    failed: results.value.filter((r: any) => !r.success).length,
+  }
+})
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-start justify-between">
-      <div>
-        <h2 class="text-xl font-bold text-slate-900">Bulk Attendance Tool</h2>
-        <p class="text-sm text-slate-500 mt-0.5">Mark attendance for a group of employees at once</p>
-      </div>
-    </div>
+  <div class="space-y-10">
+    <PageHeader 
+      title="Bulk Attendance" 
+      subtitle="Rapid multi-employee attendance processing" 
+    />
 
     <!-- Step 1: Filters -->
-    <div class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-[24px] p-6 space-y-5 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]">
-      <h3 class="text-sm font-semibold text-slate-700">Step 1 — Select Employees</h3>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label class="text-xs font-semibold text-slate-500 block mb-1">Date</label>
-          <input type="date" v-model="date" class="w-full text-sm border border-slate-200 rounded-[10px] px-3 py-2 outline-none focus:ring-2 focus:ring-slate-200" />
-        </div>
-        <div>
-          <label class="text-xs font-semibold text-slate-500 block mb-1">Department ID (optional)</label>
-          <input v-model="departmentId" placeholder="UUID" class="w-full text-sm border border-slate-200 rounded-[10px] px-3 py-2 outline-none focus:ring-2 focus:ring-slate-200" />
-        </div>
-        <div>
-          <label class="text-xs font-semibold text-slate-500 block mb-1">Branch ID (optional)</label>
-          <input v-model="branchId" placeholder="UUID" class="w-full text-sm border border-slate-200 rounded-[10px] px-3 py-2 outline-none focus:ring-2 focus:ring-slate-200" />
-        </div>
+    <div class="bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl rounded-[28px] border border-white/20 dark:border-white/10 p-8 shadow-sm">
+      <div class="flex items-center gap-2 mb-6 text-slate-900 dark:text-slate-50">
+        <Users class="w-4 h-4 text-muted-foreground" />
+        <h3 class="text-xs font-bold uppercase tracking-widest">Step 1 — Define Group</h3>
       </div>
-      <button @click="loadEmployees" :disabled="loading" class="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-full font-medium text-sm hover:bg-slate-800 transition-all disabled:opacity-60">
-        <UsersIcon class="w-4 h-4" /> {{ loading ? 'Loading…' : 'Load Employees' }}
-      </button>
-      <p v-if="errorMsg" class="text-sm text-rose-600">{{ errorMsg }}</p>
+      
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <FormInput label="Processing Date" type="date" v-model="date" required />
+        <FormInput label="Department" v-model="departmentId" placeholder="Department UUID..." />
+        <FormInput label="Branch" v-model="branchId" placeholder="Branch UUID..." />
+      </div>
+      
+      <div class="mt-8 flex items-center justify-between">
+        <p v-if="errorMsg" class="text-xs font-bold text-destructive uppercase tracking-tight">{{ errorMsg }}</p>
+        <div v-else></div>
+        <Button @click="loadEmployees" :disabled="loading" class="rounded-full px-8 bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-200">
+          <Search class="w-4 h-4 mr-2" /> {{ loading ? 'Fetching...' : 'Fetch Employee List' }}
+        </Button>
+      </div>
     </div>
 
     <!-- Step 2: Employee list -->
-    <div v-if="employees.length > 0" class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-[24px] shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] overflow-hidden">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200/60">
-        <h3 class="text-sm font-semibold text-slate-700">Step 2 — Set Status &amp; Submit</h3>
-        <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-          <input type="checkbox" :checked="allChecked()" @change="toggleAll(($event.target as HTMLInputElement).checked)" class="accent-slate-900 w-4 h-4" />
-          Select All ({{ employees.length }})
-        </label>
-      </div>
-      <div class="divide-y divide-slate-100">
-        <div v-for="emp in employees" :key="emp.id" class="flex items-center gap-4 px-6 py-3 hover:bg-slate-50/50 transition-colors">
-          <input type="checkbox" :checked="selectedIds.has(emp.id)" @change="toggleEmployee(emp.id, ($event.target as HTMLInputElement).checked)" class="accent-slate-900 w-4 h-4 shrink-0" />
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-slate-800">{{ emp.first_name ?? '' }} {{ emp.last_name ?? '' }} <span class="font-mono text-xs text-slate-400 ml-1">{{ emp.id?.slice(0, 8) }}…</span></p>
-          </div>
-          <select v-model="employeeStatus[emp.id]" :disabled="!selectedIds.has(emp.id)" class="text-sm border border-slate-200 rounded-[10px] px-3 py-1.5 outline-none disabled:opacity-40">
-            <option value="present">Present</option>
-            <option value="absent">Absent</option>
-            <option value="half_day">Half Day</option>
-          </select>
+    <div v-if="employees.length > 0" class="bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl rounded-[28px] border border-white/20 dark:border-white/10 overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-4">
+      <div class="flex items-center justify-between px-8 py-5 border-b border-white/10 bg-slate-50/50">
+        <div class="flex items-center gap-2">
+          <CheckSquare class="w-4 h-4 text-muted-foreground" />
+          <h3 class="text-xs font-bold uppercase tracking-widest">Step 2 — Selection & Status</h3>
+        </div>
+        <div class="flex items-center space-x-2">
+          <Checkbox id="bulk-all" :checked="isAllChecked" @update:checked="toggleAll($event)" />
+          <Label for="bulk-all" class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground cursor-pointer">
+            Select All ({{ employees.length }})
+          </Label>
         </div>
       </div>
-      <div class="px-6 py-4 border-t border-slate-100">
-        <button @click="submitBulk" :disabled="submitting || selectedIds.size === 0" class="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-full font-medium text-sm hover:bg-slate-800 transition-all disabled:opacity-60">
-          <CheckSquareIcon class="w-4 h-4" /> {{ submitting ? 'Marking…' : `Mark ${selectedIds.size} Employees` }}
-        </button>
+      
+      <div class="divide-y divide-white/10 max-h-[500px] overflow-y-auto">
+        <div v-for="emp in employees" :key="emp.id" class="flex items-center gap-6 px-8 py-4 hover:bg-white/20 transition-colors">
+          <Checkbox :checked="selectedIds.has(emp.id)" @update:checked="toggleEmployee(emp.id, $event)" />
+          
+          <div class="flex-1 flex items-center gap-3 min-w-0">
+            <div class="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center border border-dashed text-muted-foreground">
+              <UserCircle2 class="w-5 h-5" />
+            </div>
+            <div class="flex flex-col">
+              <p class="text-[13px] font-bold text-slate-900">{{ emp.first_name }} {{ emp.last_name }}</p>
+              <div class="flex items-center gap-1 opacity-60">
+                <Hash class="w-3 h-3" />
+                <span class="font-mono text-[10px]">{{ emp.id?.slice(0, 13) }}…</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="w-40">
+            <FormSelect 
+              :modelValue="employeeStatus[emp.id]" 
+              @update:modelValue="employeeStatus[emp.id] = $event" 
+              :options="attStatusOptions"
+              :disabled="!selectedIds.has(emp.id)"
+            />
+          </div>
+        </div>
+      </div>
+      
+      <div class="px-8 py-5 border-t border-white/10 bg-slate-50/50 flex items-center justify-between">
+        <p class="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+          {{ selectedIds.size }} of {{ employees.length }} Selected
+        </p>
+        <Button @click="submitBulk" :disabled="submitting || selectedIds.size === 0" class="rounded-full px-10 bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-200">
+          <CheckCircle2 class="w-4 h-4 mr-2" /> {{ submitting ? 'Processing...' : `Confirm & Save Attendance` }}
+        </Button>
       </div>
     </div>
 
-    <!-- Results -->
-    <div v-if="results" class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-[24px] p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]">
-      <h3 class="text-sm font-semibold text-slate-700 mb-4">Results</h3>
-      <div class="grid grid-cols-3 gap-4 mb-4">
-        <div class="text-center p-3 bg-slate-50 rounded-[14px]">
-          <p class="text-2xl font-bold text-slate-900">{{ results.length }}</p>
-          <p class="text-xs text-slate-500 mt-0.5">Total</p>
+    <!-- Results Summary -->
+    <div v-if="resultStats" class="bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl rounded-[28px] border border-white/20 dark:border-white/10 p-8 shadow-sm animate-in zoom-in-95">
+      <div class="flex items-center gap-2 mb-8">
+        <Info class="w-4 h-4 text-muted-foreground" />
+        <h3 class="text-xs font-bold uppercase tracking-widest">Processing Results</h3>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="p-6 rounded-3xl bg-slate-50/50 border border-dashed text-center">
+          <p class="text-3xl font-black text-slate-900 tracking-tighter">{{ resultStats.total }}</p>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Processed</p>
         </div>
-        <div class="text-center p-3 bg-emerald-50 rounded-[14px]">
-          <p class="text-2xl font-bold text-emerald-700">{{ results.filter((r: any) => r.success).length }}</p>
-          <p class="text-xs text-emerald-600 mt-0.5">Succeeded</p>
+        <div class="p-6 rounded-3xl bg-emerald-50/50 border border-emerald-100 text-center">
+          <p class="text-3xl font-black text-emerald-600 tracking-tighter">{{ resultStats.success }}</p>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-600/70 mt-1">Succeeded</p>
         </div>
-        <div class="text-center p-3 bg-rose-50 rounded-[14px]">
-          <p class="text-2xl font-bold text-rose-600">{{ results.filter((r: any) => !r.success).length }}</p>
-          <p class="text-xs text-rose-500 mt-0.5">Failed</p>
+        <div class="p-6 rounded-3xl bg-rose-50/50 border border-rose-100 text-center">
+          <p class="text-3xl font-black text-rose-600 tracking-tighter">{{ resultStats.failed }}</p>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-rose-600/70 mt-1">Failed</p>
         </div>
       </div>
-      <div v-for="r in results.filter((r: any) => !r.success)" :key="r.employee_id" class="text-xs text-rose-600 py-1">
-        <span class="font-mono">{{ r.employee_id?.slice(0, 8) }}…</span> — {{ r.error }}
+      
+      <div v-if="resultStats.failed > 0" class="mt-8 space-y-2">
+        <p class="text-[11px] font-bold text-destructive uppercase tracking-widest mb-3">Error Log</p>
+        <div v-for="r in results?.filter((r: any) => !r.success)" :key="r.employee_id" class="flex items-center gap-3 text-[11px] p-3 rounded-xl bg-destructive/5 text-destructive border border-destructive/10">
+          <AlertCircle class="w-3.5 h-3.5" />
+          <span class="font-mono">{{ r.employee_id?.slice(0, 13) }}…</span>
+          <span class="font-bold flex-1">{{ r.error }}</span>
+        </div>
       </div>
     </div>
   </div>

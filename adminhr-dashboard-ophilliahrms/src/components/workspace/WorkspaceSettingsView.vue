@@ -1,89 +1,117 @@
 <template>
-  <div class="max-w-2xl space-y-6">
-    <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-      <h3 class="text-base font-semibold text-slate-800">Workspace Settings</h3>
-
-      <!-- Select workspace -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1.5">Manage Workspace</label>
-        <div class="flex gap-2">
-          <select
-            v-model="selectedId"
-            class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none"
-          >
-            <option value="">Select a workspace…</option>
-            <option v-for="ws in store.workspaces" :key="ws.id" :value="ws.id">{{ ws.name }}</option>
-          </select>
-          <button
-            v-if="selectedId"
-            @click="editWorkspace"
-            class="px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
-          >
-            Edit
-          </button>
-          <button
-            v-if="selectedId"
-            @click="confirmDelete"
-            class="px-3 py-2 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50"
-          >
-            Delete
-          </button>
-        </div>
+  <div class="max-w-3xl space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <!-- Environmental Configuration -->
+    <div class="bg-white/40 backdrop-blur-xl border border-white/20 rounded-[32px] p-8 space-y-8 shadow-xl shadow-slate-200/50 relative overflow-hidden group">
+      <div class="absolute -right-12 -top-12 w-40 h-40 bg-indigo-50/50 rounded-full blur-[80px] group-hover:bg-indigo-100/50 transition-colors duration-700" />
+      
+      <div class="flex items-center gap-3">
+         <div class="h-10 w-10 rounded-2xl bg-slate-900 flex items-center justify-center shadow-lg shadow-slate-200">
+            <Settings class="w-5 h-5 text-white" />
+         </div>
+         <div>
+            <h3 class="text-base font-black text-slate-900 uppercase tracking-widest">Environmental Configuration</h3>
+            <p class="text-[11px] text-slate-500 font-bold uppercase tracking-tight">Manage active hubs and workspace hierarchies</p>
+         </div>
       </div>
 
-      <p v-if="store.workspaces.length === 0" class="text-sm text-slate-400">No workspaces created yet.</p>
+      <div class="space-y-6">
+        <div class="flex flex-col gap-2">
+           <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Contextual Hub Selection</label>
+           <div class="flex gap-3">
+              <FormSelect 
+                v-model="selectedId" 
+                :options="workspaceOptions" 
+                placeholder="Initialize hub management..."
+                class="flex-1"
+              />
+              <div v-if="selectedId" class="flex gap-2 animate-in fade-in zoom-in-95">
+                <Button variant="outline" @click="editWorkspace" class="rounded-2xl h-12 px-5 font-bold uppercase tracking-widest text-[11px] border-slate-200 hover:bg-slate-50">
+                   <Edit class="w-4 h-4 mr-2" />
+                   Recalibrate
+                </Button>
+                <Button variant="ghost" @click="showDeleteConfirm = true" class="rounded-2xl h-12 px-5 font-bold uppercase tracking-widest text-[11px] text-destructive hover:bg-destructive/5">
+                   <Trash2 class="w-4 h-4 mr-2" />
+                   Decommission
+                </Button>
+              </div>
+           </div>
+        </div>
+
+        <div v-if="store.workspaces.length === 0" class="flex flex-col items-center py-10 border border-dashed border-slate-200 rounded-[24px] bg-slate-50/30">
+           <Layout class="w-8 h-8 text-slate-300 mb-3" />
+           <p class="text-[11px] text-slate-400 font-bold uppercase tracking-widest">No active environments identified in the architecture</p>
+        </div>
+      </div>
     </div>
 
-    <!-- Google Integration -->
-    <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-      <h3 class="text-base font-semibold text-slate-800">Google Integration</h3>
-      <GoogleConnectBanner />
+    <!-- External Synchronization Protocol -->
+    <div class="bg-white/40 backdrop-blur-xl border border-white/20 rounded-[32px] p-8 space-y-8 shadow-xl shadow-slate-200/50 relative overflow-hidden group">
+      <div class="absolute -left-12 -bottom-12 w-40 h-40 bg-blue-50/50 rounded-full blur-[80px] group-hover:bg-blue-100/50 transition-colors duration-700" />
+      
+      <div class="flex items-center gap-3">
+         <div class="h-10 w-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+            <Globe class="w-5 h-5 text-white" />
+         </div>
+         <div>
+            <h3 class="text-base font-black text-slate-900 uppercase tracking-widest text-blue-900">Synchronization Protocol</h3>
+            <p class="text-[11px] text-slate-500 font-bold uppercase tracking-tight">Synchronize with external G-Suite endpoints</p>
+         </div>
+      </div>
 
-      <!-- Connected calendars -->
-      <div v-if="googleStore.isConnected" class="space-y-3">
-        <div class="flex items-center justify-between">
-          <p class="text-sm font-medium text-slate-700">Connected Google Calendars</p>
-          <button
-            @click="fetchGoogleCals"
-            class="text-xs text-blue-600 hover:underline"
-          >
-            Manage
-          </button>
+      <div class="space-y-6">
+        <div class="p-6 bg-slate-50/50 rounded-[28px] border border-white/10">
+           <GoogleConnectBanner />
         </div>
-        <div v-if="googleStore.connectedCalendars.length" class="space-y-1.5">
-          <div
-            v-for="cal in googleStore.connectedCalendars"
-            :key="cal.id"
-            class="flex items-center gap-2 text-sm text-slate-700 px-3 py-2 bg-slate-50 rounded-lg"
-          >
-            <div class="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-            {{ cal.summary }}
-            <span v-if="cal.primary" class="ml-auto text-xs text-slate-400">Primary</span>
-          </div>
-        </div>
-        <p v-else class="text-xs text-slate-400">No calendars connected.</p>
 
-        <!-- Google calendar selector -->
-        <div v-if="showCalSelector" class="space-y-2">
-          <div
-            v-for="cal in googleStore.availableCalendars"
-            :key="cal.id"
-            class="flex items-center gap-2"
-          >
-            <input
-              type="checkbox"
-              :id="cal.id"
-              :value="cal.id"
-              v-model="selectedGoogleCals"
-              class="rounded border-slate-300"
-            />
-            <label :for="cal.id" class="text-sm text-slate-700">{{ cal.summary }}</label>
+        <!-- Connected calendars -->
+        <div v-if="googleStore.isConnected" class="space-y-6 animate-in fade-in slide-in-from-top-2">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div class="flex items-center gap-2">
+               <Shield class="w-4 h-4 text-blue-500" />
+               <p class="text-[11px] font-black uppercase tracking-widest text-slate-900">Synchronized Entrypoints</p>
+            </div>
+            <Button variant="ghost" size="sm" @click="fetchGoogleCals" class="h-8 rounded-full text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:bg-blue-50">
+               Manage Endpoints
+            </Button>
           </div>
-          <div class="flex gap-2">
-            <button @click="saveGoogleCals" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-              Save
-            </button>
-            <button @click="showCalSelector = false" class="px-3 py-1.5 text-sm text-slate-500">Cancel</button>
+
+          <div v-if="googleStore.connectedCalendars.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              v-for="cal in googleStore.connectedCalendars"
+              :key="cal.id"
+              class="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm hover:border-blue-200 transition-all group"
+            >
+              <div class="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] group-hover:scale-125 transition-transform" />
+              <span class="text-[11px] font-bold text-slate-700 tracking-tight">{{ cal.summary }}</span>
+              <Badge v-if="cal.primary" variant="secondary" class="ml-auto rounded-full px-2 py-0 bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-tighter">Primary</Badge>
+            </div>
+          </div>
+          <div v-else class="text-center py-6 border border-dashed border-slate-100 rounded-2xl">
+             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">No active endpoints connected</p>
+          </div>
+
+          <!-- Google calendar selector -->
+          <div v-if="showCalSelector" class="p-6 bg-blue-50/30 border border-blue-100/50 rounded-[28px] space-y-4 animate-in zoom-in-95">
+            <p class="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-2">Endpoint Configuration</p>
+            <div class="grid grid-cols-1 gap-2">
+              <div
+                v-for="cal in googleStore.availableCalendars"
+                :key="cal.id"
+                class="flex items-center gap-3 p-3 bg-white/60 hover:bg-white rounded-xl transition-colors cursor-pointer"
+                @click="toggleCalSelection(cal.id)"
+              >
+                <div class="h-5 w-5 rounded-md border border-slate-200 flex items-center justify-center transition-all" :class="selectedGoogleCals.includes(cal.id) ? 'bg-blue-600 border-blue-600' : 'bg-white'">
+                   <Check v-if="selectedGoogleCals.includes(cal.id)" class="w-3 h-3 text-white" />
+                </div>
+                <label :for="cal.id" class="text-[11px] font-bold text-slate-700 cursor-pointer">{{ cal.summary }}</label>
+              </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <Button @click="saveGoogleCals" class="rounded-full px-8 h-10 bg-blue-600 text-white font-bold uppercase tracking-widest text-[10px] hover:bg-blue-700 shadow-lg shadow-blue-100">
+                 Commit Endpoints
+              </Button>
+              <Button variant="ghost" @click="showCalSelector = false" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[10px]">Abandon</Button>
+            </div>
           </div>
         </div>
       </div>
@@ -96,15 +124,38 @@
       @close="showEdit = false"
       @saved="store.fetchWorkspaces()"
     />
+
+    <ConfirmDialog 
+      :open="showDeleteConfirm" 
+      title="Decommission Environment?" 
+      message="Are you certain you want to disassemble this workspace hub? This action is irrevocable and will result in data fragmentation." 
+      @confirm="handleDelete" 
+      @cancel="showDeleteConfirm = false" 
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useGoogleStore } from '@/stores/google.store'
 import WorkspacePanel from './WorkspacePanel.vue'
 import GoogleConnectBanner from './GoogleConnectBanner.vue'
+import FormSelect from '../ui/FormSelect.vue'
+import ConfirmDialog from '../ui/ConfirmDialog.vue'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { 
+  Settings, 
+  Globe, 
+  Shield, 
+  Edit, 
+  Trash2, 
+  Layout, 
+  Check,
+  ChevronRight,
+  Info
+} from 'lucide-vue-next'
 import type { Workspace } from '@/services/calendar-workspace.service'
 
 const store = useWorkspaceStore()
@@ -114,6 +165,11 @@ const showEdit = ref(false)
 const editTarget = ref<Workspace | null>(null)
 const showCalSelector = ref(false)
 const selectedGoogleCals = ref<string[]>([])
+const showDeleteConfirm = ref(false)
+
+const workspaceOptions = computed(() => 
+  store.workspaces.map(ws => ({ value: ws.id, label: ws.name }))
+)
 
 onMounted(() => {
   store.fetchWorkspaces()
@@ -125,17 +181,23 @@ function editWorkspace() {
   showEdit.value = true
 }
 
-async function confirmDelete() {
+async function handleDelete() {
   if (!selectedId.value) return
-  if (!confirm('Delete this workspace? This cannot be undone.')) return
   await store.remove(selectedId.value)
   selectedId.value = ''
+  showDeleteConfirm.value = false
 }
 
 async function fetchGoogleCals() {
   showCalSelector.value = true
   await googleStore.fetchGoogleCalendars()
   selectedGoogleCals.value = googleStore.connectedCalendars.map(c => c.id)
+}
+
+function toggleCalSelection(id: string) {
+  const idx = selectedGoogleCals.value.indexOf(id)
+  if (idx > -1) selectedGoogleCals.value.splice(idx, 1)
+  else selectedGoogleCals.value.push(id)
 }
 
 async function saveGoogleCals() {

@@ -1,0 +1,49 @@
+"""Enable Row-Level Security on tenant-scoped tables (employee-service).
+
+Phase 1 of 2: ENABLE only (no FORCE). Monitor before applying 0013_rls_force.py.
+
+Revision ID: 0012_rls_enable
+Revises: 0011_add_import_jobs
+Create Date: 2026-04-19
+"""
+from alembic import op
+
+revision = "0012_rls_enable"
+down_revision = "0011_add_import_jobs"
+branch_labels = None
+depends_on = None
+
+TENANT_TABLES = [
+    "employees",
+    "departments",
+    "branches",
+    "designations",
+    "employment_types",
+    "employee_grades",
+    "employee_groups",
+    "shift_types",
+    "shift_locations",
+    "import_jobs",
+]
+
+_POLICY = """
+CREATE POLICY tenant_isolation ON {table}
+  USING (
+    current_setting('app.company_id', true) IS NOT NULL
+    AND company_id = current_setting('app.company_id', true)::uuid
+  );
+"""
+
+
+def upgrade() -> None:
+    for table in TENANT_TABLES:
+        op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
+        op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table};")
+        op.execute(_POLICY.format(table=table))
+
+
+def downgrade() -> None:
+    for table in TENANT_TABLES:
+        op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table};")
+        op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;")
+        op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;")

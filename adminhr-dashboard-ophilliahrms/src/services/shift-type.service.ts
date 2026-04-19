@@ -6,13 +6,13 @@ export interface ShiftType {
   name: string
   start_time: string
   end_time: string
+  work_hours_per_day?: number
   break_minutes: number
-  work_hours?: number
   grace_period_minutes: number
-  is_overnight: number
+  is_night_shift: boolean
   color_code?: string
   description?: string
-  is_active: number
+  is_active: boolean
   created_at?: string
   updated_at?: string
 }
@@ -35,6 +35,6 @@ export async function updateShiftType(id: string, payload: Partial<ShiftType>): 
   })
 }
 
-export async function deleteShiftType(id: string): Promise<void> {
-  await apiFetchData<void>(`/shift-types/${id}`, { method: 'DELETE' })
+export async function deleteShiftType(id: string): Promise<ShiftType> {
+  return apiFetchData<ShiftType>(`/shift-types/${id}`, { method: 'DELETE' })
 }

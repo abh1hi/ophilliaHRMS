@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, Integer, Time, DateTime, ForeignKey, Index
+from sqlalchemy import Column, String, Float, Integer, Boolean, Time, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -12,31 +12,31 @@ def naive_utcnow():
 
 
 class AttendancePolicy(Base):
-    """Admin-assigned attendance method per department or per employee.
+    """Admin-assigned attendance method per scope.
 
-    Resolution priority:
-        1. Employee-level policy (employee_id is set)
-        2. Department-level policy (department_id is set)
-        3. Global default: method = 'manual'
+    Resolution priority (highest → lowest):
+        1. Employee-level policy  (employee_id set)
+        2. Location-level policy  (location_id set, employee_id null)
+        3. Department-level policy (department_id set, employee_id null)
+        4. Company-global policy  (all scope fields null)
+        5. Hard defaults          (method=manual, 8h, 0 grace)
     """
     __tablename__ = "attendance_policies"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
-    # Scope: one of these should be set (employee overrides department)
-    department_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    # Scope (employee > location > department > global)
     employee_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-
-    # Attendance method: manual | geofence | both
-    method = Column(String(20), nullable=False, default="manual")
-
-    # Which geofence to validate against (when method is geofence/both)
-    geofence_id = Column(
+    location_id = Column(
         UUID(as_uuid=True),
         ForeignKey("geofence_locations.id", ondelete="SET NULL"),
         nullable=True,
     )
+    department_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+
+    # Attendance method: manual | geofence | both
+    method = Column(String(20), nullable=False, default="manual")
 
     # Work schedule (for late detection & overtime calc)
     work_start_time = Column(Time, nullable=True, default=time(9, 0))
@@ -49,7 +49,7 @@ class AttendancePolicy(Base):
     task_planning_grace_minutes = Column(Float, nullable=False, default=30.0)
 
     # Whether night shift (cross-date) is allowed
-    allow_night_shift = Column(String(10), nullable=False, default="false")
+    allow_night_shift = Column(Boolean, nullable=False, default=False)
 
     # Maximum shifts per day (1 = standard, >1 = multiple shifts)
     max_shifts_per_day = Column(Float, nullable=False, default=2)
@@ -65,10 +65,20 @@ class AttendancePolicy(Base):
         nullable=False,
     )
 
-    # Relationship
-    geofence = relationship("GeofenceLocation", lazy="selectin")
+    # Multi-geofence: valid clock-in locations (any match succeeds)
+    geofences = relationship(
+        "GeofenceLocation",
+        secondary="policy_geofences",
+        lazy="selectin",
+        viewonly=True,
+    )
 
     __table_args__ = (
         Index("ix_policy_employee_id", "employee_id"),
         Index("ix_policy_department_id", "department_id"),
+        Index("ix_policy_location_id", "location_id"),
+        Index(
+            "ix_policy_scope_lookup",
+            "company_id", "employee_id", "location_id", "department_id",
+        ),
     )

@@ -1,116 +1,22 @@
-<template>
-  <!-- Slide drawer overlay -->
-  <Teleport to="body">
-    <Transition name="drawer">
-      <div v-if="open" class="fixed inset-0 z-50 flex justify-end">
-        <div class="absolute inset-0 bg-black/40" @click="emit('close')" />
-        <div class="relative w-full max-w-md bg-white h-full shadow-xl flex flex-col">
-          <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-            <h2 class="text-lg font-semibold text-slate-800">
-              {{ isEdit ? 'Edit Workspace' : 'New Workspace' }}
-            </h2>
-            <button @click="emit('close')" class="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-              <XIcon class="w-5 h-5 text-slate-500" />
-            </button>
-          </div>
-
-          <!-- Form -->
-          <form @submit.prevent="submit" class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-            <!-- Name -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Name <span class="text-red-500">*</span></label>
-              <input
-                v-model="form.name"
-                type="text"
-                required
-                maxlength="200"
-                placeholder="Team workspace name"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
-            </div>
-
-            <!-- Description -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
-              <textarea
-                v-model="form.description"
-                rows="3"
-                placeholder="What is this workspace for?"
-                class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
-              />
-            </div>
-
-            <!-- Type -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Type</label>
-              <div class="grid grid-cols-3 gap-2">
-                <button
-                  v-for="t in types"
-                  :key="t.value"
-                  type="button"
-                  @click="form.workspace_type = t.value"
-                  :class="[
-                    'px-3 py-2 rounded-lg border text-sm font-medium transition-colors flex flex-col items-center gap-1',
-                    form.workspace_type === t.value
-                      ? 'bg-slate-900 text-white border-slate-900'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50',
-                  ]"
-                >
-                  <component :is="t.icon" class="w-4 h-4" />
-                  {{ t.label }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Color -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Color</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="c in colors"
-                  :key="c"
-                  type="button"
-                  @click="form.color = c"
-                  :style="{ backgroundColor: c }"
-                  :class="[
-                    'w-8 h-8 rounded-full border-2 transition-all',
-                    form.color === c ? 'border-slate-900 scale-110' : 'border-transparent',
-                  ]"
-                />
-              </div>
-            </div>
-
-            <!-- Error -->
-            <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-          </form>
-
-          <!-- Footer -->
-          <div class="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-            <button
-              type="button"
-              @click="emit('close')"
-              class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              @click="submit"
-              :disabled="saving || !form.name.trim()"
-              class="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
-            >
-              {{ saving ? 'Saving…' : isEdit ? 'Update' : 'Create' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-</template>
-
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { XIcon, UsersIcon, FolderIcon, UserIcon } from 'lucide-vue-next'
+import { ref, watch, computed } from 'vue'
+import SlideDrawer from '../ui/SlideDrawer.vue'
+import FormInput from '../ui/FormInput.vue'
+import FormTextarea from '../ui/FormTextarea.vue'
+import { Button } from '@/components/ui/button'
+import { 
+  X, 
+  Users, 
+  Folder, 
+  User, 
+  Palette, 
+  Info, 
+  Layout, 
+  Component, 
+  Compass,
+  Zap,
+  Check
+} from 'lucide-vue-next'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import type { Workspace } from '@/services/calendar-workspace.service'
 
@@ -134,9 +40,9 @@ const isEdit = computed(() => !!props.workspace)
 const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b']
 
 const types = [
-  { value: 'team' as const, label: 'Team', icon: UsersIcon },
-  { value: 'project' as const, label: 'Project', icon: FolderIcon },
-  { value: 'personal' as const, label: 'Personal', icon: UserIcon },
+  { value: 'team' as const, label: 'Collective', icon: Users },
+  { value: 'project' as const, label: 'Initiative', icon: Folder },
+  { value: 'personal' as const, label: 'Individual', icon: User },
 ]
 
 const form = ref({
@@ -190,24 +96,91 @@ async function submit() {
     saving.value = false
   }
 }
-
-import { computed } from 'vue'
 </script>
 
-<style scoped>
-.drawer-enter-active,
-.drawer-leave-active {
-  transition: opacity 0.25s;
-}
-.drawer-enter-active .relative,
-.drawer-leave-active .relative {
-  transition: transform 0.25s;
-}
-.drawer-enter-from,
-.drawer-leave-to {
-  opacity: 0;
-}
-.drawer-enter-from .relative {
-  transform: translateX(100%);
-}
-</style>
+<template>
+  <SlideDrawer 
+    :open="open" 
+    :title="isEdit ? 'Modify Environment' : 'Initialize Workspace'" 
+    width="w-full max-w-md" 
+    @close="emit('close')"
+  >
+    <div class="space-y-8 py-4">
+      <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50 mb-2">
+         <Info class="w-4 h-4 text-indigo-500 mt-0.5" />
+         <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
+           Workspaces represent synchronized environments for task orchestration. Calibration of type and aesthetic focus optimizes data visualization.
+         </p>
+      </div>
+
+      <FormInput label="Environmental Identity" v-model="form.name" required maxlength="200" placeholder="e.g. Core Engineering Hub" />
+      <FormTextarea label="Operational Brief" v-model="form.description" placeholder="Specify the mission parameters..." />
+
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 mb-2">
+           <Layout class="w-4 h-4 text-slate-400" />
+           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Type Calibration</span>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <Button
+            v-for="t in types"
+            :key="t.value"
+            type="button"
+            variant="ghost"
+            @click="form.workspace_type = t.value"
+            :class="[
+              'h-auto flex-col gap-2 p-4 rounded-[22px] border transition-all duration-300',
+              form.workspace_type === t.value
+                ? 'bg-slate-900 text-white border-slate-900 shadow-xl shadow-slate-200 scale-105'
+                : 'bg-slate-50/50 text-slate-500 border-white/10 hover:bg-slate-100/50 hover:border-slate-200 hover:text-slate-900',
+            ]"
+          >
+            <component :is="t.icon" :class="['w-5 h-5', form.workspace_type === t.value ? 'text-white' : 'text-slate-400']" />
+            <span class="text-[10px] font-bold uppercase tracking-widest">{{ t.label }}</span>
+          </Button>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 mb-2">
+           <Palette class="w-4 h-4 text-slate-400" />
+           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Aesthetic Focus</span>
+        </div>
+        <div class="p-6 bg-slate-50/50 rounded-[32px] border border-white/10 flex flex-wrap gap-3">
+          <button
+            v-for="c in colors"
+            :key="c"
+            type="button"
+            @click="form.color = c"
+            :style="{ backgroundColor: c }"
+            class="w-8 h-8 rounded-full border-2 transition-all duration-300 relative group"
+            :class="[
+              form.color === c ? 'border-slate-900 scale-125' : 'border-white/40 hover:scale-110 shadow-sm',
+            ]"
+          >
+             <Check v-if="form.color === c" class="absolute inset-0 m-auto w-3 h-3 text-white" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex-1">
+           <p v-if="error" class="text-[10px] font-bold text-destructive uppercase tracking-tight animate-in fade-in">{{ error }}</p>
+        </div>
+        <div class="flex gap-3">
+          <Button variant="outline" @click="emit('close')" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[11px]">Cancel</Button>
+          <Button 
+            @click="submit" 
+            :disabled="saving || !form.name.trim()" 
+            class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
+          >
+            {{ saving ? 'Syncing...' : isEdit ? 'Update Environment' : 'Initialize Hub' }}
+          </Button>
+        </div>
+      </div>
+    </template>
+  </SlideDrawer>
+</template>
+

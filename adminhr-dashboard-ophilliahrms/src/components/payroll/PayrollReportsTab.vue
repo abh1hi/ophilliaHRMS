@@ -1,6 +1,20 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { usePayrollStore } from '@/stores/payroll.store'
+import { Button } from '@/components/ui/button'
+import BadgeChip from '@/components/ui/BadgeChip.vue'
+import { 
+  FileText, 
+  Landmark, 
+  ClipboardCheck, 
+  ShieldAlert, 
+  CreditCard, 
+  BarChart3, 
+  Download, 
+  Info,
+  Clock,
+  ExternalLink
+} from 'lucide-vue-next'
 
 const payrollStore = usePayrollStore()
 const downloadingECR = ref(false)
@@ -33,119 +47,134 @@ const downloadBankAdvice = async () => {
     downloadingBankAdvice.value = false
   }
 }
+
+const reportTypes = [
+  {
+    id: 'ecr',
+    title: 'ECR File',
+    description: 'EPFO Contribution Return file for monthly submission',
+    icon: FileText,
+    iconColor: 'text-blue-600',
+    bgColor: 'bg-blue-50/50',
+    action: downloadECR,
+    loading: downloadingECR,
+    btnText: 'Download ECR',
+    comingSoon: false
+  },
+  {
+    id: 'bank-advice',
+    title: 'Bank Advice',
+    description: 'CSV file with employee bank account details for fund transfer',
+    icon: Landmark,
+    iconColor: 'text-emerald-600',
+    bgColor: 'bg-emerald-50/50',
+    action: downloadBankAdvice,
+    loading: downloadingBankAdvice,
+    btnText: 'Download CSV',
+    comingSoon: false
+  },
+  {
+    id: 'form-16',
+    title: 'Form 16',
+    description: 'Tax deduction certificate for employee annual tax filing',
+    icon: ClipboardCheck,
+    iconColor: 'text-indigo-600',
+    bgColor: 'bg-indigo-50/50',
+    comingSoon: true
+  },
+  {
+    id: 'esic',
+    title: 'ESIC Return',
+    description: 'ESIC monthly return data for compliance submission',
+    icon: ShieldAlert,
+    iconColor: 'text-amber-600',
+    bgColor: 'bg-amber-50/50',
+    comingSoon: true
+  },
+  {
+    id: 'pt',
+    title: 'PT Challan',
+    description: 'Professional Tax payment details segmented by state',
+    icon: CreditCard,
+    iconColor: 'text-rose-600',
+    bgColor: 'bg-rose-50/50',
+    comingSoon: true
+  },
+  {
+    id: 'lwf',
+    title: 'LWF Summary',
+    description: 'Labour Welfare Fund monthly contribution summary',
+    icon: BarChart3,
+    iconColor: 'text-slate-600',
+    bgColor: 'bg-slate-50/50',
+    comingSoon: true
+  }
+]
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <!-- ECR Export -->
-      <div class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-2xl p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-            <span class="text-lg">📄</span>
-          </div>
-          <h3 class="font-bold text-slate-900">ECR File</h3>
-        </div>
-        <p class="text-sm text-slate-600 mb-4">EPFO Contribution Return file for monthly submission</p>
-        <button
-          @click="downloadECR"
-          :disabled="!payrollStore.currentRun || downloadingECR"
-          class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 font-medium transition-colors disabled:opacity-50"
-        >
-          {{ downloadingECR ? 'Downloading...' : 'Download ECR' }}
-        </button>
-      </div>
+  <div class="space-y-10">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div 
+        v-for="report in reportTypes" 
+        :key="report.id"
+        class="group bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-[28px] p-8 hover:shadow-2xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all duration-500 overflow-hidden relative"
+      >
+        <!-- Card Decoration -->
+        <div class="absolute -right-8 -top-8 w-24 h-24 bg-slate-900/5 rounded-full blur-2xl group-hover:bg-slate-900/10 transition-colors"></div>
 
-      <!-- Bank Advice -->
-      <div class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-2xl p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-            <span class="text-lg">🏦</span>
+        <div class="flex items-start justify-between mb-6">
+          <div :class="['w-12 h-12 rounded-2xl flex items-center justify-center border border-white/40', report.bgColor]">
+            <component :is="report.icon" :class="['w-6 h-6', report.iconColor]" />
           </div>
-          <h3 class="font-bold text-slate-900">Bank Advice</h3>
+          <BadgeChip v-if="report.comingSoon" variant="secondary" class="font-bold tracking-widest text-[9px] uppercase">Alpha</BadgeChip>
+          <div v-else-if="!payrollStore.currentRun" class="flex items-center gap-1.5 text-[9px] font-bold text-rose-500 uppercase tracking-widest animate-pulse">
+             <Clock class="w-3 h-3" /> Select Cycle
+          </div>
         </div>
-        <p class="text-sm text-slate-600 mb-4">CSV file with employee bank account details for fund transfer</p>
-        <button
-          @click="downloadBankAdvice"
-          :disabled="!payrollStore.currentRun || downloadingBankAdvice"
-          class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 font-medium transition-colors disabled:opacity-50"
-        >
-          {{ downloadingBankAdvice ? 'Downloading...' : 'Download CSV' }}
-        </button>
-      </div>
 
-      <!-- Form 16 -->
-      <div class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-2xl p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-            <span class="text-lg">📋</span>
-          </div>
-          <h3 class="font-bold text-slate-900">Form 16</h3>
-        </div>
-        <p class="text-sm text-slate-600 mb-4">Tax deduction certificate for employee annual tax filing</p>
-        <button
+        <h3 class="font-black text-slate-900 dark:text-slate-100 text-lg tracking-tight mb-2">{{ report.title }}</h3>
+        <p class="text-[11px] leading-relaxed text-muted-foreground font-medium mb-8">
+          {{ report.description }}
+        </p>
+
+        <Button 
+          v-if="!report.comingSoon"
+          @click="report.action"
+          :disabled="!payrollStore.currentRun || report.loading?.value"
+          variant="outline"
+          class="w-full h-11 rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-50 font-bold uppercase tracking-wider text-[11px] group/btn"
+        >
+          <Download v-if="!report.loading?.value" class="w-4 h-4 mr-2 group-hover/btn:translate-y-0.5 transition-transform" />
+          <div v-else class="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mr-2"></div>
+          {{ report.loading?.value ? 'Preparing File...' : report.btnText }}
+        </Button>
+        <Button 
+          v-else
           disabled
-          class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 font-medium transition-colors disabled:opacity-50"
+          variant="ghost"
+          class="w-full h-11 rounded-2xl border border-dashed border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[11px]"
         >
-          Coming Soon
-        </button>
-      </div>
-
-      <!-- ESIC Return -->
-      <div class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-2xl p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-            <span class="text-lg">🛡️</span>
-          </div>
-          <h3 class="font-bold text-slate-900">ESIC Return</h3>
-        </div>
-        <p class="text-sm text-slate-600 mb-4">ESIC monthly return data for compliance</p>
-        <button
-          disabled
-          class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 font-medium transition-colors disabled:opacity-50"
-        >
-          Coming Soon
-        </button>
-      </div>
-
-      <!-- PT Challan -->
-      <div class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-2xl p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
-            <span class="text-lg">💳</span>
-          </div>
-          <h3 class="font-bold text-slate-900">PT Challan</h3>
-        </div>
-        <p class="text-sm text-slate-600 mb-4">Professional Tax payment details by state</p>
-        <button
-          disabled
-          class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 font-medium transition-colors disabled:opacity-50"
-        >
-          Coming Soon
-        </button>
-      </div>
-
-      <!-- LWF Summary -->
-      <div class="bg-white/70 backdrop-blur-md border border-slate-200/60 rounded-2xl p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <span class="text-lg">📊</span>
-          </div>
-          <h3 class="font-bold text-slate-900">LWF Summary</h3>
-        </div>
-        <p class="text-sm text-slate-600 mb-4">Labour Welfare Fund contribution summary</p>
-        <button
-          disabled
-          class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 font-medium transition-colors disabled:opacity-50"
-        >
-          Coming Soon
-        </button>
+          Pipeline Under Construction
+        </Button>
       </div>
     </div>
 
-    <!-- Info Message -->
-    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
-      <strong>Note:</strong> Select a payroll run to enable download options for reports and compliance documents.
+    <!-- Info Banner -->
+    <div class="bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-500/10 rounded-[32px] p-8 flex items-center gap-6 animate-in slide-in-from-bottom-2">
+      <div class="h-14 w-14 rounded-[22px] bg-white dark:bg-slate-900 shadow-sm flex items-center justify-center shrink-0">
+        <Info class="w-6 h-6 text-indigo-500" />
+      </div>
+      <div class="flex-1">
+        <h4 class="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">Compliance Readiness</h4>
+        <p class="text-[11px] text-muted-foreground font-medium mt-1">
+          To generate specific reports, ensure you have an <span class="text-indigo-600 font-bold">active Payroll Cycle</span> selected. 
+          Compliance documents are generated in real-time based on calculated ledger entries.
+        </p>
+      </div>
+      <Button variant="link" class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+        Go to Cycles <ExternalLink class="w-3 h-3 ml-2" />
+      </Button>
     </div>
   </div>
 </template>

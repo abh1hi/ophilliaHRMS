@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import SlideDrawer from '../ui/SlideDrawer.vue'
+import { Button } from '../ui/button'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '../ui/tabs'
 import EmployeeFormPersonal from './EmployeeFormPersonal.vue'
 import EmployeeFormJoining from './EmployeeFormJoining.vue'
 import EmployeeFormDeptGrade from './EmployeeFormDeptGrade.vue'
@@ -71,58 +78,55 @@ async function save() {
     :open="open"
     :title="isEdit() ? `Edit — ${employee?.first_name} ${employee?.last_name}` : 'New Employee'"
     subtitle="Fill in the details across the sections below"
-    width="w-full max-w-3xl"
+    width="w-full max-w-4xl"
     @close="emit('close')"
   >
-    <!-- Tab Pills -->
-    <div class="flex flex-wrap gap-2 mb-8 -mt-2">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        @click="activeTab = tab.key"
-        :class="[
-          'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200',
-          activeTab === tab.key
-            ? 'bg-slate-900 text-white shadow-sm'
-            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800'
-        ]"
-      >
-        {{ tab.label }}
-      </button>
-    </div>
+    <Tabs v-model="activeTab" class="w-full">
+      <div class="sticky top-0 bg-background/95 backdrop-blur z-20 -mx-6 px-6 pb-2 border-b">
+        <TabsList class="flex w-full justify-start h-auto p-1 bg-muted/50 rounded-lg overflow-x-auto no-scrollbar">
+          <TabsTrigger
+            v-for="tab in tabs"
+            :key="tab.key"
+            :value="tab.key"
+            class="px-4 py-2 text-xs font-semibold rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            {{ tab.label }}
+          </TabsTrigger>
+        </TabsList>
+      </div>
 
-    <!-- Tab Content -->
-    <EmployeeFormPersonal  v-if="activeTab === 'personal'"   v-model="form" />
-    <EmployeeFormJoining   v-if="activeTab === 'joining'"    v-model="form" />
-    <EmployeeFormDeptGrade v-if="activeTab === 'dept'"       v-model="form" />
-    <EmployeeFormSalary    v-if="activeTab === 'salary'"     v-model="form" />
-    <EmployeeFormContact   v-if="activeTab === 'contact'"    v-model="form" />
-    <EmployeeFormEmergency v-if="activeTab === 'emergency'"  v-model="form" />
-    <EmployeeFormEducation v-if="activeTab === 'education'"  v-model="form" />
-    <EmployeeFormExperience v-if="activeTab === 'experience'" v-model="form" />
-    <EmployeeFormExit      v-if="activeTab === 'exit'"       v-model="form" />
+      <div class="mt-8">
+        <TabsContent value="personal"> <EmployeeFormPersonal v-model="form" /> </TabsContent>
+        <TabsContent value="joining"> <EmployeeFormJoining v-model="form" /> </TabsContent>
+        <TabsContent value="dept"> <EmployeeFormDeptGrade v-model="form" /> </TabsContent>
+        <TabsContent value="salary"> <EmployeeFormSalary v-model="form" /> </TabsContent>
+        <TabsContent value="contact"> <EmployeeFormContact v-model="form" /> </TabsContent>
+        <TabsContent value="emergency"> <EmployeeFormEmergency v-model="form" /> </TabsContent>
+        <TabsContent value="education"> <EmployeeFormEducation v-model="form" /> </TabsContent>
+        <TabsContent value="experience"> <EmployeeFormExperience v-model="form" /> </TabsContent>
+        <TabsContent value="exit"> <EmployeeFormExit v-model="form" /> </TabsContent>
+      </div>
+    </Tabs>
 
     <!-- Footer -->
     <template #footer>
       <div class="flex items-center justify-between">
-        <p v-if="errorMsg" class="text-sm text-rose-600 font-medium">{{ errorMsg }}</p>
+        <p v-if="errorMsg" class="text-xs text-destructive font-medium">{{ errorMsg }}</p>
         <div v-else></div>
         <div class="flex items-center space-x-3">
-          <button
-            @click="emit('close')"
-            class="px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full font-medium text-sm transition-colors"
-          >
+          <Button variant="outline" @click="emit('close')" class="rounded-full px-6">
             Cancel
-          </button>
-          <button
-            @click="save"
-            :disabled="saving"
-            class="px-6 py-2.5 bg-slate-900 text-white rounded-full font-medium text-sm hover:bg-slate-800 transition-all disabled:opacity-60 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
-          >
+          </Button>
+          <Button @click="save" :disabled="saving" class="rounded-full px-8 shadow-md">
             {{ saving ? 'Saving...' : (isEdit() ? 'Update Employee' : 'Create Employee') }}
-          </button>
+          </Button>
         </div>
       </div>
     </template>
   </SlideDrawer>
 </template>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>

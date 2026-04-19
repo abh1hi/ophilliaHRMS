@@ -10,12 +10,6 @@ const routes = [
     meta: { public: true }
   },
   {
-    path: '/select-company',
-    name: 'SelectCompany',
-    component: () => import('../views/CompanySelectionView.vue'),
-    meta: { requiresAuth: true, roles: ['super_admin'] }
-  },
-  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('../views/DashboardView.vue'),
@@ -31,13 +25,13 @@ const routes = [
     path: '/payroll',
     name: 'Payroll',
     component: () => import('../views/PayrollView.vue'),
-    meta: { requiresAuth: true, roles: ['admin', 'hr', 'super_admin'] }
+    meta: { requiresAuth: true, roles: ['admin', 'hr'] }
   },
   {
     path: '/onboarding',
     name: 'Onboarding',
     component: () => import('../views/OnboardingView.vue'),
-    meta: { requiresAuth: true, roles: ['admin', 'super_admin', 'hr'] }
+    meta: { requiresAuth: true, roles: ['admin', 'hr'] }
   }
 ]
 
@@ -57,6 +51,12 @@ router.beforeEach((to, _from, next) => {
 
   const claims = decodeToken(token)
   if (!claims || claims.exp * 1000 < Date.now()) {
+    clearTokens()
+    return next('/')
+  }
+
+  // Block super_admin from HR dashboard — they must use the Super Admin Portal
+  if (claims.role === 'super_admin') {
     clearTokens()
     return next('/')
   }

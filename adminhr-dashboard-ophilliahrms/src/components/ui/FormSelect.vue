@@ -1,4 +1,14 @@
 <script setup lang="ts">
+import { Label } from './label'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './select'
+
 defineProps<{
   label: string
   modelValue: string | undefined
@@ -13,23 +23,34 @@ defineEmits<{ (e: 'update:modelValue', val: string): void }>()
 </script>
 
 <template>
-  <div class="space-y-1.5">
-    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
-      {{ label }}<span v-if="required" class="text-rose-500 ml-0.5">*</span>
-    </label>
-    <select
-      :value="modelValue"
-      :required="required"
+  <div class="space-y-2">
+    <Label :class="{ 'text-destructive': !!error }">
+      {{ label }}<span v-if="required" class="text-destructive ml-0.5">*</span>
+    </Label>
+    
+    <Select
+      :model-value="modelValue"
       :disabled="disabled"
-      @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
-      :class="[
-        'w-full bg-slate-50/50 border text-slate-900 text-sm rounded-[12px] focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 px-4 py-2.5 outline-none transition-all disabled:opacity-50 appearance-none cursor-pointer',
-        error ? 'border-rose-300' : 'border-slate-200/60'
-      ]"
+      @update:model-value="$emit('update:modelValue', $event)"
     >
-      <option v-if="placeholder" value="" disabled>{{ placeholder }}</option>
-      <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-    </select>
-    <p v-if="error" class="text-xs text-rose-500">{{ error }}</p>
+      <SelectTrigger :class="{ 'border-destructive ring-destructive': !!error }">
+        <SelectValue :placeholder="placeholder" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectItem
+            v-for="opt in options"
+            :key="opt.value"
+            :value="opt.value"
+          >
+            {{ opt.label }}
+          </SelectItem>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+    
+    <p v-if="error" class="text-[0.8rem] font-medium text-destructive">
+      {{ error }}
+    </p>
   </div>
 </template>

@@ -8,12 +8,31 @@ import EmployeeProfilePanel from './EmployeeProfilePanel.vue'
 import EmployeeStatusBadge from './EmployeeStatusBadge.vue'
 import AccountStatusBadge from './AccountStatusBadge.vue'
 import FormSelect from '../ui/FormSelect.vue'
+import { Button } from '../ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog'
+import { Textarea } from '../ui/textarea'
 import {
   listEmployees, deleteEmployee,
   sendEmployeeInvite, resendEmployeeInvite, revokeEmployeeInvite, disableEmployeeAccount,
 } from '../../services/employee.service'
 import type { Employee, SendInviteResponse } from '../../services/employee.service'
-import { PencilIcon, Trash2Icon, RefreshCwIcon, MailIcon, ShieldOffIcon, XCircleIcon } from 'lucide-vue-next'
+import { 
+  Pencil, 
+  Trash2, 
+  RefreshCw, 
+  Mail, 
+  ShieldOff, 
+  XCircle,
+  Copy,
+  Check as CheckIcon
+} from 'lucide-vue-next'
 
 const employees    = ref<Employee[]>([])
 const total        = ref(0)
@@ -177,19 +196,20 @@ function fullName(emp: Employee | null) {
     <PageHeader
       title="Employee Directory"
       subtitle="Manage all employees across your organization"
-      action-label="+ New Employee"
+      action-label="New Employee"
       @action="openCreate"
     >
       <template #extra>
-        <button
+        <Button
+          variant="outline"
           @click="load"
           :disabled="loading"
-          class="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-500 rounded-full text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+          class="rounded-full gap-2 px-4 h-9"
           title="Refresh list"
         >
-          <RefreshCwIcon :class="['w-3.5 h-3.5', loading ? 'animate-spin' : '']" />
+          <RefreshCw :class="['w-3.5 h-3.5', loading ? 'animate-spin' : '']" />
           Refresh
-        </button>
+        </Button>
       </template>
     </PageHeader>
 
@@ -232,17 +252,17 @@ function fullName(emp: Employee | null) {
       <template #cell-employee_code="{ row }">
         <span
           v-if="row.employee_code"
-          class="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-mono font-semibold"
+          class="inline-block px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-mono font-bold"
         >{{ row.employee_code }}</span>
-        <span v-else class="text-slate-300 text-xs">—</span>
+        <span v-else class="text-muted-foreground/30 text-xs">—</span>
       </template>
 
       <template #cell-name="{ row }">
         <div class="flex items-center space-x-3">
-          <div class="w-8 h-8 rounded-[10px] bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+          <div class="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0 border border-border">
             {{ (row.first_name?.[0] ?? '') + (row.last_name?.[0] ?? '') }}
           </div>
-          <span class="font-semibold text-slate-900">{{ fullName(row) }}</span>
+          <span class="font-semibold text-foreground">{{ fullName(row) }}</span>
         </div>
       </template>
 
@@ -258,64 +278,76 @@ function fullName(emp: Employee | null) {
       <template #actions="{ row }">
         <div class="flex items-center justify-end space-x-1">
           <!-- Edit -->
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             @click="openEdit(row)"
-            class="p-2 rounded-[10px] hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            class="h-8 w-8 rounded-md"
             title="Edit"
           >
-            <PencilIcon class="w-4 h-4" />
-          </button>
+            <Pencil class="w-4 h-4 text-muted-foreground" />
+          </Button>
 
           <!-- Send Invite (not_registered) -->
-          <button
+          <Button
             v-if="row.account_status === 'not_registered'"
+            variant="ghost"
+            size="icon"
             @click="confirmSendInvite(row)"
             :disabled="inviting && inviteTarget?.id === row.id"
-            class="p-2 rounded-[10px] hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors disabled:opacity-40"
+            class="h-8 w-8 rounded-md text-blue-500 hover:text-blue-600 hover:bg-blue-50"
             title="Send Invite"
           >
-            <MailIcon class="w-4 h-4" />
-          </button>
+            <Mail class="w-4 h-4" />
+          </Button>
 
           <!-- Resend Invite (invited) -->
-          <button
+          <Button
             v-if="row.account_status === 'invited'"
+            variant="ghost"
+            size="icon"
             @click="confirmSendInvite(row, true)"
             :disabled="inviting && inviteTarget?.id === row.id"
-            class="p-2 rounded-[10px] hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors disabled:opacity-40"
+            class="h-8 w-8 rounded-md text-blue-500 hover:text-blue-600 hover:bg-blue-50"
             title="Resend Invite"
           >
-            <RefreshCwIcon class="w-4 h-4" />
-          </button>
+            <RefreshCw class="w-4 h-4" />
+          </Button>
 
           <!-- Revoke Invite (invited) -->
-          <button
+          <Button
             v-if="row.account_status === 'invited'"
+            variant="ghost"
+            size="icon"
             @click="revokeTarget = row"
-            class="p-2 rounded-[10px] hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
+            class="h-8 w-8 rounded-md text-amber-500 hover:text-amber-600 hover:bg-amber-50"
             title="Revoke Invite"
           >
-            <XCircleIcon class="w-4 h-4" />
-          </button>
+            <XCircle class="w-4 h-4" />
+          </Button>
 
           <!-- Disable Account (active) -->
-          <button
+          <Button
             v-if="row.account_status === 'active'"
+            variant="ghost"
+            size="icon"
             @click="disableTarget = row"
-            class="p-2 rounded-[10px] hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+            class="h-8 w-8 rounded-md text-destructive hover:text-destructive hover:bg-destructive/10"
             title="Disable Account"
           >
-            <ShieldOffIcon class="w-4 h-4" />
-          </button>
+            <ShieldOff class="w-4 h-4 text-destructive" />
+          </Button>
 
           <!-- Delete -->
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             @click="deleteTarget = row"
-            class="p-2 rounded-[10px] hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+            class="h-8 w-8 rounded-md text-destructive hover:text-destructive hover:bg-destructive/10"
             title="Delete"
           >
-            <Trash2Icon class="w-4 h-4" />
-          </button>
+            <Trash2 class="w-4 h-4 text-destructive" />
+          </Button>
         </div>
       </template>
     </DataTable>
@@ -368,37 +400,37 @@ function fullName(emp: Employee | null) {
       @cancel="disableTarget = null"
     />
 
-    <!-- Invite Link Modal -->
-    <div
-      v-if="showInviteModal && inviteResult"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      @click.self="showInviteModal = false"
-    >
-      <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md space-y-4">
-        <h3 class="text-base font-semibold text-slate-800">Invite Link Ready</h3>
-        <p class="text-sm text-slate-500">
-          Share this link with <strong>{{ inviteResult.email }}</strong>. It expires on
-          {{ inviteResult.expires_at ? new Date(inviteResult.expires_at).toLocaleDateString() : '7 days from now' }}.
-        </p>
-        <textarea
-          readonly
-          :value="inviteResult.invite_url"
-          rows="3"
-          class="w-full text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl p-3 resize-none text-slate-700 focus:outline-none"
-        />
-        <div class="flex justify-end gap-3">
-          <button
-            @click="showInviteModal = false"
-            class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-          >Close</button>
-          <button
-            @click="copyInviteUrl"
-            class="px-4 py-2 text-sm font-medium bg-slate-900 text-white rounded-full hover:bg-slate-700 transition-colors"
-          >
-            {{ copySuccess ? 'Copied!' : 'Copy Link' }}
-          </button>
+    <!-- Invite Link Modal (Shadcn Dialog) -->
+    <Dialog :open="showInviteModal" @update:open="showInviteModal = $event">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Invite Link Ready</DialogTitle>
+          <DialogDescription v-if="inviteResult">
+            Share this link with <span class="font-bold">{{ inviteResult.email }}</span>. It expires on
+            {{ inviteResult.expires_at ? new Date(inviteResult.expires_at).toLocaleDateString() : '7 days from now' }}.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div class="mt-4" v-if="inviteResult">
+          <Textarea
+            readonly
+            :value="inviteResult.invite_url"
+            rows="3"
+            class="font-mono text-xs bg-muted resize-none focus-visible:ring-0"
+          />
         </div>
-      </div>
-    </div>
+
+        <DialogFooter class="flex justify-end gap-2 mt-4">
+          <Button variant="ghost" @click="showInviteModal = false">
+            Close
+          </Button>
+          <Button @click="copyInviteUrl" class="gap-2 px-6">
+            <CheckIcon v-if="copySuccess" class="w-4 h-4" />
+            <Copy v-else class="w-4 h-4" />
+            {{ copySuccess ? 'Copied!' : 'Copy Link' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

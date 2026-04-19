@@ -7,7 +7,6 @@ from app.db.session import get_db
 from app.models.outbox import OutboxEvent
 from uuid import UUID
 from app.schemas.request_response_models import (
-    UserCreate,
     AdminUserCreate,
     UserLogin,
     UserResponse,
@@ -16,12 +15,12 @@ from app.schemas.request_response_models import (
     PasswordResetRequest,
     PasswordResetConfirm,
     RoleUpdateRequest,
-    CompanyCreate,
     CompanyUpdate,
     CompanyResponse,
     CompanyListResponse,
+    CompanyWithAdminCreate,
+    CompanyWithAdminResponse,
     PostLoginContext,
-    SelectCompanyRequest,
     SystemStatusResponse,
     BootstrapRequest,
     InviteRequest,
@@ -32,7 +31,7 @@ from app.schemas.request_response_models import (
 )
 from app.services.auth_service import AuthService
 from app.core.rate_limit import limiter
-from app.api.v1.dependencies import get_current_user, require_role, oauth2_scheme, verify_internal_token
+from app.api.v1.dependencies import get_current_user, require_role, oauth2_scheme, verify_internal_token, get_super_admin_db
 from app.models.user import User
 from app.core.constants import UserRole
 from app.core.config import settings
@@ -47,21 +46,39 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+@router.get("/validate", include_in_schema=False)
+async def validate_token(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+):
+    """Internal endpoint used by nginx auth_request.
+
+    Returns 200 + X-Company-ID header when the JWT is valid.
+    nginx uses this to inject the tenant header before forwarding to services.
+    Super admin has no company_id obligation — still returns their bootstrapped company_id.
+    """
+    response.headers["X-Company-ID"] = str(current_user.company_id)
+    return {}
+
+
 @router.get("/system-status", response_model=SystemStatusResponse)
 async def system_status(db: AsyncSession = Depends(get_db)):
-    """Public endpoint: returns whether the system has been initialized."""
+    """Public endpoint: returns only whether the system has been bootstrapped.
+
+    Intentionally returns no counts or company names — prevents tenant enumeration.
+    """
     from app.repositories.user_repository import UserRepository
-    from app.models.user import Company
+    from app.models.user import User as UserModel
     from sqlalchemy import select, func
 
-    repo = UserRepository(db)
-    user_count = await repo.count_active_by_role(None)  # count all active users
-    company_result = await db.execute(select(func.count()).select_from(Company).where(Company.is_active == True))
-    company_count = company_result.scalar() or 0
+    result = await db.execute(
+        select(func.count()).select_from(UserModel).where(UserModel.is_active == True)
+    )
+    user_count = result.scalar() or 0
 
     return SystemStatusResponse(
-        initialized=user_count > 0 and company_count > 0,
-        has_companies=company_count > 0,
+        initialized=user_count > 0,
+        has_companies=user_count > 0,
     )
 
 
@@ -127,25 +144,30 @@ async def bootstrap(request: Request, payload: BootstrapRequest, db: AsyncSessio
     return await auth_service.authenticate_user(UserLogin(email=payload.email, password=payload.password))
 
 
-@router.post("/companies", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("3/hour")
-async def register_company(request: Request, company_in: CompanyCreate, db: AsyncSession = Depends(get_db)):
-    """Register a new Company (Tenant) for SaaS mode."""
+@router.post("/companies", response_model=CompanyWithAdminResponse, status_code=status.HTTP_201_CREATED)
+async def register_company(
+    request: Request,
+    company_in: CompanyWithAdminCreate,
+    db: AsyncSession = Depends(get_super_admin_db),
+):
+    """Super Admin only: provision a new tenant company + its first (power) admin atomically."""
     auth_service = AuthService(db)
-    company = await auth_service.register_company(company_in)
-    # Write company.created to outbox — guaranteed delivery via relay worker
+    company, admin_user = await auth_service.create_company_with_admin(
+        company_in.name,
+        company_in.domain,
+        company_in.admin,
+    )
     db.add(OutboxEvent(
         event_type="company.created",
         payload_json=json.dumps({"company_id": str(company.id), "name": company.name, "domain": company.domain}),
     ))
     await db.commit()
-    return company
+    return CompanyWithAdminResponse(company=company, admin=admin_user)
 
 
 @router.get("/companies", response_model=CompanyListResponse, status_code=status.HTTP_200_OK)
 async def get_companies(
-    db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_role(UserRole.SUPER_ADMIN)),
+    db: AsyncSession = Depends(get_super_admin_db),
 ):
     """List all registered companies. Restricted to Super Admin."""
     auth_service = AuthService(db)
@@ -157,10 +179,9 @@ async def get_companies(
 async def update_company(
     company_id: UUID,
     data: CompanyUpdate,
-    db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_role(UserRole.SUPER_ADMIN)),
+    db: AsyncSession = Depends(get_super_admin_db),
 ):
-    """Update company name/domain. Super Admin only."""
+    """Update company name/domain/status. Super Admin only."""
     auth_service = AuthService(db)
     return await auth_service.update_company(company_id, data)
 
@@ -168,23 +189,12 @@ async def update_company(
 @router.delete("/companies/{company_id}", response_model=CompanyResponse)
 async def deactivate_company(
     company_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_role(UserRole.SUPER_ADMIN)),
+    db: AsyncSession = Depends(get_super_admin_db),
 ):
     """Soft-delete a company (set is_active=false). Super Admin only."""
     auth_service = AuthService(db)
     return await auth_service.deactivate_company(company_id)
 
-
-@router.post("/select-company", response_model=Token)
-async def select_company(
-    data: SelectCompanyRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Select active company for multi-company admins. Returns new JWT tokens."""
-    auth_service = AuthService(db)
-    return await auth_service.select_company(current_user, data.company_id)
 
 
 async def _fetch_onboarding_status(company_id: str) -> str | None:
@@ -231,35 +241,24 @@ async def post_login_context(
             onboarding_status=onboarding_status,
         )
 
+    # Super admin always goes to their own portal — never to the HR dashboard.
+    # The super admin portal reads /companies separately.
     if current_user.role == UserRole.SUPER_ADMIN.value:
-        if len(companies) == 0:
-            return PostLoginContext(
-                role=current_user.role,
-                companies=[],
-                next_action="CREATE_COMPANY",
-            )
-        elif len(companies) > 1:
-            return PostLoginContext(
-                role=current_user.role,
-                companies=companies,
-                next_action="SELECT_COMPANY",
-            )
+        return PostLoginContext(
+            role=current_user.role,
+            companies=None,
+            next_action="ENTER_DASHBOARD",
+            selected_company=str(current_user.company_id),
+        )
 
     # Single company or non-admin user → go to dashboard
     return PostLoginContext(
         role=current_user.role,
-        companies=companies if current_user.role == UserRole.SUPER_ADMIN.value else None,
+        companies=None,
         next_action="ENTER_DASHBOARD",
         selected_company=str(current_user.company_id),
     )
 
-
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("5/minute")
-async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    """Public self-registration. Always creates an EMPLOYEE — role cannot be chosen."""
-    auth_service = AuthService(db)
-    return await auth_service.register_user(user_in)
 
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -352,7 +351,7 @@ async def update_user_role(
 ):
     """Update a user's RBAC role. Tenant-isolated with privilege-escalation guards."""
     from app.repositories.user_repository import UserRepository
-    from app.core.constants import MAX_SUPER_ADMINS, MAX_ADMINS
+    from app.core.constants import MAX_SUPER_ADMINS
     repo = UserRepository(db)
     user = await repo.get_by_id(user_id)
     if not user:
@@ -374,17 +373,19 @@ async def update_user_role(
     if str(user.id) == str(admin.id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change your own role")
 
-    # Enforce system-wide role limits when promoting
     target_role = payload.role.value if isinstance(payload.role, UserRole) else payload.role
-    if target_role == UserRole.SUPER_ADMIN.value:
-        count = await repo.count_active_by_role(UserRole.SUPER_ADMIN.value)
-        if count >= MAX_SUPER_ADMINS:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Maximum of {MAX_SUPER_ADMINS} super_admin account(s) allowed")
 
-    if target_role == UserRole.ADMIN.value:
-        count = await repo.count_active_by_role(UserRole.ADMIN.value)
-        if count >= MAX_ADMINS:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Maximum of {MAX_ADMINS} admin account(s) allowed")
+    # super_admin promotion: only allowed via bootstrap/DB — never via this endpoint
+    if target_role == UserRole.SUPER_ADMIN.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot promote to super_admin via API")
+
+    # Admin promoting to admin: only company owner admin can do this
+    if target_role == UserRole.ADMIN.value and admin.role == UserRole.ADMIN.value:
+        if not getattr(admin, "is_company_owner", False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the company owner admin can promote users to admin",
+            )
 
     return await repo.update_role(user, payload.role)
 
@@ -411,9 +412,17 @@ async def send_invite(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User with this email already exists")
 
-    # Admin cannot invite admin or super_admin
-    if UserRole(admin.role) == UserRole.ADMIN and payload.role in (UserRole.SUPER_ADMIN, UserRole.ADMIN):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin cannot invite admin or super_admin roles")
+    # No one can invite a super_admin via invite flow
+    if payload.role == UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="super_admin cannot be created via invite")
+
+    # Admin inviting another admin: only allowed if the inviting admin is the company owner
+    if UserRole(admin.role) == UserRole.ADMIN and payload.role == UserRole.ADMIN:
+        if not getattr(admin, "is_company_owner", False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the company owner admin can invite other admins",
+            )
 
     # HR can only invite employee/manager
     if UserRole(admin.role) == UserRole.HR and payload.role not in (UserRole.EMPLOYEE, UserRole.MANAGER):
@@ -468,8 +477,11 @@ async def send_batch_invites(
             continue  # Skip already-registered users silently
 
         # Enforce role restrictions
-        if UserRole(admin.role) == UserRole.ADMIN and inv.role in (UserRole.SUPER_ADMIN, UserRole.ADMIN):
-            continue
+        if inv.role == UserRole.SUPER_ADMIN:
+            continue  # super_admin cannot be invited
+        if UserRole(admin.role) == UserRole.ADMIN and inv.role == UserRole.ADMIN:
+            if not getattr(admin, "is_company_owner", False):
+                continue  # non-owner admin cannot invite admins
         if UserRole(admin.role) == UserRole.HR and inv.role not in (UserRole.EMPLOYEE, UserRole.MANAGER):
             continue
 

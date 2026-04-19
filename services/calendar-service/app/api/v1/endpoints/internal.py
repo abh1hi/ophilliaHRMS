@@ -14,15 +14,33 @@ router = APIRouter(dependencies=[Depends(verify_internal_token)])
 
 @router.post("/events/inject", response_model=APIResponse[CalendarEventResponse], status_code=201)
 async def inject_event(data: EventCreate):
-    """Other services push leave/shift/holiday events into calendar."""
+    """Other services push leave/shift/holiday events into calendar.
+
+    Requires explicit company_id in the payload — validated before setting tenant context.
+    """
     from app.db.session import AsyncSessionLocal
     from app.services.event_service import create_event
+    from app.models.calendar import Calendar
+    from sqlalchemy.future import select
     from uuid import uuid4
+    from fastapi import HTTPException
+
+    if not getattr(data, "company_id", None):
+        raise HTTPException(status_code=400, detail="company_id is required for event injection")
 
     async with AsyncSessionLocal() as db:
-        db.info["company_id"] = str(data.calendar_id)  # company_id set by caller in payload
-        # For inject, we use a system user ID
-        event = await create_event(db, data, uuid4(), str(data.calendar_id))
+        # Verify the target calendar belongs to the stated company
+        result = await db.execute(
+            select(Calendar).where(
+                Calendar.id == data.calendar_id,
+                Calendar.company_id == data.company_id,
+            )
+        )
+        if not result.scalars().first():
+            raise HTTPException(status_code=403, detail="Calendar does not belong to stated company")
+
+        db.info["company_id"] = str(data.company_id)
+        event = await create_event(db, data, uuid4(), str(data.company_id))
     return APIResponse(success=True, data=event)
 
 

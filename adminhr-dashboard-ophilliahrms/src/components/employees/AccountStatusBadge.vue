@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Badge } from '../ui/badge'
 
 const props = defineProps<{
   status?: string | null
@@ -13,20 +14,20 @@ const isExpired = computed(() => {
 
 const badge = computed(() => {
   if (props.status === 'invited' && isExpired.value) {
-    return { label: 'Invite Expired', classes: 'bg-amber-50 text-amber-700 border border-amber-300' }
+    return { label: 'Invite Expired', class: 'bg-amber-100 text-amber-700 hover:bg-amber-100/80 border-transparent shadow-none' }
   }
-  const map: Record<string, { label: string; classes: string }> = {
-    not_registered: { label: 'Not Registered', classes: 'bg-slate-100 text-slate-500' },
-    invited:        { label: 'Invite Sent',     classes: 'bg-amber-100 text-amber-700' },
-    active:         { label: 'Active',           classes: 'bg-emerald-100 text-emerald-700' },
-    suspended:      { label: 'Suspended',        classes: 'bg-rose-100 text-rose-700' },
+  const map: Record<string, { label: string; class: string }> = {
+    not_registered: { label: 'Not Registered', class: 'bg-muted text-muted-foreground hover:bg-muted/80 border-transparent shadow-none' },
+    invited:        { label: 'Invite Sent',     class: 'bg-amber-100 text-amber-700 hover:bg-amber-100/80 border-transparent shadow-none' },
+    active:         { label: 'Active',           class: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100/80 border-transparent shadow-none' },
+    suspended:      { label: 'Suspended',        class: 'bg-destructive/10 text-destructive hover:bg-destructive/20 border-transparent shadow-none' },
   }
-  return map[props.status ?? ''] ?? { label: props.status ?? '—', classes: 'bg-slate-100 text-slate-500' }
+  return map[props.status ?? ''] ?? { label: props.status ?? '—', class: 'bg-muted text-muted-foreground border-transparent shadow-none' }
 })
 </script>
 
 <template>
-  <span :class="['inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold', badge.classes]">
+  <Badge :class="['rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider', badge.class]">
     {{ badge.label }}
-  </span>
+  </Badge>
 </template>
