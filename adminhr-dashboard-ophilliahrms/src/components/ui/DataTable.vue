@@ -96,7 +96,7 @@ const totalPages = computed(() => Math.ceil((props.total ?? props.rows?.length ?
                 :key="col.key"
                 :class="col.class"
               >
-                {{ col.label }}
+                <slot :name="`head-${col.key}`">{{ col.label }}</slot>
               </TableHead>
               <TableHead class="text-right">Actions</TableHead>
             </TableRow>

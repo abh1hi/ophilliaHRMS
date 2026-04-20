@@ -117,7 +117,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 watch(() => props.modelValue, async (val) => {
   if (!props.multiple && typeof val === 'string' && val && !query.value) {
     const res = await listEmployees({ search: val, page: 1, page_size: 1 })
-    const match = res.employees.find(e => e.id === val)
+    const match = res.data.find(e => e.id === val)
     if (match) query.value = `${match.first_name} ${match.last_name}`
   }
 }, { immediate: true })

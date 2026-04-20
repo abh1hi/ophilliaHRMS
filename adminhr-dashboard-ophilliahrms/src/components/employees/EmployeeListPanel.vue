@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import PageHeader from '../ui/PageHeader.vue'
 import DataTable from '../ui/DataTable.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
@@ -23,15 +23,18 @@ import {
   sendEmployeeInvite, resendEmployeeInvite, revokeEmployeeInvite, disableEmployeeAccount,
 } from '../../services/employee.service'
 import type { Employee, SendInviteResponse } from '../../services/employee.service'
-import { 
-  Pencil, 
-  Trash2, 
-  RefreshCw, 
-  Mail, 
-  ShieldOff, 
+import { Checkbox } from '../ui/checkbox'
+import {
+  Pencil,
+  Trash2,
+  RefreshCw,
+  Mail,
+  ShieldOff,
   XCircle,
   Copy,
-  Check as CheckIcon
+  Check as CheckIcon,
+  Download,
+  Users
 } from 'lucide-vue-next'
 
 const employees    = ref<Employee[]>([])
@@ -45,6 +48,11 @@ const drawerOpen   = ref(false)
 const selected     = ref<Employee | null>(null)
 const deleteTarget = ref<Employee | null>(null)
 const deleting     = ref(false)
+
+// Bulk selection
+const selectedIds  = ref(new Set<string>())
+const bulkInviting = ref(false)
+const bulkInviteResult = ref<string | null>(null)
 
 // Profile panel
 const profileOpen     = ref(false)
@@ -66,6 +74,7 @@ const disableTarget = ref<Employee | null>(null)
 const disabling     = ref(false)
 
 const columns = [
+  { key: '_select',          label: ''            },
   { key: 'employee_code',    label: 'Code'        },
   { key: 'name',             label: 'Name'        },
   { key: 'email',            label: 'Email'       },
@@ -189,6 +198,59 @@ function fullName(emp: Employee | null) {
   if (!emp) return '—'
   return `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
 }
+
+function toggleSelect(id: string) {
+  const s = new Set(selectedIds.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  selectedIds.value = s
+}
+
+function toggleSelectAll() {
+  if (selectedIds.value.size === employees.value.length) {
+    selectedIds.value = new Set()
+  } else {
+    selectedIds.value = new Set(employees.value.map(e => e.id))
+  }
+}
+
+const selectedNotRegistered = computed(() =>
+  employees.value.filter(e => selectedIds.value.has(e.id) && e.account_status === 'not_registered')
+)
+
+async function bulkInvite() {
+  if (!selectedNotRegistered.value.length) return
+  bulkInviting.value = true
+  bulkInviteResult.value = null
+  let success = 0
+  for (const emp of selectedNotRegistered.value) {
+    try { await sendEmployeeInvite(emp.id); success++ } catch { /* continue */ }
+  }
+  bulkInviteResult.value = `Invites sent to ${success} of ${selectedNotRegistered.value.length} employee(s).`
+  selectedIds.value = new Set()
+  bulkInviting.value = false
+  load()
+}
+
+function exportCsv() {
+  const headers = ['Employee ID', 'First Name', 'Last Name', 'Email', 'Department', 'Designation', 'Status']
+  const rows = employees.value.map(e => [
+    e.employee_code ?? '',
+    e.first_name ?? '',
+    e.last_name ?? '',
+    e.email ?? '',
+    e.department ?? '',
+    e.designation ?? '',
+    e.employment_status ?? '',
+  ])
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'employees.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <template>
@@ -200,16 +262,39 @@ function fullName(emp: Employee | null) {
       @action="openCreate"
     >
       <template #extra>
-        <Button
-          variant="outline"
-          @click="load"
-          :disabled="loading"
-          class="rounded-full gap-2 px-4 h-9"
-          title="Refresh list"
-        >
-          <RefreshCw :class="['w-3.5 h-3.5', loading ? 'animate-spin' : '']" />
-          Refresh
-        </Button>
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- Bulk Invite — only when not_registered employees are selected -->
+          <Button
+            v-if="selectedNotRegistered.length"
+            @click="bulkInvite"
+            :disabled="bulkInviting"
+            class="rounded-full gap-2 px-4 h-9 bg-blue-600 text-white hover:bg-blue-700"
+          >
+            <Users class="w-3.5 h-3.5" />
+            {{ bulkInviting ? 'Inviting…' : `Invite ${selectedNotRegistered.length} Selected` }}
+          </Button>
+
+          <!-- Export CSV — always visible -->
+          <Button
+            variant="outline"
+            @click="exportCsv"
+            class="rounded-full gap-2 px-4 h-9"
+          >
+            <Download class="w-3.5 h-3.5" />
+            Export CSV
+          </Button>
+
+          <Button
+            variant="outline"
+            @click="load"
+            :disabled="loading"
+            class="rounded-full gap-2 px-4 h-9"
+            title="Refresh list"
+          >
+            <RefreshCw :class="['w-3.5 h-3.5', loading ? 'animate-spin' : '']" />
+            Refresh
+          </Button>
+        </div>
       </template>
     </PageHeader>
 
@@ -233,6 +318,15 @@ function fullName(emp: Employee | null) {
       </div>
     </div>
 
+    <!-- Bulk invite feedback -->
+    <div v-if="bulkInviteResult" class="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700 font-medium animate-in fade-in">
+      <CheckIcon class="w-4 h-4 shrink-0" />
+      {{ bulkInviteResult }}
+      <button @click="bulkInviteResult = null" class="ml-auto text-blue-400 hover:text-blue-600">
+        <XCircle class="w-4 h-4" />
+      </button>
+    </div>
+
     <!-- Table -->
     <DataTable
       :columns="columns"
@@ -248,6 +342,24 @@ function fullName(emp: Employee | null) {
       @search="onSearch"
       @row-click="openProfile"
     >
+      <!-- Checkbox column header -->
+      <template #head-_select>
+        <Checkbox
+          :checked="employees.length > 0 && selectedIds.size === employees.length"
+          @update:checked="toggleSelectAll"
+          @click.stop
+        />
+      </template>
+
+      <!-- Checkbox cell -->
+      <template #cell-_select="{ row }">
+        <Checkbox
+          :checked="selectedIds.has(row.id)"
+          @update:checked="toggleSelect(row.id)"
+          @click.stop
+        />
+      </template>
+
       <!-- Custom cells -->
       <template #cell-employee_code="{ row }">
         <span
