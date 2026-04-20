@@ -6,6 +6,7 @@ import SlideDrawer from '../ui/SlideDrawer.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import FormInput from '../ui/FormInput.vue'
 import FormSelect from '../ui/FormSelect.vue'
+import FieldHint from '../ui/FieldHint.vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Pencil, Trash2, Building2, FolderTree, CheckCircle2, XCircle, FolderOpen } from 'lucide-vue-next'
@@ -150,11 +151,16 @@ async function confirmDelete() {
           :options="parentOptions"
         />
 
-        <FormInput
-          label="Leave Block List"
-          v-model="form.leave_block_list"
-          placeholder="Leave block list ID (optional)"
-        />
+        <div class="space-y-1">
+          <div class="flex items-center gap-1.5">
+            <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Leave Block List</label>
+            <FieldHint text="Prevents employees in this department from taking leave during specific blocked periods. Enter the Leave Block List ID to link it." />
+          </div>
+          <FormInput
+            v-model="form.leave_block_list"
+            placeholder="Leave block list ID (optional)"
+          />
+        </div>
 
         <label for="group-toggle" class="flex items-start gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer">
           <Checkbox

@@ -60,7 +60,7 @@ def require_role(*roles: UserRole):
 async def apply_tenant_context(db: AsyncSession, company_id: str) -> None:
     """Set company_id in both session info dict and PostgreSQL session variable for RLS."""
     db.info["company_id"] = company_id
-    await db.execute(text("SET LOCAL app.company_id = :cid"), {"cid": company_id})
+    await db.execute(text("SELECT set_config('app.company_id', :cid, true)"), {"cid": company_id})
 
 
 async def get_db_with_tenant(

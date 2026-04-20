@@ -51,8 +51,8 @@ const downloadBankAdvice = async () => {
 const reportTypes = [
   {
     id: 'ecr',
-    title: 'ECR File',
-    description: 'EPFO Contribution Return file for monthly submission',
+    title: 'EPF Employee Contribution Return (ECR)',
+    description: 'EPFO Contribution Return file for monthly submission to the provident fund portal',
     icon: FileText,
     iconColor: 'text-blue-600',
     bgColor: 'bg-blue-50/50',
@@ -63,8 +63,8 @@ const reportTypes = [
   },
   {
     id: 'bank-advice',
-    title: 'Bank Advice',
-    description: 'CSV file with employee bank account details for fund transfer',
+    title: 'Salary Bank Transfer File',
+    description: 'CSV file with employee bank account details and net salary amounts for fund transfer',
     icon: Landmark,
     iconColor: 'text-emerald-600',
     bgColor: 'bg-emerald-50/50',
@@ -76,7 +76,7 @@ const reportTypes = [
   {
     id: 'form-16',
     title: 'Form 16',
-    description: 'Tax deduction certificate for employee annual tax filing',
+    description: 'Tax deduction certificate for employee annual income tax filing',
     icon: ClipboardCheck,
     iconColor: 'text-indigo-600',
     bgColor: 'bg-indigo-50/50',
@@ -85,7 +85,7 @@ const reportTypes = [
   {
     id: 'esic',
     title: 'ESIC Return',
-    description: 'ESIC monthly return data for compliance submission',
+    description: 'Employee State Insurance monthly return data for compliance submission',
     icon: ShieldAlert,
     iconColor: 'text-amber-600',
     bgColor: 'bg-amber-50/50',
@@ -93,8 +93,8 @@ const reportTypes = [
   },
   {
     id: 'pt',
-    title: 'PT Challan',
-    description: 'Professional Tax payment details segmented by state',
+    title: 'Professional Tax Challan',
+    description: 'Professional Tax payment challan segmented by state for statutory compliance',
     icon: CreditCard,
     iconColor: 'text-rose-600',
     bgColor: 'bg-rose-50/50',
@@ -102,8 +102,8 @@ const reportTypes = [
   },
   {
     id: 'lwf',
-    title: 'LWF Summary',
-    description: 'Labour Welfare Fund monthly contribution summary',
+    title: 'Labour Welfare Fund Report',
+    description: 'Labour Welfare Fund monthly contribution summary for statutory filing',
     icon: BarChart3,
     iconColor: 'text-slate-600',
     bgColor: 'bg-slate-50/50',
@@ -127,7 +127,7 @@ const reportTypes = [
           <div :class="['w-12 h-12 rounded-2xl flex items-center justify-center border border-white/40', report.bgColor]">
             <component :is="report.icon" :class="['w-6 h-6', report.iconColor]" />
           </div>
-          <BadgeChip v-if="report.comingSoon" variant="secondary" class="font-bold tracking-widest text-[9px] uppercase">Alpha</BadgeChip>
+          <BadgeChip v-if="report.comingSoon" variant="secondary" class="font-bold tracking-widest text-[9px] uppercase">Coming Soon</BadgeChip>
           <div v-else-if="!payrollStore.currentRun" class="flex items-center gap-1.5 text-[9px] font-bold text-rose-500 uppercase tracking-widest animate-pulse">
              <Clock class="w-3 h-3" /> Select Cycle
           </div>
@@ -155,7 +155,7 @@ const reportTypes = [
           variant="ghost"
           class="w-full h-11 rounded-2xl border border-dashed border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[11px]"
         >
-          Pipeline Under Construction
+          Coming Soon
         </Button>
       </div>
     </div>

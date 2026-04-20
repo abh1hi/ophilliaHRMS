@@ -57,8 +57,8 @@ function openMembers(ws: Workspace) {
             <Layers class="w-5 h-5 text-white" />
          </div>
          <div>
-            <h3 class="text-lg font-black text-slate-900 uppercase tracking-widest leading-none">Environmental Hubs</h3>
-            <p class="text-[11px] text-slate-400 font-bold uppercase tracking-tight mt-1">{{ store.workspaces.length }} Managed Node{{ store.workspaces.length !== 1 ? 's' : '' }}</p>
+            <h3 class="text-lg font-black text-slate-900 uppercase tracking-widest leading-none">Workspaces</h3>
+            <p class="text-[11px] text-slate-400 font-bold uppercase tracking-tight mt-1">{{ store.workspaces.length }} Workspace{{ store.workspaces.length !== 1 ? 's' : '' }}</p>
          </div>
       </div>
       <Button
@@ -66,7 +66,7 @@ function openMembers(ws: Workspace) {
         class="h-11 rounded-full px-6 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
       >
         <Plus class="w-4 h-4 mr-2" />
-        Initialize Hub
+        Create Workspace
       </Button>
     </div>
 
@@ -118,7 +118,7 @@ function openMembers(ws: Workspace) {
         <div class="space-y-1 mb-6">
           <p class="text-[13px] font-black text-slate-900 uppercase tracking-tight truncate">{{ ws.name }}</p>
           <p v-if="ws.description" class="text-[11px] text-slate-400 font-medium line-clamp-2 leading-relaxed h-8">{{ ws.description }}</p>
-          <p v-else class="text-[11px] text-slate-300 font-medium italic">No operational brief provided</p>
+          <p v-else class="text-[11px] text-slate-300 font-medium italic">No description provided</p>
         </div>
 
         <div class="flex items-center justify-between">
@@ -135,14 +135,14 @@ function openMembers(ws: Workspace) {
       <div class="h-20 w-20 rounded-[30px] bg-white shadow-xl shadow-slate-200/50 flex items-center justify-center mb-6">
          <Box class="w-10 h-10 text-slate-200" />
       </div>
-      <p class="text-sm font-black text-slate-900 uppercase tracking-widest">Architecture Inactive</p>
-      <p class="text-[11px] text-slate-400 font-bold uppercase tracking-tight mt-2 max-w-[240px] text-center">No synchronized hubs identified. Initialize a workspace to commence environmental orchestration.</p>
+      <p class="text-sm font-black text-slate-900 uppercase tracking-widest">No Workspaces Yet</p>
+      <p class="text-[11px] text-slate-400 font-bold uppercase tracking-tight mt-2 max-w-[240px] text-center">Create your first workspace to start organising tasks, calendars, and notes.</p>
       <Button
         variant="outline"
         @click="showCreate = true"
         class="mt-8 rounded-full h-10 px-8 border-slate-200 text-slate-900 font-black uppercase tracking-widest text-[10px] hover:bg-white"
       >
-        Initialize Hub Sequence
+        Create Workspace
       </Button>
     </div>
 

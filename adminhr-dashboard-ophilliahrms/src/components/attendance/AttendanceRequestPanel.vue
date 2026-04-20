@@ -23,6 +23,8 @@ const rows = ref<AttendanceRequest[]>([])
 const loading = ref(false)
 const createDrawerOpen = ref(false)
 const reviewTarget = ref<AttendanceRequest | null>(null)
+const selectedIds = ref(new Set<string>())
+const bulkProcessing = ref(false)
 const cancelTarget = ref<AttendanceRequest | null>(null)
 const form = ref<Partial<AttendanceRequest>>({})
 const reviewNote = ref('')
@@ -97,6 +99,23 @@ async function doReview(status: 'approved' | 'rejected') {
   finally { reviewing.value = false }
 }
 
+function toggleSelect(id: string) {
+  if (selectedIds.value.has(id)) selectedIds.value.delete(id)
+  else selectedIds.value.add(id)
+  selectedIds.value = new Set(selectedIds.value)
+}
+
+async function bulkReview(status: 'approved' | 'rejected') {
+  bulkProcessing.value = true
+  try {
+    for (const id of selectedIds.value) {
+      await reviewAttendanceRequest(id, { status })
+    }
+    selectedIds.value = new Set()
+    load()
+  } catch {} finally { bulkProcessing.value = false }
+}
+
 const statusOptions = [
   { value: '', label: 'All Status' },
   { value: 'pending', label: 'Pending' },
@@ -115,8 +134,8 @@ const reasonOptions = [
 <template>
   <div class="space-y-8">
     <PageHeader 
-      title="Attendance Requests" 
-      subtitle="Regularization and remote work applications" 
+      title="Attendance Adjustments"
+      subtitle="Submit and review attendance correction requests"
       action-label="New Request" 
       @action="openCreate" 
     />
@@ -131,6 +150,20 @@ const reasonOptions = [
           <Search class="w-4 h-4 mr-2" /> Apply Filter
         </Button>
       </div>
+    </div>
+
+    <!-- Bulk action toolbar -->
+    <div v-if="selectedIds.size > 0" class="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl shadow-md">
+      <span class="text-sm font-semibold text-slate-700">{{ selectedIds.size }} selected</span>
+      <Button @click="bulkReview('approved')" :disabled="bulkProcessing" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-[11px] font-bold uppercase tracking-widest px-4">
+        Approve All
+      </Button>
+      <Button @click="bulkReview('rejected')" :disabled="bulkProcessing" variant="destructive" class="rounded-xl h-8 text-[11px] font-bold uppercase tracking-widest px-4">
+        Reject All
+      </Button>
+      <Button @click="selectedIds = new Set()" variant="ghost" class="rounded-xl h-8 text-[11px] font-bold uppercase tracking-widest px-4 text-slate-500">
+        Clear
+      </Button>
     </div>
 
     <DataTable :columns="columns" :rows="rows" :loading="loading" :searchable="false" empty-text="No requests found.">
@@ -159,22 +192,28 @@ const reasonOptions = [
         </span>
       </template>
       <template #actions="{ row }">
-        <div class="flex items-center justify-end gap-1">
+        <div class="flex items-center justify-end gap-2">
+          <Checkbox
+            v-if="row.status === 'pending'"
+            :checked="selectedIds.has(row.id)"
+            @update:checked="toggleSelect(row.id)"
+            class="mr-1"
+          />
           <template v-if="row.status === 'pending'">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              @click="reviewTarget = row; reviewNote = ''; errorMsg = ''" 
-              class="h-8 w-8 rounded-lg hover:bg-emerald-50 text-slate-400 hover:text-emerald-700" 
+            <Button
+              variant="ghost"
+              size="icon"
+              @click="reviewTarget = row; reviewNote = ''; errorMsg = ''"
+              class="h-8 w-8 rounded-lg hover:bg-emerald-50 text-slate-400 hover:text-emerald-700"
               title="Review"
             >
               <Check class="w-4 h-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              @click="cancelTarget = row" 
-              class="h-8 w-8 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600" 
+            <Button
+              variant="ghost"
+              size="icon"
+              @click="cancelTarget = row"
+              class="h-8 w-8 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600"
               title="Cancel"
             >
               <Ban class="w-4 h-4" />

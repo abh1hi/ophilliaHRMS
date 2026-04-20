@@ -36,10 +36,6 @@ function navigateTab(tab: string) {
   }
 }
 
-function switchEntity() {
-  router.push('/select-company')
-}
-
 function handleLogout() {
   logout()
   router.push('/')
@@ -58,7 +54,6 @@ function onRunCreated() {
       :user-role="userRole"
       :user-name="userName"
       @navigate="navigateTab"
-      @switch-entity="switchEntity"
       @logout="handleLogout"
     />
 

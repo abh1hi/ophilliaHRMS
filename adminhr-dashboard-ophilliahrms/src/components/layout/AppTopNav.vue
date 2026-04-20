@@ -14,7 +14,11 @@ import {
   ChevronDown,
   Building2,
   ArrowLeft,
+  Search,
 } from 'lucide-vue-next'
+import { useCommandPaletteStore } from '../../stores/commandPalette.store'
+
+const palette = useCommandPaletteStore()
 
 const props = defineProps<{
   currentTab: string
@@ -25,7 +29,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'navigate', tab: string): void
-  (e: 'switch-entity'): void
   (e: 'logout'): void
 }>()
 
@@ -58,6 +61,8 @@ const tabToSection: Record<string, string> = {
   'leave-policies': 'leaves',
   'leave-policy-assignments': 'leaves',
   'leave-allocations': 'leaves',
+  'leave-types': 'leaves',
+  'leave-balance': 'leaves',
   'leave-block-lists': 'leaves',
   'compensatory-leave': 'leaves',
   'leave-encashments': 'leaves',
@@ -132,6 +137,16 @@ function onLogout() {
         {{ section.label }}
       </button>
     </nav>
+
+    <!-- CMD+K search -->
+    <button
+      @click="palette.open()"
+      class="hidden lg:flex items-center gap-2 h-8 pl-3 pr-3 rounded-lg border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 bg-slate-50 transition-all text-xs font-medium shrink-0 mx-2"
+    >
+      <Search class="w-3.5 h-3.5" />
+      <span class="text-slate-400">Search</span>
+      <kbd class="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-1 py-0.5 rounded ml-1">⌘K</kbd>
+    </button>
 
     <!-- User menu -->
     <div class="flex items-center gap-3 shrink-0 ml-2">

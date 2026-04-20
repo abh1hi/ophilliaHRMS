@@ -9,7 +9,7 @@ Create Date: 2026-04-19
 from alembic import op
 
 revision = "0008_rls_enable"
-down_revision = "0007_add_company_id_to_child_tables"
+down_revision = "0007_cid_child_tables"
 branch_labels = None
 depends_on = None
 

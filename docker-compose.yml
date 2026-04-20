@@ -50,7 +50,7 @@ services:
   # Profile: CORE
   frontend:
     profiles: ["core", "hr", "payroll", "student"]
-    build: ./frontend-tailless-ophillia-hrms-vue
+    build: ./adminhr-dashboard-ophilliahrms
     container_name: hrms-frontend
     <<: *frontend-limits
     ports:
@@ -62,6 +62,27 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ─────────────── SUPER ADMIN PORTAL (Vue 3, port 3001) ───────────────
+  # Profile: CORE
+  superadmin-portal:
+    profiles: ["core", "hr"]
+    build: ./superadmin-portal-ophilliahrms
+    container_name: hrms-superadmin-portal
+    <<: *frontend-limits
+    ports:
+      - "3001:3001"
+    depends_on:
+      - gateway
+    networks:
+      - hrms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3001/health"]
       interval: 10s
       timeout: 5s
       retries: 3

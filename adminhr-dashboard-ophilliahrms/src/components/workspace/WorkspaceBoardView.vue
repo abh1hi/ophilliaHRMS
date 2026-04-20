@@ -35,11 +35,11 @@ const editTask = ref<CalendarTask | null>(null)
 const draggedTaskId = ref<string | null>(null)
 
 const displayColumns = [
-  { key: 'todo',        label: 'Activation Queue',  icon: Clock,        accent: 'bg-slate-400' },
-  { key: 'in_progress', label: 'Active Processing', icon: Activity,     accent: 'bg-blue-500' },
-  { key: 'in_review',   label: 'Validation Layer',  icon: Monitor,      accent: 'bg-yellow-500' },
-  { key: 'blocked',     label: 'Node Latency',      icon: AlertCircle,  accent: 'bg-rose-500' },
-  { key: 'done',        label: 'Commit Complete',   icon: CheckCircle2, accent: 'bg-emerald-500' },
+  { key: 'todo',        label: 'To Do',       icon: Clock,        accent: 'bg-slate-400' },
+  { key: 'in_progress', label: 'In Progress', icon: Activity,     accent: 'bg-blue-500' },
+  { key: 'in_review',   label: 'In Review',   icon: Monitor,      accent: 'bg-yellow-500' },
+  { key: 'blocked',     label: 'Blocked',     icon: AlertCircle,  accent: 'bg-rose-500' },
+  { key: 'done',        label: 'Done',        icon: CheckCircle2, accent: 'bg-emerald-500' },
 ]
 
 const filteredKanban = computed(() => {
@@ -98,21 +98,21 @@ async function onDrop(e: DragEvent, targetStatus: string) {
 }
 
 const workspaceOptions = computed(() => [
-  { value: '', label: 'Global Topology (All Nodes)' },
+  { value: '', label: 'All Workspaces' },
   ...workspaceStore.workspaces.map(ws => ({ value: ws.id, label: ws.name }))
 ])
 
 const statusOptions = computed(() => [
-  { value: '', label: 'Full Spectrum Status' },
+  { value: '', label: 'All Statuses' },
   ...displayColumns.map(col => ({ value: col.key, label: col.label }))
 ])
 
 const priorityOptions = [
-  { value: '', label: 'Unified Priority' },
-  { value: 'urgent', label: 'L0: Critical' },
-  { value: 'high', label: 'L1: High' },
-  { value: 'medium', label: 'L2: Standard' },
-  { value: 'low', label: 'L3: Auxiliary' }
+  { value: '', label: 'All Priorities' },
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' }
 ]
 </script>
 
@@ -122,13 +122,13 @@ const priorityOptions = [
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
       <div class="flex flex-col sm:flex-row items-end gap-4 flex-1">
         <div class="w-full sm:w-64">
-           <FormSelect label="Hub Environment" v-model="activeWorkspaceId" :options="workspaceOptions" @update:model-value="loadTasks" />
+           <FormSelect label="Workspace" v-model="activeWorkspaceId" :options="workspaceOptions" @update:model-value="loadTasks" />
         </div>
         <div class="w-full sm:w-48">
            <FormSelect label="Status Filter" v-model="filterStatus" :options="statusOptions" />
         </div>
         <div class="w-full sm:w-48">
-           <FormSelect label="Priority Grade" v-model="filterPriority" :options="priorityOptions" />
+           <FormSelect label="Priority" v-model="filterPriority" :options="priorityOptions" />
         </div>
       </div>
       <Button
@@ -136,7 +136,7 @@ const priorityOptions = [
         class="h-11 rounded-full px-8 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
       >
         <Plus class="w-4 h-4 mr-2" />
-        Initialize Process
+        New Task
       </Button>
     </div>
 
@@ -158,7 +158,7 @@ const priorityOptions = [
                 </div>
                 <div>
                   <h4 class="text-[11px] font-black text-slate-900 uppercase tracking-widest leading-none">{{ col.label }}</h4>
-                  <p class="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-tight">{{ filteredKanban[col.key]?.length ?? 0 }} Instances</p>
+                  <p class="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-tight">{{ filteredKanban[col.key]?.length ?? 0 }} tasks</p>
                 </div>
              </div>
              <Button variant="ghost" size="icon" @click="openCreate(col.key)" class="h-8 w-8 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 transition-all">

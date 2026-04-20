@@ -14,7 +14,7 @@ down_revision = "0008_superadmin_db_role"
 branch_labels = None
 depends_on = None
 
-TENANT_TABLES = ["users", "invites", "refresh_tokens", "magic_tokens"]
+TENANT_TABLES = ["users", "invites"]
 
 
 def upgrade() -> None:

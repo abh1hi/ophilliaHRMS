@@ -8,10 +8,12 @@ import { Button } from '../ui/button'
 import { Filter, Search } from 'lucide-vue-next'
 import { listLeaveLedgerEntries } from '../../services/leave-ledger.service'
 import type { LeaveLedgerEntry } from '../../services/leave-ledger.service'
+import { listLeaveTypes } from '../../services/leave-type.service'
 
 const rows = ref<LeaveLedgerEntry[]>([])
 const total = ref(0)
 const loading = ref(false)
+const leaveTypeMap = ref<Record<string, string>>({})
 
 const filterEmployeeId = ref('')
 const filterLeaveTypeId = ref('')
@@ -55,8 +57,12 @@ async function load() {
     if (filterTxType.value) params.transaction_type = filterTxType.value
     if (filterFromDate.value) params.from_date = filterFromDate.value
     if (filterToDate.value) params.to_date = filterToDate.value
-    const res = await listLeaveLedgerEntries(params)
+    const [res, types] = await Promise.all([
+      listLeaveLedgerEntries(params),
+      Object.keys(leaveTypeMap.value).length ? Promise.resolve(null) : listLeaveTypes(),
+    ])
     rows.value = res.entries; total.value = res.total
+    if (types) leaveTypeMap.value = Object.fromEntries(types.map(t => [t.id, t.name]))
   } catch {} finally { loading.value = false }
 }
 onMounted(load)
@@ -98,6 +104,9 @@ onMounted(load)
     </div>
 
     <DataTable :columns="columns" :rows="rows" :loading="loading" empty-text="No ledger entries found.">
+      <template #cell-leave_type_id="{ value }">
+        <span class="text-xs font-medium text-slate-700">{{ leaveTypeMap[value] ?? value }}</span>
+      </template>
       <template #cell-leaves="{ value }">
         <div class="flex items-center gap-1 font-mono text-[13px]">
           <span 

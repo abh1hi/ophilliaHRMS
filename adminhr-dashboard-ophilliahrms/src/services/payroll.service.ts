@@ -108,9 +108,21 @@ export const payrollService = {
     return apiFetch<any[]>(`/payroll/salary-structures?${query}`)
   },
 
+  createSalaryStructure: (data: any) =>
+    apiFetch<any>('/payroll/salary-structures', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateSalaryStructure: (id: string, data: any) =>
+    apiFetch<any>(`/payroll/salary-structures/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteSalaryStructure: (id: string) =>
+    apiFetch<any>(`/payroll/salary-structures/${id}`, { method: 'DELETE' }),
+
   getTaxProfile: (employeeId: string, financialYear: number) => {
     return apiFetch<any>(`/payroll/tax-profiles/${employeeId}?fy=${financialYear}`)
   },
+
+  createTaxProfile: (data: any) =>
+    apiFetch<any>('/payroll/tax-profiles', { method: 'POST', body: JSON.stringify(data) }),
 
   updateTaxProfile: (employeeId: string, financialYear: number, data: any) => {
     return apiFetch<any>(`/payroll/tax-profiles/${employeeId}?fy=${financialYear}`, {

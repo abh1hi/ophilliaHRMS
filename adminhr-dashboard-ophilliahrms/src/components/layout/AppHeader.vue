@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { UserCircle, LogOut, User, ChevronDown, ChevronRight } from 'lucide-vue-next'
+import { UserCircle, LogOut, User, ChevronDown, ChevronRight, Search } from 'lucide-vue-next'
+import { useCommandPaletteStore } from '../../stores/commandPalette.store'
+
+const palette = useCommandPaletteStore()
 
 defineProps<{
   title?: string
@@ -36,6 +39,16 @@ function onLogout() {
       </div>
 
       <div class="relative flex items-center gap-3">
+        <!-- CMD+K search trigger -->
+        <button
+          @click="palette.open()"
+          class="hidden md:flex items-center gap-2 h-9 pl-3 pr-4 rounded-xl border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 bg-white transition-all text-xs font-medium"
+        >
+          <Search class="w-3.5 h-3.5" />
+          <span>Search or jump to…</span>
+          <kbd class="ml-2 bg-slate-100 text-slate-500 text-[10px] font-bold px-1.5 py-0.5 rounded-md">⌘K</kbd>
+        </button>
+
         <div class="hidden sm:block text-right">
           <p class="text-sm font-medium text-slate-800">{{ userName || '—' }}</p>
           <p class="text-xs text-slate-400 capitalize">{{ userRole?.replace('_', ' ') }}</p>

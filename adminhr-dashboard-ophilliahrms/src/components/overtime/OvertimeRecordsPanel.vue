@@ -33,7 +33,7 @@ const columns = [
   { key: 'clock_in',    label: 'Clock In'    },
   { key: 'clock_out',   label: 'Clock Out'   },
   { key: 'work_hours',  label: 'Regular Hrs' },
-  { key: 'overtime_hours', label: 'OT Hours' },
+  { key: 'overtime_hours', label: 'Overtime Hours' },
   { key: 'status',      label: 'Status'      },
 ]
 
@@ -68,9 +68,9 @@ function fmtTime(dt?: string) {
     <!-- Stat cards -->
     <div class="grid grid-cols-3 gap-4">
       <div v-for="stat in [
-        { label: 'Total OT Hours', value: totalOtHours + 'h', icon: Clock, color: 'indigo' },
-        { label: 'Employees with OT', value: String(employeesWithOt), icon: Users, color: 'amber' },
-        { label: 'Avg OT / Employee', value: avgOt + 'h', icon: TrendingUp, color: 'emerald' },
+        { label: 'Total Overtime Hours', value: totalOtHours + 'h', icon: Clock, color: 'indigo' },
+        { label: 'Employees with Overtime', value: String(employeesWithOt), icon: Users, color: 'amber' },
+        { label: 'Avg Overtime / Employee', value: avgOt + 'h', icon: TrendingUp, color: 'emerald' },
       ]" :key="stat.label"
         class="bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between"
       >

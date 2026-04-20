@@ -9,10 +9,12 @@ import { Button } from '../ui/button'
 import { Pencil, PlusCircle } from 'lucide-vue-next'
 import { listLeaveAllocations, createLeaveAllocation, adjustLeaveAllocation } from '../../services/leave-allocation.service'
 import type { LeaveAllocation } from '../../services/leave-allocation.service'
+import { listLeaveTypes } from '../../services/leave-type.service'
 
 const rows = ref<LeaveAllocation[]>([])
 const total = ref(0)
 const loading = ref(false)
+const leaveTypeMap = ref<Record<string, string>>({})
 const skip = ref(0)
 const limit = ref(50)
 
@@ -50,8 +52,12 @@ const columns = [
 async function load() {
   loading.value = true
   try {
-    const res = await listLeaveAllocations({ skip: skip.value, limit: limit.value })
+    const [res, types] = await Promise.all([
+      listLeaveAllocations({ skip: skip.value, limit: limit.value }),
+      listLeaveTypes(),
+    ])
     rows.value = res.allocations; total.value = res.total
+    leaveTypeMap.value = Object.fromEntries(types.map(t => [t.id, t.name]))
   } catch {} finally { loading.value = false }
 }
 onMounted(load)
@@ -98,6 +104,9 @@ const adjustmentOptions = [
     />
     
     <DataTable :columns="columns" :rows="rows" :loading="loading" :searchable="true" empty-text="No allocations yet.">
+      <template #cell-leave_type_id="{ value }">
+        <span class="text-xs font-medium text-slate-700">{{ leaveTypeMap[value] ?? value }}</span>
+      </template>
       <template #cell-status="{ value }">
         <span 
           :class="{ 

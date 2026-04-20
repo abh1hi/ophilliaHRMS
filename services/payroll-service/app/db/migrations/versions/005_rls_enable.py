@@ -15,11 +15,14 @@ depends_on = None
 
 TENANT_TABLES = [
     "salary_structures",
+    "employee_salaries",
     "payroll_runs",
-    "payroll_slips",
-    "tax_profiles",
-    "ytd_summaries",
-    "salary_assignments",
+    "payslips",
+    "employee_tax_profiles",
+    "employee_ytd",
+    "payroll_adjustments",
+    "payroll_loans",
+    "payroll_audit_logs",
 ]
 
 _POLICY = """

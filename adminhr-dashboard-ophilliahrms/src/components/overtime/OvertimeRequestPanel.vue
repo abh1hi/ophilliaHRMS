@@ -14,7 +14,8 @@ import {
   cancelOvertimeRequest,
 } from '../../services/overtime-request.service'
 import type { OvertimeRequest } from '../../services/overtime-request.service'
-import { decodeToken, getToken } from '../../services/auth.service'
+import { decodeToken } from '../../services/auth.service'
+import { getToken } from '../../services/http'
 
 const claims = decodeToken(getToken())
 const userRole = claims?.role ?? ''

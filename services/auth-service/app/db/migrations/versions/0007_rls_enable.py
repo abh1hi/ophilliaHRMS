@@ -14,7 +14,7 @@ branch_labels = None
 depends_on = None
 
 # companies is intentionally excluded — super admin must see all companies without RLS
-TENANT_TABLES = ["users", "invites", "refresh_tokens", "magic_tokens"]
+TENANT_TABLES = ["users", "invites"]
 
 _POLICY = """
 CREATE POLICY tenant_isolation ON {table}

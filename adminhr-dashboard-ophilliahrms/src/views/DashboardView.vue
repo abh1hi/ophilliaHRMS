@@ -40,6 +40,8 @@ import OvertimeRequestPanel from '../components/overtime/OvertimeRequestPanel.vu
 import OvertimeReportsPanel from '../components/overtime/OvertimeReportsPanel.vue'
 import LeavePeriodPanel from '../components/leaves/LeavePeriodPanel.vue'
 import HolidayListPanel from '../components/leaves/HolidayListPanel.vue'
+import LeaveTypePanel from '../components/leaves/LeaveTypePanel.vue'
+import LeaveBalanceSummaryPanel from '../components/leaves/LeaveBalanceSummaryPanel.vue'
 import LeavePolicyPanel from '../components/leaves/LeavePolicyPanel.vue'
 import LeavePolicyAssignmentPanel from '../components/leaves/LeavePolicyAssignmentPanel.vue'
 import LeaveAllocationPanel from '../components/leaves/LeaveAllocationPanel.vue'
@@ -52,6 +54,7 @@ import WorkspaceCalendarView from '../components/workspace/WorkspaceCalendarView
 import WorkspaceBoardView from '../components/workspace/WorkspaceBoardView.vue'
 import WorkspaceNotesPanel from '../components/workspace/WorkspaceNotesPanel.vue'
 import WorkspaceSettingsView from '../components/workspace/WorkspaceSettingsView.vue'
+import HelpView from './HelpView.vue'
 import { getEmployeeProfile, logout, decodeToken } from '../services/auth.service'
 import { getToken } from '../services/http'
 import type { EmployeeProfile } from '../services/auth.service'
@@ -96,12 +99,14 @@ const headerTitles: Record<string, { title: string; subtitle: string }> = {
   'attendance-bulk':          { title: 'Bulk Attendance',       subtitle: 'Upload attendance data in bulk'                          },
   'attendance-upload':        { title: 'Upload Attendance',     subtitle: 'Import from external biometric systems'                  },
   'holiday-calendars-attendance': { title: 'Holiday Calendars', subtitle: 'Manage public and optional holidays'                     },
-  'ot-policies':              { title: 'OT Policies',           subtitle: 'Configure overtime thresholds and pay multipliers'        },
-  'ot-records':               { title: 'OT Records',            subtitle: 'Auto-calculated overtime from clock-in/out data'          },
-  'ot-requests':              { title: 'OT Requests',           subtitle: 'Submit and review overtime requests'                      },
-  'ot-reports':               { title: 'OT Reports',            subtitle: 'Monthly overtime analytics by employee'                   },
+  'ot-policies':              { title: 'Overtime Policies',     subtitle: 'Define overtime thresholds and pay rates'                 },
+  'ot-records':               { title: 'Overtime Records',      subtitle: 'Auto-calculated overtime from clock-in/out data'          },
+  'ot-requests':              { title: 'Overtime Requests',     subtitle: 'Submit and review overtime requests'                      },
+  'ot-reports':               { title: 'Overtime Reports',      subtitle: 'Monthly overtime analytics by employee'                   },
   'leave-periods':            { title: 'Leave Periods',         subtitle: 'Define annual leave cycles'                              },
   'holiday-lists':            { title: 'Holiday Lists',         subtitle: 'Manage company and public holidays'                      },
+  'leave-types':              { title: 'Leave Types',           subtitle: 'Manage leave categories and entitlements'                },
+  'leave-balance':            { title: 'Leave Balances',        subtitle: 'Current leave balances by employee and type'            },
   'leave-policies':           { title: 'Leave Policies',        subtitle: 'Define leave rules and entitlements'                     },
   'leave-policy-assignments': { title: 'Policy Assignments',    subtitle: 'Assign leave policies to employees'                      },
   'leave-allocations':        { title: 'Leave Allocations',     subtitle: 'Manage employee leave balances'                          },
@@ -121,6 +126,7 @@ const headerTitles: Record<string, { title: string; subtitle: string }> = {
   'workspace-notes':          { title: 'Notes',                 subtitle: 'Team notes and knowledge base'                           },
   'workspace-settings':       { title: 'Workspace Settings',    subtitle: 'Configure workspace preferences'                         },
   profile:                    { title: 'My Profile',            subtitle: 'Your account and personal details'                       },
+  help:                       { title: 'Help & Guide',          subtitle: 'Documentation and how-to guides for HR staff'            },
 }
 
 const pageTitle = computed(() => headerTitles[currentTab.value]?.title ?? '')
@@ -187,6 +193,8 @@ function handleLogout() {
           <!-- Leaves -->
           <LeavePeriodPanel           v-else-if="currentTab === 'leave-periods'"            />
           <HolidayListPanel           v-else-if="currentTab === 'holiday-lists'"            />
+          <LeaveTypePanel             v-else-if="currentTab === 'leave-types'"              />
+          <LeaveBalanceSummaryPanel   v-else-if="currentTab === 'leave-balance'"            />
           <LeavePolicyPanel           v-else-if="currentTab === 'leave-policies'"           />
           <LeavePolicyAssignmentPanel v-else-if="currentTab === 'leave-policy-assignments'" />
           <LeaveAllocationPanel       v-else-if="currentTab === 'leave-allocations'"        />
@@ -223,6 +231,9 @@ function handleLogout() {
           <WorkspaceBoardView    v-else-if="currentTab === 'workspace-board'"    />
           <WorkspaceNotesPanel   v-else-if="currentTab === 'workspace-notes'"    />
           <WorkspaceSettingsView v-else-if="currentTab === 'workspace-settings'" />
+
+          <!-- Help -->
+          <HelpView v-else-if="currentTab === 'help'" @navigate="navigate" />
 
           <!-- My Profile -->
           <div v-else-if="currentTab === 'profile'" class="max-w-3xl space-y-6">

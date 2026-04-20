@@ -13,19 +13,24 @@ import {
 } from '@/components/ui/dialog'
 import FormInput from '@/components/ui/FormInput.vue'
 import FormSelect from '@/components/ui/FormSelect.vue'
-import { 
-  Plus, 
-  Calendar, 
-  IndianRupee, 
-  Users, 
-  ArrowRight, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle 
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import PayrollRunDetailPanel from './PayrollRunDetailPanel.vue'
+import {
+  Plus,
+  IndianRupee,
+  Users,
+  ArrowRight,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Trash2
 } from 'lucide-vue-next'
 
 const payrollStore = usePayrollStore()
 const showDialog = ref(false)
+const showDetail = ref(false)
+const showDeleteConfirm = ref(false)
+const deleteTarget = ref<PayrollRun | null>(null)
 
 const form = ref({
   period_start: '',
@@ -40,10 +45,10 @@ const formatPeriod = (start: string, end: string) => {
 }
 
 const formatCurrency = (amount: number) => {
-  return amount.toLocaleString('en-IN', { 
-    style: 'currency', 
-    currency: 'INR', 
-    maximumFractionDigits: 0 
+  return (amount ?? 0).toLocaleString('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
   })
 }
 
@@ -54,6 +59,21 @@ const formatDate = (date?: string) => {
 
 const selectRun = (run: PayrollRun) => {
   payrollStore.currentRun = run
+  showDetail.value = true
+}
+
+const confirmDelete = (e: Event, run: PayrollRun) => {
+  e.stopPropagation()
+  deleteTarget.value = run
+  showDeleteConfirm.value = true
+}
+
+const handleDelete = async () => {
+  if (!deleteTarget.value) return
+  payrollStore.payrollRuns = payrollStore.payrollRuns.filter(r => r.id !== deleteTarget.value!.id)
+  if (payrollStore.currentRun?.id === deleteTarget.value.id) payrollStore.currentRun = null
+  deleteTarget.value = null
+  showDeleteConfirm.value = false
 }
 
 const handleCreate = async () => {
@@ -64,11 +84,7 @@ const handleCreate = async () => {
       run_type: form.value.run_type,
     })
     showDialog.value = false
-    form.value = {
-      period_start: '',
-      period_end: '',
-      run_type: 'REGULAR',
-    }
+    form.value = { period_start: '', period_end: '', run_type: 'REGULAR' }
   } catch (err) {
     console.error('Failed to create payroll run', err)
   }
@@ -85,11 +101,17 @@ const runTypeOptions = [
   { value: 'FNF', label: 'Full & Final' },
 ]
 
+const isDeletable = (status: string) => ['draft', 'open'].includes(status.toLowerCase())
+
 const getStatusStyles = (status: string) => {
   switch (status.toLowerCase()) {
+    case 'draft':
     case 'open': return 'bg-blue-100/50 text-blue-700 border-blue-200/50'
+    case 'computed': return 'bg-yellow-100/50 text-yellow-700 border-yellow-200/50'
+    case 'approved': return 'bg-teal-100/50 text-teal-700 border-teal-200/50'
     case 'processed': return 'bg-emerald-100/50 text-emerald-700 border-emerald-200/50'
     case 'paid': return 'bg-indigo-100/50 text-indigo-700 border-indigo-200/50'
+    case 'failed': return 'bg-rose-100/50 text-rose-700 border-rose-200/50'
     default: return 'bg-slate-100/50 text-slate-500 border-slate-200/50'
   }
 }
@@ -110,9 +132,9 @@ const getStatusStyles = (status: string) => {
     <Dialog :open="showDialog" @update:open="showDialog = $event">
       <DialogContent class="sm:max-w-md rounded-[32px] border-white/20 backdrop-blur-2xl">
         <DialogHeader>
-          <DialogTitle>Initiate Payroll Run</DialogTitle>
+          <DialogTitle>New Payroll Run</DialogTitle>
           <DialogDescription>
-            Specify the period and type for this calculation cycle.
+            Set the period dates and run type to create a new payroll run.
           </DialogDescription>
         </DialogHeader>
 
@@ -131,7 +153,7 @@ const getStatusStyles = (status: string) => {
             :disabled="payrollStore.isLoading" 
             class="rounded-full px-8 bg-slate-900 text-white hover:bg-slate-800"
           >
-            {{ payrollStore.isLoading ? 'Processing...' : 'Start Cycle' }}
+            {{ payrollStore.isLoading ? 'Creating...' : 'Create Run' }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -140,7 +162,7 @@ const getStatusStyles = (status: string) => {
     <!-- Loading State -->
     <div v-if="payrollStore.isLoading && !payrollStore.payrollRuns?.length" class="flex flex-col items-center justify-center py-20 gap-4">
       <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
-      <p class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Synchronizing Payroll Data...</p>
+      <p class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Loading payroll runs…</p>
     </div>
 
     <!-- Empty State -->
@@ -167,15 +189,25 @@ const getStatusStyles = (status: string) => {
         <div class="absolute -right-12 -top-12 w-32 h-32 bg-slate-900/5 rounded-full blur-3xl group-hover:bg-slate-900/10 transition-colors"></div>
 
         <div class="flex items-center justify-between mb-6">
-          <span 
+          <span
             :class="[
-              'px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm', 
+              'px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm',
               getStatusStyles(run.status)
             ]"
           >
             {{ run.status }}
           </span>
-          <ArrowRight class="w-4 h-4 text-slate-300 group-hover:translate-x-1 group-hover:text-slate-900 transition-all" />
+          <div class="flex items-center gap-1">
+            <button
+              v-if="isDeletable(run.status)"
+              @click="confirmDelete($event, run)"
+              class="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+              title="Delete run"
+            >
+              <Trash2 class="w-3.5 h-3.5" />
+            </button>
+            <ArrowRight class="w-4 h-4 text-slate-300 group-hover:translate-x-1 group-hover:text-slate-900 transition-all" />
+          </div>
         </div>
 
         <h3 class="font-black text-slate-900 dark:text-slate-100 text-lg tracking-tight mb-1">{{ formatPeriod(run.period_start, run.period_end) }}</h3>
@@ -220,4 +252,19 @@ const getStatusStyles = (status: string) => {
       </div>
     </div>
   </div>
+
+  <PayrollRunDetailPanel
+    :open="showDetail"
+    :run="payrollStore.currentRun"
+    @close="showDetail = false"
+    @updated="payrollStore.fetchPayrollRuns()"
+  />
+
+  <ConfirmDialog
+    :open="showDeleteConfirm"
+    title="Delete Payroll Run?"
+    message="Are you sure you want to delete this payroll run? This action cannot be undone."
+    @confirm="handleDelete"
+    @cancel="showDeleteConfirm = false"
+  />
 </template>

@@ -9,14 +9,14 @@
             <Settings class="w-5 h-5 text-white" />
          </div>
          <div>
-            <h3 class="text-base font-black text-slate-900 uppercase tracking-widest">Environmental Configuration</h3>
-            <p class="text-[11px] text-slate-500 font-bold uppercase tracking-tight">Manage active hubs and workspace hierarchies</p>
+            <h3 class="text-base font-black text-slate-900 uppercase tracking-widest">Workspace Management</h3>
+            <p class="text-[11px] text-slate-500 font-bold uppercase tracking-tight">Manage workspaces and settings</p>
          </div>
       </div>
 
       <div class="space-y-6">
         <div class="flex flex-col gap-2">
-           <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Contextual Hub Selection</label>
+           <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Select Workspace</label>
            <div class="flex gap-3">
               <FormSelect 
                 v-model="selectedId" 
@@ -27,11 +27,11 @@
               <div v-if="selectedId" class="flex gap-2 animate-in fade-in zoom-in-95">
                 <Button variant="outline" @click="editWorkspace" class="rounded-2xl h-12 px-5 font-bold uppercase tracking-widest text-[11px] border-slate-200 hover:bg-slate-50">
                    <Edit class="w-4 h-4 mr-2" />
-                   Recalibrate
+                   Edit
                 </Button>
                 <Button variant="ghost" @click="showDeleteConfirm = true" class="rounded-2xl h-12 px-5 font-bold uppercase tracking-widest text-[11px] text-destructive hover:bg-destructive/5">
                    <Trash2 class="w-4 h-4 mr-2" />
-                   Decommission
+                   Delete
                 </Button>
               </div>
            </div>
@@ -39,7 +39,7 @@
 
         <div v-if="store.workspaces.length === 0" class="flex flex-col items-center py-10 border border-dashed border-slate-200 rounded-[24px] bg-slate-50/30">
            <Layout class="w-8 h-8 text-slate-300 mb-3" />
-           <p class="text-[11px] text-slate-400 font-bold uppercase tracking-widest">No active environments identified in the architecture</p>
+           <p class="text-[11px] text-slate-400 font-bold uppercase tracking-widest">No workspaces yet</p>
         </div>
       </div>
     </div>
@@ -53,8 +53,8 @@
             <Globe class="w-5 h-5 text-white" />
          </div>
          <div>
-            <h3 class="text-base font-black text-slate-900 uppercase tracking-widest text-blue-900">Synchronization Protocol</h3>
-            <p class="text-[11px] text-slate-500 font-bold uppercase tracking-tight">Synchronize with external G-Suite endpoints</p>
+            <h3 class="text-base font-black text-slate-900 uppercase tracking-widest text-blue-900">Google Calendar Integration</h3>
+            <p class="text-[11px] text-slate-500 font-bold uppercase tracking-tight">Connect and sync your Google Calendar</p>
          </div>
       </div>
 
@@ -68,10 +68,10 @@
           <div class="flex items-center justify-between border-b border-slate-100 pb-4">
             <div class="flex items-center gap-2">
                <Shield class="w-4 h-4 text-blue-500" />
-               <p class="text-[11px] font-black uppercase tracking-widest text-slate-900">Synchronized Entrypoints</p>
+               <p class="text-[11px] font-black uppercase tracking-widest text-slate-900">Connected Calendars</p>
             </div>
             <Button variant="ghost" size="sm" @click="fetchGoogleCals" class="h-8 rounded-full text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:bg-blue-50">
-               Manage Endpoints
+               Manage Calendars
             </Button>
           </div>
 
@@ -87,12 +87,12 @@
             </div>
           </div>
           <div v-else class="text-center py-6 border border-dashed border-slate-100 rounded-2xl">
-             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">No active endpoints connected</p>
+             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">No calendars connected yet</p>
           </div>
 
           <!-- Google calendar selector -->
           <div v-if="showCalSelector" class="p-6 bg-blue-50/30 border border-blue-100/50 rounded-[28px] space-y-4 animate-in zoom-in-95">
-            <p class="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-2">Endpoint Configuration</p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-2">Select Calendars to Connect</p>
             <div class="grid grid-cols-1 gap-2">
               <div
                 v-for="cal in googleStore.availableCalendars"
@@ -108,9 +108,9 @@
             </div>
             <div class="flex gap-3 pt-2">
               <Button @click="saveGoogleCals" class="rounded-full px-8 h-10 bg-blue-600 text-white font-bold uppercase tracking-widest text-[10px] hover:bg-blue-700 shadow-lg shadow-blue-100">
-                 Commit Endpoints
+                 Save
               </Button>
-              <Button variant="ghost" @click="showCalSelector = false" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[10px]">Abandon</Button>
+              <Button variant="ghost" @click="showCalSelector = false" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[10px]">Cancel</Button>
             </div>
           </div>
         </div>
@@ -125,12 +125,12 @@
       @saved="store.fetchWorkspaces()"
     />
 
-    <ConfirmDialog 
-      :open="showDeleteConfirm" 
-      title="Decommission Environment?" 
-      message="Are you certain you want to disassemble this workspace hub? This action is irrevocable and will result in data fragmentation." 
-      @confirm="handleDelete" 
-      @cancel="showDeleteConfirm = false" 
+    <ConfirmDialog
+      :open="showDeleteConfirm"
+      title="Delete Workspace?"
+      message="Are you sure you want to delete this workspace? This action cannot be undone."
+      @confirm="handleDelete"
+      @cancel="showDeleteConfirm = false"
     />
   </div>
 </template>

@@ -6,7 +6,7 @@ WORKDIR /build
 ENV PIP_DEFAULT_TIMEOUT=120 \
     PIP_RETRIES=5
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update -o Acquire::Retries=3 && apt-get install --fix-missing -y --no-install-recommends \
     build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,7 +19,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update -o Acquire::Retries=3 && apt-get install --fix-missing -y --no-install-recommends \
     libpq5 curl \
     && rm -rf /var/lib/apt/lists/*
 

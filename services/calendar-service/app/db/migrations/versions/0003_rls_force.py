@@ -18,7 +18,7 @@ TENANT_TABLES = [
     "workspace_members",
     "calendars",
     "calendar_events",
-    "tasks",
+    "calendar_tasks",
 ]
 
 

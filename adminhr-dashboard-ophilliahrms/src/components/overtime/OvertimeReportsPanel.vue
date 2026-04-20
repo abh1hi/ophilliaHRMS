@@ -74,7 +74,7 @@ const maxOt = computed(() => byEmployee.value[0]?.total_ot ?? 1)
     <div class="grid grid-cols-2 gap-4">
       <div class="bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between">
         <div>
-          <p class="text-xs text-slate-400 font-medium mb-1">Total OT Hours</p>
+          <p class="text-xs text-slate-400 font-medium mb-1">Total Overtime Hours</p>
           <p class="text-3xl font-bold text-slate-900">{{ totalOt }}h</p>
           <p class="text-xs text-slate-400 mt-1">{{ months[selectedMonth - 1] }} {{ selectedYear }}</p>
         </div>
@@ -84,7 +84,7 @@ const maxOt = computed(() => byEmployee.value[0]?.total_ot ?? 1)
       </div>
       <div class="bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between">
         <div>
-          <p class="text-xs text-slate-400 font-medium mb-1">Top OT Employee</p>
+          <p class="text-xs text-slate-400 font-medium mb-1">Top Overtime Employee</p>
           <p class="text-sm font-bold text-slate-900 truncate max-w-[160px]">
             {{ topEmployee ? topEmployee.employee_id.slice(0, 8) + '...' : '—' }}
           </p>

@@ -183,7 +183,7 @@ async function confirmDelete() {
       </template>
     </DataTable>
 
-    <SlideDrawer :open="drawerOpen" :title="selected ? 'Edit OT Policy' : 'New Overtime Policy'" width="w-full max-w-xl" @close="drawerOpen = false">
+    <SlideDrawer :open="drawerOpen" :title="selected ? 'Edit Overtime Policy' : 'New Overtime Policy'" width="w-full max-w-xl" @close="drawerOpen = false">
       <div class="space-y-6 py-4">
 
         <!-- Template quick-pick -->
@@ -290,7 +290,7 @@ async function confirmDelete() {
 
     <ConfirmDialog
       :open="!!deleteTarget"
-      title="Delete OT Policy?"
+      title="Delete Overtime Policy?"
       :message="`Remove this overtime policy? Existing records will not be affected.`"
       :loading="deleting"
       @confirm="confirmDelete"

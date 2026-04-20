@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Activity, Clock, ChevronRight, UserCircle, Zap, ShieldCheck } from 'lucide-vue-next'
+import { Activity, Clock, ChevronRight, Zap } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
@@ -44,8 +44,8 @@ function colorFor(i: number) { return colors[i % colors.length] }
          </div>
       </div>
       <div class="space-y-1">
-        <p class="text-[12px] font-black text-slate-300 uppercase tracking-[0.2em]">Activity Buffer Empty</p>
-        <p class="text-[10px] text-slate-400 font-medium uppercase tracking-widest">No ingestion events discovered in current matrix</p>
+        <p class="text-[12px] font-black text-slate-300 uppercase tracking-[0.2em]">No recent activity</p>
+        <p class="text-[10px] text-slate-400 font-medium uppercase tracking-widest">No activity items to display</p>
       </div>
     </div>
 
@@ -86,7 +86,7 @@ function colorFor(i: number) { return colors[i % colors.length] }
           v-if="item.requires_action"
           class="h-10 rounded-full px-6 bg-slate-900 text-white hover:bg-black shadow-lg shadow-slate-200/50 text-[10px] font-black uppercase tracking-widest transition-all"
         >
-          Review Entity
+          View
         </Button>
         <div v-else class="pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
            <div class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center hover:bg-white border border-transparent hover:border-slate-100 transition-all cursor-pointer">

@@ -101,9 +101,9 @@ function shiftWeek(days: number) {
 <template>
   <div class="space-y-10">
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-      <PageHeader 
-        title="Operational Roster" 
-        subtitle="Manage and visualize weekly workforce deployments" 
+      <PageHeader
+        title="Roster"
+        subtitle="Visualize weekly shift assignments across your workforce"
       />
 
       <div class="flex items-center gap-3">
@@ -116,7 +116,7 @@ function shiftWeek(days: number) {
              <div class="relative">
                <input type="date" v-model="fromDate" class="absolute inset-0 opacity-0 cursor-pointer" />
                <div class="flex flex-col">
-                  <span class="text-[9px] font-bold uppercase tracking-widest text-slate-400">Commence</span>
+                  <span class="text-[9px] font-bold uppercase tracking-widest text-slate-400">Start</span>
                   <span class="text-xs font-black text-slate-900 dark:text-slate-100">{{ formatDay(fromDate).full }}</span>
                </div>
              </div>
@@ -124,7 +124,7 @@ function shiftWeek(days: number) {
              <div class="relative">
                <input type="date" v-model="toDate" class="absolute inset-0 opacity-0 cursor-pointer" />
                <div class="flex flex-col text-right">
-                  <span class="text-[9px] font-bold uppercase tracking-widest text-slate-400">Conclude</span>
+                  <span class="text-[9px] font-bold uppercase tracking-widest text-slate-400">End</span>
                   <span class="text-xs font-black text-slate-900 dark:text-slate-100">{{ formatDay(toDate).full }}</span>
                </div>
              </div>
@@ -144,7 +144,7 @@ function shiftWeek(days: number) {
     <!-- Loading State -->
     <div v-if="loading" class="flex flex-col items-center justify-center py-32 gap-4">
       <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
-      <p class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Synchronizing Roster Engine...</p>
+      <p class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Loading roster…</p>
     </div>
 
     <!-- Error State -->
@@ -158,7 +158,7 @@ function shiftWeek(days: number) {
       <div class="h-20 w-20 rounded-full bg-slate-50 flex items-center justify-center mb-6">
         <Users class="w-10 h-10 text-slate-200" />
       </div>
-      <p class="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground italic">No active assignments identified for this temporal window</p>
+      <p class="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground italic">No shift assignments found for this date range</p>
     </div>
 
     <!-- Roster Grid -->
@@ -167,7 +167,7 @@ function shiftWeek(days: number) {
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-slate-50/50 dark:bg-white/5">
-              <th class="text-left px-10 py-8 font-black text-slate-900 dark:text-slate-100 text-[10px] uppercase tracking-[0.2em] border-r border-white/10 w-48">Resource ID</th>
+              <th class="text-left px-10 py-8 font-black text-slate-900 dark:text-slate-100 text-[10px] uppercase tracking-[0.2em] border-r border-white/10 w-48">Employee</th>
               <th v-for="d in dateRange" :key="d" class="px-6 py-8 text-center border-r border-white/10 last:border-0">
                 <div class="flex flex-col items-center gap-1">
                    <span class="text-slate-400 text-[9px] font-black uppercase tracking-widest">{{ formatDay(d).day }}</span>
@@ -185,7 +185,7 @@ function shiftWeek(days: number) {
                    </div>
                    <div class="flex flex-col">
                       <span class="text-[10px] font-black text-slate-900 dark:text-slate-100 tracking-tight">{{ empId.slice(0, 8) }}…</span>
-                      <span class="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Active Individual</span>
+                      <span class="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Active Employee</span>
                    </div>
                 </div>
               </td>
@@ -219,9 +219,9 @@ function shiftWeek(days: number) {
       <div class="bg-indigo-50/30 dark:bg-white/5 px-10 py-6 border-t border-white/10 flex items-center justify-between">
          <div class="flex items-center gap-2">
             <Info class="w-4 h-4 text-indigo-500" />
-            <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Temporal Intelligence Active</span>
+            <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Roster Active</span>
          </div>
-         <p class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Visualizing {{ employeeIds.length }} Active Resources across {{ dateRange.length }} Operational Windows</p>
+         <p class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Showing {{ employeeIds.length }} active employees across {{ dateRange.length }} days</p>
       </div>
     </div>
   </div>

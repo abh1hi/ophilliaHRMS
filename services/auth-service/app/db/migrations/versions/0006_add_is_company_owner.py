@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "0006_is_company_owner"
-down_revision = "0005_add_outbox_table"
+down_revision = "0005_add_outbox"
 branch_labels = None
 depends_on = None
 

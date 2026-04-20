@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update -o Acquire::Retries=3 && apt-get install --fix-missing -y \
     netcat-openbsd \
     build-essential \
     libpq-dev \

@@ -3,7 +3,7 @@ FROM python:3.11-slim AS builder
 WORKDIR /build
 ENV PIP_DEFAULT_TIMEOUT=120 \
     PIP_RETRIES=5
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -o Acquire::Retries=3 && apt-get install --fix-missing -y --no-install-recommends build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir --prefix=/install -r requirements.txt
@@ -11,7 +11,7 @@ RUN pip install --upgrade pip && \
 # ── Stage 2: Production image ────────────────────────────────────────────────
 FROM python:3.11-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -o Acquire::Retries=3 && apt-get install --fix-missing -y --no-install-recommends libpq5 curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /install /usr/local
 RUN useradd -m -r appuser && chown -R appuser:appuser /app
 USER appuser

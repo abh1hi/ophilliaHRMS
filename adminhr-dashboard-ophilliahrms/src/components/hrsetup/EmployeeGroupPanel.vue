@@ -4,9 +4,9 @@ import PageHeader from '../ui/PageHeader.vue'
 import DataTable from '../ui/DataTable.vue'
 import SlideDrawer from '../ui/SlideDrawer.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
-import FormInput from '../ui/FormInput.vue'
 import { Button } from '@/components/ui/button'
-import { Pencil, Trash2, X, Users, UserPlus } from 'lucide-vue-next'
+import EntitySearchSelect from '../ui/EntitySearchSelect.vue'
+import { Pencil, Trash2, X, Users } from 'lucide-vue-next'
 import { listEmployeeGroups, createEmployeeGroup, updateEmployeeGroup, deleteEmployeeGroup } from '../../services/employee-group.service'
 import type { EmployeeGroup } from '../../services/employee-group.service'
 
@@ -19,7 +19,7 @@ const deleteTarget = ref<EmployeeGroup | null>(null)
 const saving      = ref(false)
 const deleting    = ref(false)
 const errorMsg    = ref('')
-const newMemberId = ref('')
+const selectedEmployeeId = ref('')
 
 const columns = [
   { key: 'name',         label: 'Group Name'    },
@@ -39,7 +39,7 @@ onMounted(load)
 function openCreate() {
   selected.value = null
   form.value = { members: [] }
-  newMemberId.value = ''
+  selectedEmployeeId.value = ''
   errorMsg.value = ''
   drawerOpen.value = true
 }
@@ -47,20 +47,20 @@ function openCreate() {
 function openEdit(row: EmployeeGroup) {
   selected.value = row
   form.value = { ...row, members: [...(row.members ?? [])] }
-  newMemberId.value = ''
+  selectedEmployeeId.value = ''
   errorMsg.value = ''
   drawerOpen.value = true
 }
 
 function addMember() {
-  const id = newMemberId.value.trim()
+  const id = selectedEmployeeId.value?.trim()
   if (!id) return
   if (form.value.members?.some(m => m.employee_id === id)) {
     errorMsg.value = 'This employee is already in the group.'
     return
   }
   form.value.members = [...(form.value.members ?? []), { employee_id: id }]
-  newMemberId.value = ''
+  selectedEmployeeId.value = ''
   errorMsg.value = ''
 }
 
@@ -161,16 +161,16 @@ function shortId(id: string) {
             Members ({{ form.members?.length ?? 0 }})
           </p>
 
-          <div class="flex gap-2">
-            <input
-              v-model="newMemberId"
-              @keydown.enter.prevent="addMember"
-              type="text"
-              placeholder="Paste Employee ID and press Enter or click Add"
-              class="flex-1 border border-slate-200 bg-white text-slate-900 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-            />
-            <Button @click="addMember" type="button" variant="outline" class="shrink-0 gap-1.5">
-              <UserPlus class="w-4 h-4" /> Add
+          <div class="flex gap-2 items-end">
+            <div class="flex-1">
+              <EntitySearchSelect
+                v-model="selectedEmployeeId"
+                entity="employee"
+                placeholder="Search employee by name or ID…"
+              />
+            </div>
+            <Button @click="addMember" type="button" variant="outline" class="shrink-0 gap-1.5 h-11 rounded-xl">
+              Add
             </Button>
           </div>
 

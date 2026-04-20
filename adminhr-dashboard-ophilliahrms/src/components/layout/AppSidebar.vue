@@ -40,7 +40,9 @@ import {
   Activity,
   TrendingUp,
   Settings2,
-  Monitor
+  Monitor,
+  HelpCircle,
+  PieChart
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 
@@ -52,7 +54,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'navigate', tab: string): void
-  (e: 'switch-entity'): void
   (e: 'logout'): void
 }>()
 
@@ -104,20 +105,22 @@ const attendanceNav = [
 const leaveNav = [
   { key: 'leave-periods',            label: 'Leave Periods',     icon: CalendarDays  },
   { key: 'holiday-lists',            label: 'Holiday Lists',     icon: Umbrella      },
+  { key: 'leave-types',              label: 'Leave Types',       icon: Tag           },
   { key: 'leave-policies',           label: 'Leave Policies',    icon: Shield        },
   { key: 'leave-policy-assignments', label: 'Policy Assignments', icon: BookOpen     },
   { key: 'leave-allocations',        label: 'Leave Allocations', icon: List          },
-  { key: 'leave-block-lists',        label: 'Block Lists',       icon: Slash         },
+  { key: 'leave-balance',            label: 'Leave Balances',    icon: PieChart      },
+  { key: 'leave-block-lists',        label: 'Leave Block Lists', icon: Slash         },
   { key: 'compensatory-leave',       label: 'Compensatory Leave', icon: CalendarCheck},
   { key: 'leave-encashments',        label: 'Leave Encashment',  icon: Coins         },
   { key: 'leave-ledger',             label: 'Leave Ledger',      icon: BarChart3     },
 ]
 
 const overtimeNav = [
-  { key: 'ot-policies', label: 'OT Policies', icon: Settings2  },
-  { key: 'ot-records',  label: 'OT Records',  icon: Clock      },
-  { key: 'ot-requests', label: 'OT Requests', icon: FileText   },
-  { key: 'ot-reports',  label: 'OT Reports',  icon: BarChart3  },
+  { key: 'ot-policies', label: 'Overtime Policies', icon: Settings2  },
+  { key: 'ot-records',  label: 'Overtime Records',  icon: Clock      },
+  { key: 'ot-requests', label: 'Overtime Requests', icon: FileText   },
+  { key: 'ot-reports',  label: 'Overtime Reports',  icon: BarChart3  },
 ]
 
 const workspaceNav = [
@@ -243,6 +246,24 @@ const workspaceNavKeys  = workspaceNav.map(n => n.key)
         <div class="text-left">
           <div class="text-[10px] font-black uppercase tracking-widest leading-none">My Profile</div>
           <div class="text-[8px] font-bold text-slate-400 uppercase tracking-tight mt-1">Account settings</div>
+        </div>
+      </button>
+
+      <button
+        @click="emit('navigate', 'help')"
+        :class="[
+          'w-full flex items-center space-x-4 px-5 py-4 rounded-[22px] transition-all duration-300 group',
+          currentTab === 'help'
+            ? 'bg-slate-100 text-slate-900'
+            : 'text-slate-400 hover:bg-white hover:text-slate-900 shadow-sm'
+        ]"
+      >
+        <div class="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-white transition-colors">
+          <HelpCircle class="w-4 h-4" />
+        </div>
+        <div class="text-left">
+          <div class="text-[10px] font-black uppercase tracking-widest leading-none">Help & Guide</div>
+          <div class="text-[8px] font-bold text-slate-400 uppercase tracking-tight mt-1">Documentation</div>
         </div>
       </button>
 

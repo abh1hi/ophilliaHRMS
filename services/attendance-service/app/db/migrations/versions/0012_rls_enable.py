@@ -18,8 +18,6 @@ TENANT_TABLES = [
     "attendance_requests",
     "attendance_policies",
     "employee_checkins",
-    "overtime_policies",
-    "overtime_requests",
     "shift_assignments",
     "shift_schedules",
     "geofence_locations",

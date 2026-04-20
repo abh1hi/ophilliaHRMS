@@ -30,26 +30,26 @@ const props = defineProps<Props>()
 const emit = defineEmits<{ (e: 'click', task: CalendarTask): void }>()
 
 const priorityConfig = {
-  low: { 
-    label: 'L3: Auxiliary',
+  low: {
+    label: 'Low',
     icon: ArrowDown,
     color: 'bg-slate-100/80 text-slate-500 border-slate-200/50',
     iconColor: 'text-slate-400'
   },
-  medium: { 
-    label: 'L2: Standard',
+  medium: {
+    label: 'Medium',
     icon: ArrowRight,
     color: 'bg-blue-50/80 text-blue-600 border-blue-100/50',
     iconColor: 'text-blue-500'
   },
-  high: { 
-    label: 'L1: High',
+  high: {
+    label: 'High',
     icon: ArrowUp,
     color: 'bg-amber-50/80 text-amber-600 border-amber-100/50',
     iconColor: 'text-amber-500'
   },
-  urgent: { 
-    label: 'L0: Critical',
+  urgent: {
+    label: 'Urgent',
     icon: Zap,
     color: 'bg-rose-50/80 text-rose-600 border-rose-100/50',
     iconColor: 'text-rose-500'

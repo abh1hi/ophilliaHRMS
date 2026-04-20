@@ -121,10 +121,6 @@ class CompanyWithAdminCreate(BaseModel):
     admin: AdminCreate
 
 
-class CompanyWithAdminResponse(BaseModel):
-    company: "CompanyResponse"
-    admin: UserResponse
-
 class CompanyResponse(CompanyBase):
     id: UUID
     is_active: bool
@@ -136,6 +132,11 @@ class CompanyResponse(CompanyBase):
 class CompanyListResponse(BaseModel):
     total: int
     companies: list[CompanyResponse]
+
+
+class CompanyWithAdminResponse(BaseModel):
+    company: CompanyResponse
+    admin: UserResponse
 
 
 class Token(BaseModel):

@@ -30,6 +30,7 @@ import {
   Tag,
   Star,
   Users2,
+  PieChart,
 } from 'lucide-vue-next'
 import { computed } from 'vue'
 
@@ -57,10 +58,12 @@ const subNavMap: Record<string, { key: string; label: string; icon: any }[]> = {
   leaves: [
     { key: 'leave-periods',             label: 'Leave Periods',      icon: CalendarDays  },
     { key: 'holiday-lists',             label: 'Holiday Lists',      icon: Umbrella      },
+    { key: 'leave-types',               label: 'Leave Types',        icon: Tag           },
     { key: 'leave-policies',            label: 'Leave Policies',     icon: Shield        },
     { key: 'leave-policy-assignments',  label: 'Policy Assignments', icon: BookOpen      },
     { key: 'leave-allocations',         label: 'Allocations',        icon: List          },
-    { key: 'leave-block-lists',         label: 'Block Lists',        icon: Slash         },
+    { key: 'leave-balance',             label: 'Leave Balances',     icon: PieChart      },
+    { key: 'leave-block-lists',         label: 'Leave Block Lists',  icon: Slash         },
     { key: 'compensatory-leave',        label: 'Compensatory Leave', icon: CalendarCheck },
     { key: 'leave-encashments',         label: 'Leave Encashment',   icon: Coins         },
     { key: 'leave-ledger',              label: 'Leave Ledger',       icon: BarChart3     },
@@ -101,6 +104,8 @@ const tabToSection: Record<string, string> = {
   'attendance-upload': 'attendance',
   'leave-periods': 'leaves',
   'holiday-lists': 'leaves',
+  'leave-types': 'leaves',
+  'leave-balance': 'leaves',
   'leave-policies': 'leaves',
   'leave-policy-assignments': 'leaves',
   'leave-allocations': 'leaves',

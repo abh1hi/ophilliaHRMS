@@ -5,15 +5,14 @@ import FormInput from '../ui/FormInput.vue'
 import FormTextarea from '../ui/FormTextarea.vue'
 import FormSelect from '../ui/FormSelect.vue'
 import { Button } from '@/components/ui/button'
-import { 
-  X, 
-  CheckCircle, 
-  Calendar, 
-  Clock, 
-  User, 
-  Tag, 
-  AlertCircle, 
-  Info,
+import {
+  X,
+  CheckCircle,
+  Calendar,
+  Clock,
+  User,
+  Tag,
+  AlertCircle,
   Layers,
   Zap,
   Target,
@@ -119,47 +118,40 @@ async function submit() {
 }
 
 const priorityOptions = [
-  { value: 'low', label: 'Low Intensity' },
-  { value: 'medium', label: 'Medium Priority' },
-  { value: 'high', label: 'High Priority' },
-  { value: 'urgent', label: 'Mission Critical' }
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'urgent', label: 'Urgent' }
 ]
 
 const statusOptions = [
-  { value: 'todo', label: 'Initial Queue' },
-  { value: 'in_progress', label: 'Active Execution' },
-  { value: 'blocked', label: 'Synchronous Block' },
-  { value: 'in_review', label: 'Validation Phase' },
-  { value: 'done', label: 'Finalized' }
+  { value: 'todo', label: 'To Do' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'blocked', label: 'Blocked' },
+  { value: 'in_review', label: 'In Review' },
+  { value: 'done', label: 'Done' }
 ]
 </script>
 
 <template>
-  <SlideDrawer 
-    :open="open" 
-    :title="isEdit ? 'Task Reprogramming' : 'Initialize Task Sequence'" 
-    width="w-full max-w-lg" 
+  <SlideDrawer
+    :open="open"
+    :title="isEdit ? 'Edit Task' : 'New Task'"
+    width="w-full max-w-lg"
     @close="emit('close')"
   >
     <div class="space-y-8 py-4">
-      <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50 mb-2">
-         <Info class="w-4 h-4 text-indigo-500 mt-0.5" />
-         <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
-           Tasks represent atomic units of work within the workspace engine. Configure priority and resource allotment to optimize the execution flow.
-         </p>
-      </div>
-
-      <FormInput label="Sequence Title" v-model="form.title" required placeholder="Describe the objective..." />
-      <FormTextarea label="Operational Brief" v-model="form.description" placeholder="Specify depth and constraints..." />
+      <FormInput label="Task Title" v-model="form.title" required placeholder="What needs to be done?" />
+      <FormTextarea label="Description" v-model="form.description" placeholder="Add details, notes, or context…" />
 
       <div class="grid grid-cols-2 gap-6">
-        <FormSelect label="Intensity Protocol" v-model="form.priority" :options="priorityOptions" />
-        <FormSelect label="Execution Status" v-model="form.status" :options="statusOptions" />
+        <FormSelect label="Priority" v-model="form.priority" :options="priorityOptions" />
+        <FormSelect label="Status" v-model="form.status" :options="statusOptions" />
       </div>
 
       <div class="grid grid-cols-2 gap-6">
         <div class="space-y-2">
-          <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Temporal Deadline</label>
+          <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Due Date</label>
           <div class="relative group">
              <Calendar class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-slate-900 transition-colors pointer-events-none" />
              <input
@@ -197,12 +189,12 @@ const statusOptions = [
             <div class="space-y-3">
                <div class="flex items-center gap-2">
                   <User class="w-3.5 h-3.5 text-slate-400" />
-                  <label class="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Resource Allotment</label>
+                  <label class="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Assign To</label>
                </div>
                <input
                  v-model="assigneesRaw"
                  type="text"
-                 placeholder="e.g. EMP-001, EMP-088"
+                 placeholder="e.g. EMP-001, EMP-088 (comma separated)"
                  class="w-full bg-white border border-slate-200/60 text-slate-900 text-sm rounded-2xl px-4 py-3 outline-none focus:ring-4 focus:ring-slate-900/5 transition-all shadow-sm"
                />
             </div>
@@ -210,7 +202,7 @@ const statusOptions = [
             <div class="space-y-3">
                <div class="flex items-center gap-2">
                   <Tag class="w-3.5 h-3.5 text-slate-400" />
-                  <label class="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Taxonomy Tags</label>
+                  <label class="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Tags</label>
                </div>
                <input
                  v-model="tagsRaw"
@@ -235,7 +227,7 @@ const statusOptions = [
             :disabled="saving || !form.title.trim()" 
             class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
           >
-            {{ saving ? 'Syncing...' : isEdit ? 'Deploy Update' : 'Initialize Sequence' }}
+            {{ saving ? 'Saving…' : isEdit ? 'Update Task' : 'Create Task' }}
           </Button>
         </div>
       </div>

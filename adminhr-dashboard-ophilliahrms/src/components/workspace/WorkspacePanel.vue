@@ -40,9 +40,9 @@ const isEdit = computed(() => !!props.workspace)
 const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b']
 
 const types = [
-  { value: 'team' as const, label: 'Collective', icon: Users },
-  { value: 'project' as const, label: 'Initiative', icon: Folder },
-  { value: 'personal' as const, label: 'Individual', icon: User },
+  { value: 'team' as const, label: 'Team', icon: Users },
+  { value: 'project' as const, label: 'Project', icon: Folder },
+  { value: 'personal' as const, label: 'Personal', icon: User },
 ]
 
 const form = ref({
@@ -99,27 +99,20 @@ async function submit() {
 </script>
 
 <template>
-  <SlideDrawer 
-    :open="open" 
-    :title="isEdit ? 'Modify Environment' : 'Initialize Workspace'" 
-    width="w-full max-w-md" 
+  <SlideDrawer
+    :open="open"
+    :title="isEdit ? 'Edit Workspace' : 'Create Workspace'"
+    width="w-full max-w-md"
     @close="emit('close')"
   >
     <div class="space-y-8 py-4">
-      <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50 mb-2">
-         <Info class="w-4 h-4 text-indigo-500 mt-0.5" />
-         <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
-           Workspaces represent synchronized environments for task orchestration. Calibration of type and aesthetic focus optimizes data visualization.
-         </p>
-      </div>
-
-      <FormInput label="Environmental Identity" v-model="form.name" required maxlength="200" placeholder="e.g. Core Engineering Hub" />
-      <FormTextarea label="Operational Brief" v-model="form.description" placeholder="Specify the mission parameters..." />
+      <FormInput label="Workspace Name" v-model="form.name" required maxlength="200" placeholder="e.g. Engineering Team, Q1 Project" />
+      <FormTextarea label="Description" v-model="form.description" placeholder="What is this workspace for?" />
 
       <div class="space-y-4">
         <div class="flex items-center gap-2 mb-2">
            <Layout class="w-4 h-4 text-slate-400" />
-           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Type Calibration</span>
+           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Type</span>
         </div>
         <div class="grid grid-cols-3 gap-3">
           <Button
@@ -144,7 +137,7 @@ async function submit() {
       <div class="space-y-4">
         <div class="flex items-center gap-2 mb-2">
            <Palette class="w-4 h-4 text-slate-400" />
-           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Aesthetic Focus</span>
+           <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Color</span>
         </div>
         <div class="p-6 bg-slate-50/50 rounded-[32px] border border-white/10 flex flex-wrap gap-3">
           <button
@@ -176,7 +169,7 @@ async function submit() {
             :disabled="saving || !form.name.trim()" 
             class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]"
           >
-            {{ saving ? 'Syncing...' : isEdit ? 'Update Environment' : 'Initialize Hub' }}
+            {{ saving ? 'Saving…' : isEdit ? 'Update Workspace' : 'Create Workspace' }}
           </Button>
         </div>
       </div>

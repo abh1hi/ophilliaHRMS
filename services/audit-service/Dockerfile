@@ -22,7 +22,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Install libpq for asyncpg
-RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -o Acquire::Retries=3 && apt-get install --fix-missing -y --no-install-recommends libpq-dev && rm -rf /var/lib/apt/lists/*
 
 # Non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser

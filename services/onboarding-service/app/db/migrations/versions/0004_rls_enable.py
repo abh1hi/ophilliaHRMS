@@ -13,7 +13,7 @@ down_revision = "0003"
 branch_labels = None
 depends_on = None
 
-TENANT_TABLES = ["onboarding_status", "onboarding_steps"]
+TENANT_TABLES = ["onboarding_status"]
 
 _POLICY = """
 CREATE POLICY tenant_isolation ON {table}

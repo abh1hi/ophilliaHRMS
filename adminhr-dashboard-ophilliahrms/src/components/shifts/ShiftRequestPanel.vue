@@ -4,22 +4,21 @@ import PageHeader from '../ui/PageHeader.vue'
 import DataTable from '../ui/DataTable.vue'
 import SlideDrawer from '../ui/SlideDrawer.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
+import EntitySearchSelect from '../ui/EntitySearchSelect.vue'
 import FormInput from '../ui/FormInput.vue'
 import FormSelect from '../ui/FormSelect.vue'
 import FormTextarea from '../ui/FormTextarea.vue'
 import { Button } from '@/components/ui/button'
-import { 
-  Check, 
-  X, 
-  Plus, 
-  FileQuestion, 
-  Calendar, 
-  Shuffle, 
-  Reply, 
-  CheckCircle2, 
-  XCircle, 
+import {
+  Check,
+  X,
+  CheckCircle2,
+  XCircle,
   Info,
   Clock,
+  Calendar,
+  Shuffle,
+  FileQuestion,
   MessageSquare,
   ArrowRight,
   User
@@ -35,9 +34,9 @@ const saving = ref(false); const reviewing = ref(false); const cancelling = ref(
 const errorMsg = ref('')
 
 const requestTypeOptions = [
-  { value: 'change', label: 'Framework Modification' },
-  { value: 'swap',   label: 'Resource Exchange' },
-  { value: 'leave',  label: 'Operational Absence' },
+  { value: 'change', label: 'Change Shift' },
+  { value: 'swap',   label: 'Swap Shift' },
+  { value: 'leave',  label: 'Time Off Request' },
 ]
 
 const statusColors: Record<string, string> = {
@@ -47,6 +46,12 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-slate-50 text-slate-400 border-slate-100',
 }
 
+const typeLabels: Record<string, string> = {
+  change: 'Change Shift',
+  swap:   'Swap Shift',
+  leave:  'Time Off Request',
+}
+
 const typeIcons: Record<string, any> = {
   change: Clock,
   swap:   Shuffle,
@@ -54,11 +59,11 @@ const typeIcons: Record<string, any> = {
 }
 
 const columns = [
-  { key: 'employee_id',   label: 'Petitioner' },
-  { key: 'request_type',  label: 'Protocol'   },
-  { key: 'from_date',     label: 'Commence'   },
-  { key: 'to_date',       label: 'Conclude'   },
-  { key: 'status',        label: 'Status'     },
+  { key: 'employee_id',   label: 'Employee'    },
+  { key: 'request_type',  label: 'Type'        },
+  { key: 'from_date',     label: 'Start Date'  },
+  { key: 'to_date',       label: 'End Date'    },
+  { key: 'status',        label: 'Status'      },
 ]
 
 async function load() { loading.value = true; try { rows.value = await listShiftRequests() } catch {} finally { loading.value = false } }
@@ -95,26 +100,26 @@ function openReview(row: ShiftRequest) { reviewTarget.value = row; reviewNote.va
 
 <template>
   <div class="space-y-10">
-    <PageHeader 
-      title="Temporal Petitions" 
-      subtitle="Evaluate and synchronize operational framework modification requests" 
-      action-label="File Petition" 
-      @action="openCreate" 
+    <PageHeader
+      title="Shift Requests"
+      subtitle="Review and approve employee shift change, swap, and time off requests"
+      action-label="New Request"
+      @action="openCreate"
     />
 
-    <DataTable :columns="columns" :rows="rows" :loading="loading" :searchable="true" empty-text="No active petitions identified.">
+    <DataTable :columns="columns" :rows="rows" :loading="loading" :searchable="true" empty-text="No shift requests found.">
       <template #cell-employee_id="{ value }">
         <div class="flex items-center gap-3">
-           <div class="h-8 w-8 rounded-lg bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-sm">
-              {{ value?.slice(0, 2).toUpperCase() }}
-           </div>
-           <span class="font-mono text-[11px] font-bold text-slate-500 uppercase tracking-tight">{{ value?.slice(0, 8) }}…</span>
+          <div class="h-8 w-8 rounded-lg bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0">
+            {{ value?.slice(0, 2).toUpperCase() }}
+          </div>
+          <span class="font-mono text-[11px] font-bold text-slate-500">{{ value?.slice(0, 8) }}…</span>
         </div>
       </template>
       <template #cell-request_type="{ value }">
         <div class="flex items-center gap-2">
-           <component :is="typeIcons[value] || FileQuestion" class="w-3.5 h-3.5 text-slate-400" />
-           <span class="text-[11px] font-bold text-slate-900 uppercase tracking-wide capitalize">{{ value }}</span>
+          <component :is="typeIcons[value] || FileQuestion" class="w-3.5 h-3.5 text-slate-400" />
+          <span class="text-[11px] font-bold text-slate-900">{{ typeLabels[value] ?? value }}</span>
         </div>
       </template>
       <template #cell-status="{ value }">
@@ -127,21 +132,21 @@ function openReview(row: ShiftRequest) { reviewTarget.value = row; reviewNote.va
       </template>
       <template #actions="{ row }">
         <div class="flex items-center justify-end gap-2">
-          <Button 
-            v-if="row.status === 'pending'" 
-            variant="ghost" 
-            size="icon" 
-            @click="openReview(row)" 
-            class="h-9 w-9 rounded-xl text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
+          <Button
+            v-if="row.status === 'pending'"
+            variant="ghost"
+            size="icon"
+            @click="openReview(row)"
+            class="h-9 w-9 rounded-xl text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
           >
             <Check class="w-4 h-4" />
           </Button>
-          <Button 
-            v-if="row.status === 'pending'" 
-            variant="ghost" 
-            size="icon" 
-            @click="cancelTarget = row" 
-            class="h-9 w-9 rounded-xl text-slate-400 hover:text-destructive hover:bg-destructive/10 transition-all"
+          <Button
+            v-if="row.status === 'pending'"
+            variant="ghost"
+            size="icon"
+            @click="cancelTarget = row"
+            class="h-9 w-9 rounded-xl text-slate-400 hover:text-destructive hover:bg-destructive/10"
           >
             <X class="w-4 h-4" />
           </Button>
@@ -150,34 +155,31 @@ function openReview(row: ShiftRequest) { reviewTarget.value = row; reviewNote.va
     </DataTable>
 
     <!-- Create Request Drawer -->
-    <SlideDrawer :open="drawerOpen" title="Initialize Temporal Petition" width="w-full max-w-lg" @close="drawerOpen = false">
-      <div class="space-y-8 py-4">
-        <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50 mb-2">
-           <Info class="w-4 h-4 text-indigo-500 mt-0.5" />
-           <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
-             Specify the required temporal adjustment. All petitions are evaluated against current operational framework density.
-           </p>
+    <SlideDrawer :open="drawerOpen" title="New Shift Request" width="w-full max-w-lg" @close="drawerOpen = false">
+      <div class="space-y-6 py-4">
+        <EntitySearchSelect
+          :modelValue="form.employee_id ?? ''"
+          @update:modelValue="form.employee_id = $event as string"
+          label="Employee"
+          entity="employee"
+          placeholder="Search employee…"
+          required
+        />
+        <FormSelect label="Request Type" v-model="form.request_type" :options="requestTypeOptions" />
+        <div class="grid grid-cols-2 gap-4 p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
+          <FormInput label="Start Date" type="date" v-model="form.from_date" required />
+          <FormInput label="End Date" type="date" v-model="form.to_date" required />
         </div>
-
-        <FormInput label="Petitioner Hardware ID" v-model="form.employee_id" required placeholder="Paste Individual UUID" />
-        <FormSelect label="Adjust Protocol" v-model="form.request_type" :options="requestTypeOptions" />
-        
-        <div class="grid grid-cols-2 gap-6 p-6 bg-slate-50/50 rounded-[32px] border border-white/10">
-          <FormInput label="Temporal Commencement" type="date" v-model="form.from_date" required />
-          <FormInput label="Temporal Conclusion" type="date" v-model="form.to_date" required />
-        </div>
-
-        <FormTextarea label="Contextual Reason" v-model="form.reason" placeholder="Detail the necessity for this operational variance..." />
+        <FormTextarea label="Reason" v-model="form.reason" placeholder="Briefly describe the reason for this request…" />
       </div>
       <template #footer>
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex-1">
-             <p v-if="errorMsg" class="text-[10px] font-bold text-destructive uppercase tracking-tight animate-in fade-in">{{ errorMsg }}</p>
-          </div>
+        <div class="flex items-center justify-between gap-4 w-full">
+          <p v-if="errorMsg" class="text-xs text-destructive font-medium">{{ errorMsg }}</p>
+          <div v-else />
           <div class="flex gap-3">
-            <Button variant="outline" @click="drawerOpen = false" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[11px]">Cancel</Button>
-            <Button @click="save" :disabled="saving" class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]">
-              {{ saving ? 'Syncing...' : 'File Petition' }}
+            <Button variant="outline" @click="drawerOpen = false" class="rounded-full px-6 h-10">Cancel</Button>
+            <Button @click="save" :disabled="saving" class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800">
+              {{ saving ? 'Submitting…' : 'Submit Request' }}
             </Button>
           </div>
         </div>
@@ -185,75 +187,52 @@ function openReview(row: ShiftRequest) { reviewTarget.value = row; reviewNote.va
     </SlideDrawer>
 
     <!-- Review Drawer -->
-    <SlideDrawer :open="!!reviewTarget" title="Petition Evaluation" width="w-full max-w-md" @close="reviewTarget = null">
-      <div v-if="reviewTarget" class="space-y-8 py-4">
-        <div class="bg-slate-900 dark:bg-white rounded-[40px] p-8 text-white dark:text-slate-900 shadow-2xl shadow-slate-200 dark:shadow-none relative overflow-hidden group">
-           <div class="absolute -right-10 -top-10 w-32 h-32 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
-           
-           <div class="flex items-center gap-3 mb-6">
-              <div class="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center">
-                 <User class="w-5 h-5" />
+    <SlideDrawer :open="!!reviewTarget" title="Review Shift Request" width="w-full max-w-md" @close="reviewTarget = null">
+      <div v-if="reviewTarget" class="space-y-6 py-4">
+        <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Request Details</span>
+            <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 uppercase">Pending Review</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <p class="text-[10px] text-slate-400 mb-0.5">Type</p>
+              <div class="flex items-center gap-1.5">
+                <component :is="typeIcons[reviewTarget.request_type] || FileQuestion" class="w-3.5 h-3.5 text-slate-600" />
+                <p class="font-semibold text-slate-900 text-sm">{{ typeLabels[reviewTarget.request_type] ?? reviewTarget.request_type }}</p>
               </div>
-              <div>
-                 <p class="text-[10px] font-bold uppercase tracking-widest opacity-60">Petitioner Interface</p>
-                 <p class="text-sm font-black tracking-tight">{{ reviewTarget.employee_id.slice(0, 16) }}…</p>
-              </div>
-           </div>
-
-           <div class="grid grid-cols-2 gap-6 mb-8">
-              <div>
-                 <p class="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1">Protocol</p>
-                 <div class="flex items-center gap-2">
-                    <component :is="typeIcons[reviewTarget.request_type] || FileQuestion" class="w-4 h-4" />
-                    <span class="text-xs font-bold capitalize">{{ reviewTarget.request_type }}</span>
-                 </div>
-              </div>
-              <div class="text-right">
-                 <p class="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1">Status</p>
-                 <span class="text-xs font-bold uppercase tracking-tighter bg-white/20 px-3 py-1 rounded-full">Active Review</span>
-              </div>
-           </div>
-
-           <div class="flex items-center justify-between p-4 bg-white/5 rounded-3xl border border-white/10">
-              <div class="text-center flex-1">
-                 <p class="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1">Commence</p>
-                 <p class="text-xs font-bold">{{ reviewTarget.from_date }}</p>
-              </div>
-              <ArrowRight class="w-4 h-4 opacity-20" />
-              <div class="text-center flex-1">
-                 <p class="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1">Conclude</p>
-                 <p class="text-xs font-bold">{{ reviewTarget.to_date }}</p>
-              </div>
-           </div>
-
-           <div v-if="reviewTarget.reason" class="mt-8 pt-6 border-t border-white/10">
-              <p class="text-[9px] font-black uppercase tracking-widest opacity-50 mb-2 flex items-center gap-2">
-                 <MessageSquare class="w-3 h-3" /> Declaration
-              </p>
-              <p class="text-xs font-medium leading-relaxed italic opacity-80">"{{ reviewTarget.reason }}"</p>
-           </div>
+            </div>
+            <div>
+              <p class="text-[10px] text-slate-400 mb-0.5">Period</p>
+              <p class="font-semibold text-slate-900 text-sm">{{ reviewTarget.from_date }} — {{ reviewTarget.to_date }}</p>
+            </div>
+          </div>
+          <div v-if="reviewTarget.reason">
+            <p class="text-[10px] text-slate-400 mb-0.5">Reason</p>
+            <p class="text-sm text-slate-700 italic">"{{ reviewTarget.reason }}"</p>
+          </div>
         </div>
 
-        <FormTextarea label="Evaluation Feedback" v-model="reviewNote" placeholder="Acknowledge or dispute the operational variance..." />
+        <FormTextarea label="Review Note (optional)" v-model="reviewNote" placeholder="Add a comment about your decision…" />
       </div>
       <template #footer>
-        <div class="flex gap-4 justify-end">
-          <Button variant="outline" @click="reviewTarget = null" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[11px]">Defer</Button>
-          <div class="flex gap-2">
-             <Button @click="reject" :disabled="reviewing" variant="ghost" class="rounded-full px-6 h-10 text-destructive hover:bg-destructive/10 font-black uppercase tracking-widest text-[11px]">Reject</Button>
-             <Button @click="approve" :disabled="reviewing" class="rounded-full px-10 h-10 bg-emerald-600 text-white hover:bg-emerald-700 shadow-xl shadow-emerald-100 font-bold uppercase tracking-widest text-[11px]">Synchronize</Button>
-          </div>
+        <div class="flex gap-3 justify-end w-full">
+          <Button variant="outline" @click="reviewTarget = null" class="rounded-full px-6 h-10">Close</Button>
+          <Button @click="reject" :disabled="reviewing" variant="ghost" class="rounded-full px-6 h-10 text-destructive hover:bg-destructive/10 font-bold">Reject</Button>
+          <Button @click="approve" :disabled="reviewing" class="rounded-full px-8 h-10 bg-emerald-600 text-white hover:bg-emerald-700 font-bold">
+            {{ reviewing ? 'Processing…' : 'Approve' }}
+          </Button>
         </div>
       </template>
     </SlideDrawer>
 
-    <ConfirmDialog 
-      :open="!!cancelTarget" 
-      title="Retract Petition?" 
-      message="Are you certain you want to nullify this temporal request? This action is immutable." 
-      :loading="cancelling" 
-      @confirm="confirmCancel" 
-      @cancel="cancelTarget = null" 
+    <ConfirmDialog
+      :open="!!cancelTarget"
+      title="Cancel Request?"
+      message="Are you sure you want to cancel this shift request? This cannot be undone."
+      :loading="cancelling"
+      @confirm="confirmCancel"
+      @cancel="cancelTarget = null"
     />
   </div>
 </template>
