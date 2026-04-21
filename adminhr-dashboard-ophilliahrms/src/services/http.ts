@@ -64,8 +64,8 @@ export async function apiFetchData<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const res = await apiFetch<T>(endpoint, options)
-  return res.data
+  const res = await apiFetch<any>(endpoint, options)
+  return (res.data !== undefined ? res.data : res) as T
 }
 
 // ─── Authenticated raw fetch (auth headers but no envelope assumption) ───────────

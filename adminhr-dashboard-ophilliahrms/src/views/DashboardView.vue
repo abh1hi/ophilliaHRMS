@@ -28,6 +28,7 @@ import ShiftAssignmentPanel from '../components/shifts/ShiftAssignmentPanel.vue'
 import ShiftRequestPanel from '../components/shifts/ShiftRequestPanel.vue'
 import ShiftSchedulePanel from '../components/shifts/ShiftSchedulePanel.vue'
 import RosterPanel from '../components/shifts/RosterPanel.vue'
+import AttendanceOverviewPanel from '../components/attendance/AttendanceOverviewPanel.vue'
 import AttendanceRecordsPanel from '../components/attendance/AttendanceRecordsPanel.vue'
 import AttendanceCheckinPanel from '../components/attendance/AttendanceCheckinPanel.vue'
 import AttendanceRequestPanel from '../components/attendance/AttendanceRequestPanel.vue'
@@ -86,7 +87,7 @@ const headerTitles: Record<string, { title: string; subtitle: string }> = {
   employees:                  { title: 'Employees',             subtitle: 'Manage your workforce'                                   },
   'employees-import-queue':   { title: 'Bulk Import',           subtitle: 'Import employees from CSV'                               },
   payroll:                    { title: 'Payroll',               subtitle: 'Manage compensation and payroll runs'                     },
-  attendance:                 { title: 'Attendance',            subtitle: 'Track employee attendance'                               },
+  attendance:                 { title: 'Attendance',            subtitle: 'Track employee attendance, shift readiness, and alerts'   },
   departments:                { title: 'Departments',           subtitle: 'Manage organizational structure'                         },
   branches:                   { title: 'Branches',              subtitle: 'Manage office locations'                                 },
   designations:               { title: 'Designations',          subtitle: 'Define job titles and roles'                             },
@@ -183,6 +184,7 @@ function handleLogout() {
           <BulkImportQueuePanel     v-else-if="currentTab === 'employees-import-queue'" />
 
           <!-- Attendance -->
+          <AttendanceOverviewPanel  v-else-if="currentTab === 'attendance'"           />
           <AttendanceRecordsPanel   v-else-if="currentTab === 'attendance-records'"   />
           <AttendanceCheckinPanel   v-else-if="currentTab === 'attendance-checkins'"  />
           <AttendanceRequestPanel   v-else-if="currentTab === 'attendance-requests'"  />

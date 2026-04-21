@@ -49,6 +49,7 @@ const subNavMap: Record<string, { key: string; label: string; icon: any }[]> = {
     { key: 'employees-import-queue', label: 'Bulk Import',      icon: Database },
   ],
   attendance: [
+    { key: 'attendance',          label: 'Overview',            icon: BarChart3      },
     { key: 'attendance-records',  label: 'Attendance Records',  icon: CalendarCheck },
     { key: 'attendance-checkins', label: 'Check-ins',           icon: LogIn         },
     { key: 'attendance-requests', label: 'Adjustments',         icon: FileText      },
@@ -98,6 +99,7 @@ const tabToSection: Record<string, string> = {
   employees: 'employees',
   'employees-import-queue': 'employees',
   'attendance-records': 'attendance',
+  attendance: 'attendance',
   'attendance-checkins': 'attendance',
   'attendance-requests': 'attendance',
   'attendance-bulk': 'attendance',

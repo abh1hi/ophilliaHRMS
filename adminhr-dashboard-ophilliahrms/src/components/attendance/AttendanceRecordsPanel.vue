@@ -22,7 +22,7 @@ const errorMsg = ref('')
 const filterEmployeeId = ref('')
 const filterDateFrom = ref('')
 const filterDateTo = ref('')
-const filterStatus = ref('')
+const filterStatus = ref('ALL')
 
 const columns = [
   { key: 'employee_id', label: 'Employee' },
@@ -50,7 +50,7 @@ async function load() {
       employee_id: filterEmployeeId.value || undefined,
       date_from: filterDateFrom.value || undefined,
       date_to: filterDateTo.value || undefined,
-      status: filterStatus.value || undefined,
+      status: filterStatus.value === 'ALL' ? undefined : (filterStatus.value || undefined),
       limit: 100,
     })
     rows.value = res.records ?? (res as any).items ?? []
@@ -83,7 +83,7 @@ function fmtTime(dt?: string) {
 }
 
 const statusOptions = [
-  { value: '', label: 'All Status' },
+  { value: 'ALL', label: 'All Status' },
   { value: 'present', label: 'Present' },
   { value: 'late', label: 'Late' },
   { value: 'absent', label: 'Absent' },

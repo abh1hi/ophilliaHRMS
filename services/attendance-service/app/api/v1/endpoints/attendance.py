@@ -428,7 +428,7 @@ async def list_geofences(
     limit: int = 100,
     include_inactive: bool = Query(False, description="Include soft-deleted geofences"),
     current_user: TokenPayload = Depends(
-        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN)
+        require_role(UserRole.HR, UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
     ),
     service: GeofenceService = Depends(_get_geofence_service),
 ):

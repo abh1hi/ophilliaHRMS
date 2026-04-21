@@ -19,7 +19,12 @@ const emit = defineEmits<{
 }>()
 
 function updateOpen(val: boolean) {
-  if (!val) emit('close')
+  if (!val) {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+    emit('close')
+  }
 }
 </script>
 
@@ -30,6 +35,9 @@ function updateOpen(val: boolean) {
         <SheetTitle class="text-xl font-bold">{{ title }}</SheetTitle>
         <SheetDescription v-if="subtitle" class="text-sm">
           {{ subtitle }}
+        </SheetDescription>
+        <SheetDescription v-else class="sr-only">
+          {{ title }}
         </SheetDescription>
       </SheetHeader>
       

@@ -6,7 +6,7 @@ import FormSelect from '../ui/FormSelect.vue'
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
 import { Label } from '../ui/label'
-import { Users, CheckSquare, Search, Hash, AlertCircle, CheckCircle2, UserCircle2 } from 'lucide-vue-next'
+import { Users, CheckSquare, Search, Hash, AlertCircle, CheckCircle2, UserCircle2, Info } from 'lucide-vue-next'
 import { getEmployeesForBulk } from '../../services/attendance.service'
 import { apiFetchData } from '../../services/http'
 

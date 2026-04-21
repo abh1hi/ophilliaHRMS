@@ -42,6 +42,57 @@ export interface UploadResult {
   errors: Array<{ row: number; error: string }>
 }
 
+export interface AttendanceKpi {
+  date: string
+  total_employees_present: number
+  late_checkins: number
+  absent_employees: number
+  missed_punchouts: number
+  auto_closed_count: number
+  avg_working_hours?: number
+  total_tasks_today: number
+  completed_tasks_today: number
+  task_completion_rate?: number
+}
+
+export interface AttendanceTrendPoint {
+  date: string
+  present: number
+  late: number
+  absent: number
+  half_day: number
+  auto_closed: number
+  avg_hours?: number
+}
+
+export interface AttendanceTrendResponse {
+  items: AttendanceTrendPoint[]
+}
+
+export interface AttendanceStatusBreakdown {
+  date: string
+  present: number
+  late: number
+  half_day: number
+  absent: number
+  auto_closed: number
+}
+
+export interface AttendanceAlert {
+  employee_id: string
+  company_id?: string
+  record_id: string
+  clock_in: string
+  clock_in_location_name?: string
+}
+
+export interface AttendanceAlertsResponse {
+  date: string
+  late_count: number
+  missed_punch_out_count: number
+  missed_punch_outs: AttendanceAlert[]
+}
+
 export async function listAttendanceRecords(filters: AttendanceFilters = {}): Promise<AttendanceListResponse> {
   const params = new URLSearchParams()
   if (filters.employee_id) params.set('employee_id', filters.employee_id)
@@ -52,6 +103,24 @@ export async function listAttendanceRecords(filters: AttendanceFilters = {}): Pr
   if (filters.limit !== undefined) params.set('limit', String(filters.limit))
   const qs = params.toString() ? `?${params}` : ''
   return apiFetchData<AttendanceListResponse>(`/attendance${qs}`)
+}
+
+export async function getAttendanceKpi(targetDate?: string): Promise<AttendanceKpi> {
+  const qs = targetDate ? `?target_date=${encodeURIComponent(targetDate)}` : ''
+  return apiFetchData<AttendanceKpi>(`/attendance/dashboard/kpi${qs}`)
+}
+
+export async function getAttendanceTrend(days = 14): Promise<AttendanceTrendResponse> {
+  return apiFetchData<AttendanceTrendResponse>(`/attendance/dashboard/trend?days=${days}`)
+}
+
+export async function getAttendanceStatusBreakdown(targetDate?: string): Promise<AttendanceStatusBreakdown> {
+  const qs = targetDate ? `?target_date=${encodeURIComponent(targetDate)}` : ''
+  return apiFetchData<AttendanceStatusBreakdown>(`/attendance/dashboard/status-breakdown${qs}`)
+}
+
+export async function getAttendanceAlerts(): Promise<AttendanceAlertsResponse> {
+  return apiFetchData<AttendanceAlertsResponse>('/attendance/alerts')
 }
 
 export async function updateAttendanceRecord(id: string, payload: Partial<AttendanceRecord>): Promise<AttendanceRecord> {

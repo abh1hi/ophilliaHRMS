@@ -23,7 +23,7 @@ const togglingId = ref<string | null>(null)
 const filterEmployeeId = ref('')
 const filterDateFrom = ref('')
 const filterDateTo = ref('')
-const filterLogType = ref('')
+const filterLogType = ref('ALL')
 
 const columns = [
   { key: 'employee_id',     label: 'Employee'      },
@@ -41,7 +41,7 @@ async function load() {
       employee_id: filterEmployeeId.value || undefined,
       from_dt: filterDateFrom.value ? `${filterDateFrom.value}T00:00:00` : undefined,
       to_dt: filterDateTo.value ? `${filterDateTo.value}T23:59:59` : undefined,
-      log_type: filterLogType.value as any || undefined,
+      log_type: filterLogType.value === 'ALL' ? undefined : (filterLogType.value as any),
       limit: 100,
     })
     rows.value = res.checkins
@@ -90,7 +90,7 @@ function fmtDt(dt: string) {
 }
 
 const typeOptions = [
-  { value: '', label: 'All Types' },
+  { value: 'ALL', label: 'All Types' },
   { value: 'IN', label: 'IN Entries' },
   { value: 'OUT', label: 'OUT Entries' },
 ]

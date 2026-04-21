@@ -6,8 +6,8 @@ shift_types migration (0014).
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0017"
-down_revision = "0016"
+revision = "m017"
+down_revision = "m016"
 branch_labels = None
 depends_on = None
 

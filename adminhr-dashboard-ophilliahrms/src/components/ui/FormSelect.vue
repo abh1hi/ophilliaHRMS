@@ -29,9 +29,9 @@ defineEmits<{ (e: 'update:modelValue', val: string): void }>()
     </Label>
     
     <Select
-      :model-value="modelValue"
+      :model-value="modelValue === '' ? '__EMPTY__' : modelValue"
       :disabled="disabled"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @update:model-value="$emit('update:modelValue', $event === '__EMPTY__' ? '' : $event)"
     >
       <SelectTrigger :class="{ 'border-destructive ring-destructive': !!error }">
         <SelectValue :placeholder="placeholder" />
@@ -40,8 +40,8 @@ defineEmits<{ (e: 'update:modelValue', val: string): void }>()
         <SelectGroup>
           <SelectItem
             v-for="opt in options"
-            :key="opt.value"
-            :value="opt.value"
+            :key="opt.value === '' ? '__EMPTY__' : opt.value"
+            :value="opt.value === '' ? '__EMPTY__' : opt.value"
           >
             {{ opt.label }}
           </SelectItem>

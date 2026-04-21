@@ -32,14 +32,8 @@ const drawerOpen = ref(false); const form = ref<Partial<ShiftAssignment>>({})
 const selected = ref<ShiftAssignment | null>(null); const deleteTarget = ref<ShiftAssignment | null>(null)
 const saving = ref(false); const deleting = ref(false); const errorMsg = ref('')
 
-const shiftTypeOptions = computed(() => [
-  { value: '', label: '— Select shift type —' },
-  ...shiftTypes.value.map(t => ({ value: t.id, label: t.name })),
-])
-const shiftLocationOptions = computed(() => [
-  { value: '', label: '— Select location —' },
-  ...shiftLocations.value.map(l => ({ value: l.id, label: l.name })),
-])
+const shiftTypeOptions = computed(() => shiftTypes.value.map(t => ({ value: t.id, label: t.name })))
+const shiftLocationOptions = computed(() => shiftLocations.value.map(l => ({ value: l.id, label: l.name })))
 
 const shiftTypeMap = computed(() => Object.fromEntries(shiftTypes.value.map(t => [t.id, t])))
 const locationMap = computed(() => Object.fromEntries(shiftLocations.value.map(l => [l.id, l.name])))
@@ -79,6 +73,9 @@ async function save() {
     }
     if (selected.value) await updateShiftAssignment(selected.value.id, payload)
     else await createShiftAssignment(payload)
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
     drawerOpen.value = false; load()
   } catch (e: any) { errorMsg.value = e.message } finally { saving.value = false }
 }
@@ -159,8 +156,8 @@ async function confirmDelete() {
         />
 
         <div class="grid grid-cols-2 gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
-          <FormSelect label="Shift Type" v-model="form.shift_type_id" :options="shiftTypeOptions" />
-          <FormSelect label="Location" v-model="form.shift_location_id" :options="shiftLocationOptions" />
+          <FormSelect label="Shift Type" v-model="form.shift_type_id" :options="shiftTypeOptions" placeholder="— Select shift type —" />
+          <FormSelect label="Location" v-model="form.shift_location_id" :options="shiftLocationOptions" placeholder="— Select location —" />
         </div>
 
         <div class="space-y-3">

@@ -38,7 +38,7 @@ const menuOpen = ref(false)
 const sections = [
   { key: 'dashboard',    label: 'Dashboard',   icon: LayoutDashboard, defaultTab: 'dashboard'    },
   { key: 'employees',    label: 'Employees',   icon: Users,           defaultTab: 'employees'    },
-  { key: 'attendance',   label: 'Attendance',  icon: Timer,           defaultTab: 'attendance-records' },
+  { key: 'attendance',   label: 'Attendance',  icon: Timer,           defaultTab: 'attendance' },
   { key: 'leaves',       label: 'Leaves',      icon: CalendarDays,    defaultTab: 'leave-periods' },
   { key: 'payroll',      label: 'Payroll',     icon: Wallet,          defaultTab: 'payroll'      },
   { key: 'shifts',       label: 'Shifts',      icon: Clock,           defaultTab: 'shift-types'  },
@@ -52,6 +52,7 @@ const tabToSection: Record<string, string> = {
   employees: 'employees',
   'employees-import-queue': 'employees',
   'attendance-records': 'attendance',
+  attendance: 'attendance',
   'attendance-checkins': 'attendance',
   'attendance-requests': 'attendance',
   'attendance-bulk': 'attendance',

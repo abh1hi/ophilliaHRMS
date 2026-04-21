@@ -1,4 +1,4 @@
-import { apiFetchData } from './http'
+import { apiFetchAuth } from './http'
 
 export interface ShiftLocation {
   id: string
@@ -8,29 +8,32 @@ export interface ShiftLocation {
   latitude?: number
   longitude?: number
   radius_meters: number
-  is_active: number
+  is_active: boolean
   created_at?: string
   updated_at?: string
 }
 
 export async function listShiftLocations(): Promise<ShiftLocation[]> {
-  return apiFetchData<ShiftLocation[]>('/shift-locations')
+  const res = await apiFetchAuth<{ total: number; geofences: ShiftLocation[] }>('/attendance/geofences')
+  return res.geofences ?? []
 }
 
 export async function createShiftLocation(payload: Partial<ShiftLocation>): Promise<ShiftLocation> {
-  return apiFetchData<ShiftLocation>('/shift-locations', {
+  const { name, latitude, longitude, radius_meters } = payload
+  return apiFetchAuth<ShiftLocation>('/attendance/geofences', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ name, latitude, longitude, radius_meters }),
   })
 }
 
 export async function updateShiftLocation(id: string, payload: Partial<ShiftLocation>): Promise<ShiftLocation> {
-  return apiFetchData<ShiftLocation>(`/shift-locations/${id}`, {
+  const { name, latitude, longitude, radius_meters } = payload
+  return apiFetchAuth<ShiftLocation>(`/attendance/geofences/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ name, latitude, longitude, radius_meters }),
   })
 }
 
 export async function deleteShiftLocation(id: string): Promise<void> {
-  await apiFetchData<void>(`/shift-locations/${id}`, { method: 'DELETE' })
+  await apiFetchAuth<void>(`/attendance/geofences/${id}`, { method: 'DELETE' })
 }
