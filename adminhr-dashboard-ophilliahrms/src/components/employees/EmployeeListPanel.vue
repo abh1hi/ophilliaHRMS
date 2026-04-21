@@ -1,41 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import PageHeader from '../ui/PageHeader.vue'
-import DataTable from '../ui/DataTable.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import EmployeeDrawer from './EmployeeDrawer.vue'
 import EmployeeProfilePanel from './EmployeeProfilePanel.vue'
-import EmployeeStatusBadge from './EmployeeStatusBadge.vue'
-import AccountStatusBadge from './AccountStatusBadge.vue'
-import FormSelect from '../ui/FormSelect.vue'
-import { Button } from '../ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog'
-import { Textarea } from '../ui/textarea'
+import EmployeeTable from './EmployeeTable.vue'
+import EmployeeFilters from './EmployeeFilters.vue'
+import EmployeeBulkActions from './EmployeeBulkActions.vue'
+import EmployeeInviteModal from './EmployeeInviteModal.vue'
+import { CheckIcon, XCircle } from 'lucide-vue-next'
 import {
   listEmployees, deleteEmployee,
   sendEmployeeInvite, resendEmployeeInvite, revokeEmployeeInvite, disableEmployeeAccount,
 } from '../../services/employee.service'
 import type { Employee, SendInviteResponse } from '../../services/employee.service'
-import { Checkbox } from '../ui/checkbox'
-import {
-  Pencil,
-  Trash2,
-  RefreshCw,
-  Mail,
-  ShieldOff,
-  XCircle,
-  Copy,
-  Check as CheckIcon,
-  Download,
-  Users
-} from 'lucide-vue-next'
 
 const employees    = ref<Employee[]>([])
 const total        = ref(0)
@@ -63,7 +41,6 @@ const inviteTarget  = ref<Employee | null>(null)
 const inviteResult  = ref<SendInviteResponse | null>(null)
 const inviting      = ref(false)
 const showInviteModal = ref(false)
-const copySuccess   = ref(false)
 
 // Revoke state
 const revokeTarget = ref<Employee | null>(null)
@@ -72,32 +49,6 @@ const revoking     = ref(false)
 // Disable state
 const disableTarget = ref<Employee | null>(null)
 const disabling     = ref(false)
-
-const columns = [
-  { key: '_select',          label: ''            },
-  { key: 'employee_code',    label: 'Code'        },
-  { key: 'name',             label: 'Name'        },
-  { key: 'email',            label: 'Email'       },
-  { key: 'department',       label: 'Department'  },
-  { key: 'designation',      label: 'Designation' },
-  { key: 'employment_status', label: 'Status'     },
-  { key: 'account_status',   label: 'Account'     },
-]
-
-const statusOptions = [
-  { value: '',           label: 'All Statuses'  },
-  { value: 'active',     label: 'Active'        },
-  { value: 'inactive',   label: 'Inactive'      },
-  { value: 'terminated', label: 'Terminated'    },
-]
-
-const accountStatusOptions = [
-  { value: '',               label: 'All Accounts'   },
-  { value: 'not_registered', label: 'Not Registered' },
-  { value: 'invited',        label: 'Invite Sent'    },
-  { value: 'active',         label: 'Active'         },
-  { value: 'suspended',      label: 'Suspended'      },
-]
 
 async function load() {
   loading.value = true
@@ -129,12 +80,12 @@ function onSaved() { load() }
 
 async function onProfileUpdated() {
   await load()
-  // Refresh the profile employee so badges update immediately
   if (profileEmployee.value) {
     const refreshed = employees.value.find(e => e.id === profileEmployee.value!.id)
     if (refreshed) profileEmployee.value = refreshed
   }
 }
+
 function onProfileDeleted() {
   profileOpen.value = false
   profileEmployee.value = null
@@ -183,22 +134,6 @@ async function confirmDisable() {
   finally { disabling.value = false }
 }
 
-async function copyInviteUrl() {
-  if (!inviteResult.value?.invite_url) return
-  try {
-    await navigator.clipboard.writeText(inviteResult.value.invite_url)
-    copySuccess.value = true
-    setTimeout(() => { copySuccess.value = false }, 2000)
-  } catch {
-    // fallback: select the textarea
-  }
-}
-
-function fullName(emp: Employee | null) {
-  if (!emp) return '—'
-  return `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
-}
-
 function toggleSelect(id: string) {
   const s = new Set(selectedIds.value)
   s.has(id) ? s.delete(id) : s.add(id)
@@ -238,7 +173,7 @@ function exportCsv() {
     e.first_name ?? '',
     e.last_name ?? '',
     e.email ?? '',
-    e.department ?? '',
+    e.department?.name ?? '',
     e.designation ?? '',
     e.employment_status ?? '',
   ])
@@ -251,6 +186,11 @@ function exportCsv() {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+function fullName(emp: Employee | null) {
+  if (!emp) return '—'
+  return `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
+}
 </script>
 
 <template>
@@ -262,61 +202,24 @@ function exportCsv() {
       @action="openCreate"
     >
       <template #extra>
-        <div class="flex items-center gap-2 flex-wrap">
-          <!-- Bulk Invite — only when not_registered employees are selected -->
-          <Button
-            v-if="selectedNotRegistered.length"
-            @click="bulkInvite"
-            :disabled="bulkInviting"
-            class="rounded-full gap-2 px-4 h-9 bg-blue-600 text-white hover:bg-blue-700"
-          >
-            <Users class="w-3.5 h-3.5" />
-            {{ bulkInviting ? 'Inviting…' : `Invite ${selectedNotRegistered.length} Selected` }}
-          </Button>
-
-          <!-- Export CSV — always visible -->
-          <Button
-            variant="outline"
-            @click="exportCsv"
-            class="rounded-full gap-2 px-4 h-9"
-          >
-            <Download class="w-3.5 h-3.5" />
-            Export CSV
-          </Button>
-
-          <Button
-            variant="outline"
-            @click="load"
-            :disabled="loading"
-            class="rounded-full gap-2 px-4 h-9"
-            title="Refresh list"
-          >
-            <RefreshCw :class="['w-3.5 h-3.5', loading ? 'animate-spin' : '']" />
-            Refresh
-          </Button>
-        </div>
+        <EmployeeBulkActions
+          :selected-count="selectedNotRegistered.length"
+          :bulk-inviting="bulkInviting"
+          :loading="loading"
+          @bulk-invite="bulkInvite"
+          @export="exportCsv"
+          @refresh="load"
+        />
       </template>
     </PageHeader>
 
     <!-- Filters -->
-    <div class="flex items-center gap-4 flex-wrap">
-      <div class="w-52">
-        <FormSelect
-          label=""
-          :modelValue="statusFilter"
-          :options="statusOptions"
-          @update:modelValue="statusFilter = $event; page = 1"
-        />
-      </div>
-      <div class="w-52">
-        <FormSelect
-          label=""
-          :modelValue="accountFilter"
-          :options="accountStatusOptions"
-          @update:modelValue="accountFilter = $event; page = 1"
-        />
-      </div>
-    </div>
+    <EmployeeFilters
+      v-model:statusFilter="statusFilter"
+      v-model:accountFilter="accountFilter"
+      @update:statusFilter="page = 1"
+      @update:accountFilter="page = 1"
+    />
 
     <!-- Bulk invite feedback -->
     <div v-if="bulkInviteResult" class="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700 font-medium animate-in fade-in">
@@ -328,141 +231,25 @@ function exportCsv() {
     </div>
 
     <!-- Table -->
-    <DataTable
-      :columns="columns"
-      :rows="employees"
+    <EmployeeTable
+      :employees="employees"
       :loading="loading"
       :total="total"
       :page="page"
-      :page-size="10"
-      :searchable="true"
-      :pagination-top="true"
-      empty-text="No employees found. Create the first one!"
+      :selected-ids="selectedIds"
+      :inviting="inviting"
+      :invite-target-id="inviteTarget?.id"
       @page-change="page = $event; load()"
       @search="onSearch"
-      @row-click="openProfile"
-    >
-      <!-- Checkbox column header -->
-      <template #head-_select>
-        <Checkbox
-          :checked="employees.length > 0 && selectedIds.size === employees.length"
-          @update:checked="toggleSelectAll"
-          @click.stop
-        />
-      </template>
-
-      <!-- Checkbox cell -->
-      <template #cell-_select="{ row }">
-        <Checkbox
-          :checked="selectedIds.has(row.id)"
-          @update:checked="toggleSelect(row.id)"
-          @click.stop
-        />
-      </template>
-
-      <!-- Custom cells -->
-      <template #cell-employee_code="{ row }">
-        <span
-          v-if="row.employee_code"
-          class="inline-block px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-mono font-bold"
-        >{{ row.employee_code }}</span>
-        <span v-else class="text-muted-foreground/30 text-xs">—</span>
-      </template>
-
-      <template #cell-name="{ row }">
-        <div class="flex items-center space-x-3">
-          <div class="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0 border border-border">
-            {{ (row.first_name?.[0] ?? '') + (row.last_name?.[0] ?? '') }}
-          </div>
-          <span class="font-semibold text-foreground">{{ fullName(row) }}</span>
-        </div>
-      </template>
-
-      <template #cell-employment_status="{ row }">
-        <EmployeeStatusBadge :status="row.employment_status" />
-      </template>
-
-      <template #cell-account_status="{ row }">
-        <AccountStatusBadge :status="row.account_status" :expires-at="row.invite_expires_at" />
-      </template>
-
-      <!-- Actions -->
-      <template #actions="{ row }">
-        <div class="flex items-center justify-end space-x-1">
-          <!-- Edit -->
-          <Button
-            variant="ghost"
-            size="icon"
-            @click="openEdit(row)"
-            class="h-8 w-8 rounded-md"
-            title="Edit"
-          >
-            <Pencil class="w-4 h-4 text-muted-foreground" />
-          </Button>
-
-          <!-- Send Invite (not_registered) -->
-          <Button
-            v-if="row.account_status === 'not_registered'"
-            variant="ghost"
-            size="icon"
-            @click="confirmSendInvite(row)"
-            :disabled="inviting && inviteTarget?.id === row.id"
-            class="h-8 w-8 rounded-md text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-            title="Send Invite"
-          >
-            <Mail class="w-4 h-4" />
-          </Button>
-
-          <!-- Resend Invite (invited) -->
-          <Button
-            v-if="row.account_status === 'invited'"
-            variant="ghost"
-            size="icon"
-            @click="confirmSendInvite(row, true)"
-            :disabled="inviting && inviteTarget?.id === row.id"
-            class="h-8 w-8 rounded-md text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-            title="Resend Invite"
-          >
-            <RefreshCw class="w-4 h-4" />
-          </Button>
-
-          <!-- Revoke Invite (invited) -->
-          <Button
-            v-if="row.account_status === 'invited'"
-            variant="ghost"
-            size="icon"
-            @click="revokeTarget = row"
-            class="h-8 w-8 rounded-md text-amber-500 hover:text-amber-600 hover:bg-amber-50"
-            title="Revoke Invite"
-          >
-            <XCircle class="w-4 h-4" />
-          </Button>
-
-          <!-- Disable Account (active) -->
-          <Button
-            v-if="row.account_status === 'active'"
-            variant="ghost"
-            size="icon"
-            @click="disableTarget = row"
-            class="h-8 w-8 rounded-md text-destructive hover:text-destructive hover:bg-destructive/10"
-            title="Disable Account"
-          >
-            <ShieldOff class="w-4 h-4 text-destructive" />
-          </Button>
-
-          <!-- Delete -->
-          <Button
-            variant="ghost"
-            size="icon"
-            @click="deleteTarget = row"
-            class="h-8 w-8 rounded-md text-destructive hover:text-destructive hover:bg-destructive/10"
-            title="Delete"
-          >
-            <Trash2 class="w-4 h-4 text-destructive" />
-          </Button>
-        </div>
-      </template>
-    </DataTable>
+      @profile="openProfile"
+      @edit="openEdit"
+      @delete="deleteTarget = $event"
+      @invite="confirmSendInvite"
+      @revoke="revokeTarget = $event"
+      @disable="disableTarget = $event"
+      @toggle-select="toggleSelect"
+      @toggle-select-all="toggleSelectAll"
+    />
 
     <!-- Employee Profile Panel -->
     <EmployeeProfilePanel
@@ -482,7 +269,7 @@ function exportCsv() {
       @saved="onSaved"
     />
 
-    <!-- Delete Confirm -->
+    <!-- Confirm Dialogs -->
     <ConfirmDialog
       :open="!!deleteTarget"
       title="Delete Employee?"
@@ -492,7 +279,6 @@ function exportCsv() {
       @cancel="deleteTarget = null"
     />
 
-    <!-- Revoke Invite Confirm -->
     <ConfirmDialog
       :open="!!revokeTarget"
       title="Revoke Invite?"
@@ -502,7 +288,6 @@ function exportCsv() {
       @cancel="revokeTarget = null"
     />
 
-    <!-- Disable Account Confirm -->
     <ConfirmDialog
       :open="!!disableTarget"
       title="Disable Account?"
@@ -512,37 +297,10 @@ function exportCsv() {
       @cancel="disableTarget = null"
     />
 
-    <!-- Invite Link Modal (Shadcn Dialog) -->
-    <Dialog :open="showInviteModal" @update:open="showInviteModal = $event">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Invite Link Ready</DialogTitle>
-          <DialogDescription v-if="inviteResult">
-            Share this link with <span class="font-bold">{{ inviteResult.email }}</span>. It expires on
-            {{ inviteResult.expires_at ? new Date(inviteResult.expires_at).toLocaleDateString() : '7 days from now' }}.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div class="mt-4" v-if="inviteResult">
-          <Textarea
-            readonly
-            :value="inviteResult.invite_url"
-            rows="3"
-            class="font-mono text-xs bg-muted resize-none focus-visible:ring-0"
-          />
-        </div>
-
-        <DialogFooter class="flex justify-end gap-2 mt-4">
-          <Button variant="ghost" @click="showInviteModal = false">
-            Close
-          </Button>
-          <Button @click="copyInviteUrl" class="gap-2 px-6">
-            <CheckIcon v-if="copySuccess" class="w-4 h-4" />
-            <Copy v-else class="w-4 h-4" />
-            {{ copySuccess ? 'Copied!' : 'Copy Link' }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <!-- Invite Link Modal -->
+    <EmployeeInviteModal
+      v-model:open="showInviteModal"
+      :invite-result="inviteResult"
+    />
   </div>
 </template>

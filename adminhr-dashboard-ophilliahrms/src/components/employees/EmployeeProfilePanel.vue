@@ -327,8 +327,22 @@ async function copyInviteUrl() {
             <TabsContent value="job">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="info-item"><p class="info-label">Date Joined</p><p class="info-value">{{ fmtDate(emp.date_joined) }}</p></div>
-                <div class="info-item"><p class="info-label">Designation</p><p class="info-value">{{ fmt(emp.designation) }}</p></div>
-                <div class="info-item"><p class="info-label">Department</p><p class="info-value">{{ fmt(emp.department) }}</p></div>
+                <div class="info-item">
+                  <p class="info-label">Designation</p>
+                  <p class="info-value">{{ emp.designation_rel?.name || emp.designation || '—' }}</p>
+                </div>
+                <div class="info-item">
+                  <p class="info-label">Department</p>
+                  <p class="info-value">{{ emp.department?.name || emp.department_id || '—' }}</p>
+                </div>
+                <div class="info-item">
+                  <p class="info-label">Grade</p>
+                  <p class="info-value">{{ emp.grade?.name || '—' }}</p>
+                </div>
+                <div class="info-item">
+                  <p class="info-label">Branch</p>
+                  <p class="info-value">{{ emp.branch?.name || '—' }}</p>
+                </div>
                 <div class="info-item">
                   <p class="info-label">Employment Status</p>
                   <EmployeeStatusBadge :status="emp.employment_status" />

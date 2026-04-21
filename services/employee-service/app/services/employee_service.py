@@ -94,6 +94,9 @@ class EmployeeService:
             # Job info
             date_joined=data.date_joined,
             department_id=data.department_id,
+            designation_id=data.designation_id,
+            branch_id=data.branch_id,
+            grade_id=data.grade_id,
             designation=data.designation,
             project=data.project,
             joining_salary=data.joining_salary,

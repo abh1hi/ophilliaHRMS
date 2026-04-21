@@ -5,6 +5,11 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from app.core.constants import EmploymentStatus, Gender
+from app.schemas.department import DepartmentResponse
+from app.schemas.designation import DesignationResponse
+from app.schemas.branch import BranchResponse
+from app.schemas.employee_grade import EmployeeGradeResponse
+
 
 
 # ──────────── CREATE ────────────
@@ -70,6 +75,9 @@ class EmployeeCreate(BaseModel):
     # Job info
     date_joined: date
     department_id: Optional[UUID] = None
+    designation_id: Optional[UUID] = None
+    branch_id: Optional[UUID] = None
+    grade_id: Optional[UUID] = None
     designation: Optional[str] = None
     project: Optional[str] = None
     joining_salary: Optional[Decimal] = None
@@ -162,6 +170,9 @@ class EmployeeUpdate(BaseModel):
 
     # Job info
     department_id: Optional[UUID] = None
+    designation_id: Optional[UUID] = None
+    branch_id: Optional[UUID] = None
+    grade_id: Optional[UUID] = None
     designation: Optional[str] = None
     employment_status: Optional[EmploymentStatus] = None
     project: Optional[str] = None
@@ -246,6 +257,11 @@ class EmployeeResponse(BaseModel):
     project: Optional[str] = None
     joining_salary: Optional[Decimal] = None
     role: Optional[str] = None
+    department: Optional[DepartmentResponse] = None
+    designation_rel: Optional[DesignationResponse] = None
+    branch: Optional[BranchResponse] = None
+    grade: Optional[EmployeeGradeResponse] = None
+
 
     # Files
     staff_photo_url: Optional[str] = None
@@ -351,6 +367,9 @@ class BulkEmployeeImportItem(BaseModel):
     project: Optional[str] = None
     role: Optional[str] = None
     department_id: Optional[UUID] = None
+    designation_id: Optional[UUID] = None
+    branch_id: Optional[UUID] = None
+    grade_id: Optional[UUID] = None
 
     # Files
     staff_photo_url: Optional[str] = None

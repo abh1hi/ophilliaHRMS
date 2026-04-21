@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI):
     from app.core.token_blacklist import set_redis
 
     await event_publisher.connect()
+    app.state.event_publisher = event_publisher
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     set_redis(redis_client)
     logger.info("Employee service started", extra={"service_task": "startup"})

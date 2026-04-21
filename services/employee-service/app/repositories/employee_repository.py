@@ -2,6 +2,8 @@ from typing import Optional, List
 from uuid import UUID
 
 from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload, selectinload
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.employee import Employee
@@ -34,20 +36,50 @@ class EmployeeRepository:
 
     async def get_by_id(self, employee_id: UUID) -> Optional[Employee]:
         result = await self.db.execute(
-            self._scoped(select(Employee).where(Employee.id == employee_id))
+            self._scoped(
+                select(Employee)
+                .options(
+                    selectinload(Employee.department),
+                    selectinload(Employee.designation_rel),
+                    selectinload(Employee.branch),
+                    selectinload(Employee.grade)
+                )
+                .where(Employee.id == employee_id)
+            )
         )
+
         return result.scalars().first()
 
     async def get_by_user_id(self, user_id: UUID) -> Optional[Employee]:
         result = await self.db.execute(
-            self._scoped(select(Employee).where(Employee.user_id == user_id))
+            self._scoped(
+                select(Employee)
+                .options(
+                    selectinload(Employee.department),
+                    selectinload(Employee.designation_rel),
+                    selectinload(Employee.branch),
+                    selectinload(Employee.grade)
+                )
+                .where(Employee.user_id == user_id)
+            )
         )
+
         return result.scalars().first()
 
     async def get_by_email(self, email: str) -> Optional[Employee]:
         result = await self.db.execute(
-            self._scoped(select(Employee).where(Employee.email == email))
+            self._scoped(
+                select(Employee)
+                .options(
+                    selectinload(Employee.department),
+                    selectinload(Employee.designation_rel),
+                    selectinload(Employee.branch),
+                    selectinload(Employee.grade)
+                )
+                .where(Employee.email == email)
+            )
         )
+
         return result.scalars().first()
 
     async def get_all(
@@ -90,7 +122,18 @@ class EmployeeRepository:
         total = total_result.scalar() or 0
 
         # Paginated results
-        query = query.order_by(Employee.created_at.desc()).offset(skip).limit(limit)
+        query = (
+            query.options(
+                selectinload(Employee.department),
+                selectinload(Employee.designation_rel),
+                selectinload(Employee.branch),
+                selectinload(Employee.grade)
+            )
+            .order_by(Employee.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
         result = await self.db.execute(query)
         employees = result.scalars().all()
 

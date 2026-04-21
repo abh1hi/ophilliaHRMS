@@ -34,9 +34,9 @@ onMounted(async () => {
 <template>
   <div class="space-y-5">
     <FormSelect label="Department" :modelValue="modelValue.department_id" :options="deptOptions" placeholder="Select department" @update:modelValue="update('department_id', $event)" />
-    <FormSelect label="Designation" :modelValue="modelValue.designation" :options="desigOptions" placeholder="Select designation" @update:modelValue="update('designation', $event)" />
-    <FormSelect label="Grade" :modelValue="modelValue.grade" :options="gradeOptions" placeholder="Select grade" @update:modelValue="update('grade', $event)" />
-    <FormSelect label="Branch" :modelValue="modelValue.branch" :options="branchOptions" placeholder="Select branch" @update:modelValue="update('branch', $event)" />
+    <FormSelect label="Designation" :modelValue="modelValue.designation_id" :options="desigOptions" placeholder="Select designation" @update:modelValue="update('designation_id', $event)" />
+    <FormSelect label="Grade" :modelValue="modelValue.grade_id" :options="gradeOptions" placeholder="Select grade" @update:modelValue="update('grade_id', $event)" />
+    <FormSelect label="Branch" :modelValue="modelValue.branch_id" :options="branchOptions" placeholder="Select branch" @update:modelValue="update('branch_id', $event)" />
     <FormInput label="Reports To (Employee ID)" :modelValue="modelValue.reports_to" @update:modelValue="update('reports_to', $event)" />
   </div>
 </template>

@@ -94,7 +94,28 @@ class Employee(Base):
         nullable=True,
         index=True,
     )
+    designation_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("designations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    branch_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("branches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    grade_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employee_grades.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Legacy free-text field (now secondary to designation_id)
     designation = Column(String(100), nullable=True)
+    
     employment_status = Column(
         String(20),
         nullable=False,
@@ -138,9 +159,15 @@ class Employee(Base):
 
     # Relationships
     department = relationship("Department", back_populates="employees")
+    designation_rel = relationship("Designation")
+    branch = relationship("Branch")
+    grade = relationship("EmployeeGrade")
 
     __table_args__ = (
         Index("ix_employees_employment_status", "employment_status"),
         Index("ix_employees_department_id", "department_id"),
+        Index("ix_employees_designation_id", "designation_id"),
+        Index("ix_employees_branch_id", "branch_id"),
+        Index("ix_employees_grade_id", "grade_id"),
         Index("ix_employees_created_at", "created_at"),
     )

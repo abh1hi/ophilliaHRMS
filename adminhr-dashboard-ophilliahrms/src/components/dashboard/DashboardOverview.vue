@@ -6,6 +6,7 @@ import StatCard from '../ui/StatCard.vue'
 import RecentActivityList from './RecentActivityList.vue'
 import { apiFetchData } from '../../services/http'
 import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 
 interface StatsResponse {
   total_employees: number
@@ -65,9 +66,9 @@ function navigate(tab: string) {
 </script>
 
 <template>
-  <div class="space-y-12 animate-in fade-in slide-in-from-bottom-5 duration-700">
+  <div class="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
     <!-- Primary Stats -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <StatCard
         label="Total Employees"
         :value="loading ? '…' : stats.total_employees"
@@ -89,87 +90,49 @@ function navigate(tab: string) {
     </div>
 
     <!-- Pending Action Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <button
-        @click="navigate('leave-requests')"
-        class="group bg-white/40 backdrop-blur-xl rounded-[24px] border border-white/20 p-6 text-left hover:bg-white/60 hover:border-amber-100 hover:shadow-lg transition-all duration-300"
+        v-for="action in [
+          { label: 'Pending Leaves', value: pendingLeaves, icon: CalendarCheck, color: 'amber', tab: 'leave-requests' },
+          { label: 'Pending Attendance', value: pendingAttendance, icon: Clock, color: 'blue', tab: 'attendance-adjustments' },
+          { label: 'Upcoming Payroll', value: upcomingPayroll ?? 'N/A', icon: TrendingUp, color: 'emerald', tab: 'payroll-runs' },
+          { label: 'Open Overtime Req.', value: openOvertimeRequests, icon: AlertCircle, color: 'rose', tab: 'overtime-requests' }
+        ]"
+        :key="action.label"
+        @click="navigate(action.tab)"
+        class="group bg-white rounded-xl border border-slate-200 p-5 text-left hover:border-slate-300 hover:shadow-sm transition-all duration-200"
       >
-        <div class="flex items-center justify-between mb-3">
-          <div class="h-9 w-9 rounded-xl bg-amber-50 flex items-center justify-center">
-            <CalendarCheck class="w-4 h-4 text-amber-600" />
+        <div class="flex items-center justify-between mb-4">
+          <div :class="[`h-9 w-9 rounded-lg flex items-center justify-center bg-${action.color}-50`]">
+            <component :is="action.icon" :class="[`w-5 h-5 text-${action.color}-600`]" />
           </div>
-          <ArrowUpRight class="w-4 h-4 text-slate-300 group-hover:text-amber-500 transition-colors" />
+          <ArrowUpRight class="w-4 h-4 text-slate-300 group-hover:text-slate-900 transition-colors" />
         </div>
-        <p class="text-3xl font-black text-slate-900 mb-1">{{ loading ? '…' : pendingLeaves }}</p>
-        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Leaves</p>
-      </button>
-
-      <button
-        @click="navigate('attendance-adjustments')"
-        class="group bg-white/40 backdrop-blur-xl rounded-[24px] border border-white/20 p-6 text-left hover:bg-white/60 hover:border-blue-100 hover:shadow-lg transition-all duration-300"
-      >
-        <div class="flex items-center justify-between mb-3">
-          <div class="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
-            <Clock class="w-4 h-4 text-blue-600" />
-          </div>
-          <ArrowUpRight class="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
-        </div>
-        <p class="text-3xl font-black text-slate-900 mb-1">{{ loading ? '…' : pendingAttendance }}</p>
-        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Attendance</p>
-      </button>
-
-      <button
-        @click="navigate('payroll-runs')"
-        class="group bg-white/40 backdrop-blur-xl rounded-[24px] border border-white/20 p-6 text-left hover:bg-white/60 hover:border-emerald-100 hover:shadow-lg transition-all duration-300"
-      >
-        <div class="flex items-center justify-between mb-3">
-          <div class="h-9 w-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-            <TrendingUp class="w-4 h-4 text-emerald-600" />
-          </div>
-          <ArrowUpRight class="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors" />
-        </div>
-        <p class="text-3xl font-black text-slate-900 mb-1 truncate">{{ loading ? '…' : upcomingPayroll ?? 'N/A' }}</p>
-        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Upcoming Payroll</p>
-      </button>
-
-      <button
-        @click="navigate('overtime-requests')"
-        class="group bg-white/40 backdrop-blur-xl rounded-[24px] border border-white/20 p-6 text-left hover:bg-white/60 hover:border-rose-100 hover:shadow-lg transition-all duration-300"
-      >
-        <div class="flex items-center justify-between mb-3">
-          <div class="h-9 w-9 rounded-xl bg-rose-50 flex items-center justify-center">
-            <AlertCircle class="w-4 h-4 text-rose-600" />
-          </div>
-          <ArrowUpRight class="w-4 h-4 text-slate-300 group-hover:text-rose-500 transition-colors" />
-        </div>
-        <p class="text-3xl font-black text-slate-900 mb-1">{{ loading ? '…' : openOvertimeRequests }}</p>
-        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Open Overtime Req.</p>
+        <p class="text-2xl font-bold text-slate-900 mb-0.5 truncate">{{ loading ? '…' : action.value }}</p>
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{{ action.label }}</p>
       </button>
     </div>
 
     <!-- Recent Activity -->
-    <div class="bg-white/30 backdrop-blur-2xl border border-white/60 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.05)] rounded-[48px] p-12 lg:p-16 relative overflow-hidden group">
-      <div class="absolute -right-20 -top-20 w-80 h-80 bg-slate-50 rounded-full blur-[100px] opacity-20 group-hover:opacity-40 transition-opacity" />
-
-      <div class="relative z-10">
-        <div class="flex flex-col sm:flex-row items-center justify-between mb-12 gap-6">
-          <div class="space-y-1">
-            <h3 class="text-3xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
-              <Activity class="w-8 h-8 text-slate-400" />
-              Recent Activity
-            </h3>
-            <p class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 pl-1">Latest actions across the HRMS</p>
-          </div>
-          <Button variant="outline" class="rounded-full h-12 px-8 border-slate-100 text-[10px] font-black uppercase tracking-widest hover:border-indigo-100 hover:text-indigo-600 transition-all shadow-sm">
-            View All Logs
-            <ArrowUpRight class="w-3.5 h-3.5 ml-2" />
-          </Button>
+    <Card class="border-slate-200 shadow-sm">
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-7">
+        <div class="space-y-1">
+          <CardTitle class="text-xl font-bold flex items-center gap-2">
+            <Activity class="w-5 h-5 text-slate-400" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription class="text-xs">Latest actions across the HRMS portal</CardDescription>
         </div>
-
-        <div class="min-h-[400px]">
+        <Button variant="outline" size="sm" class="h-9 px-4 text-xs font-semibold">
+          View All Logs
+          <ArrowUpRight class="w-3.5 h-3.5 ml-2" />
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div class="min-h-[300px]">
           <RecentActivityList :activities="activities" :loading="loading" />
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   </div>
 </template>

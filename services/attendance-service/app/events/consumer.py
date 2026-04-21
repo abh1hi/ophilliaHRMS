@@ -31,7 +31,7 @@ EXCHANGE_NAME = "hrms_events"
 QUEUE_NAME = "attendance_events_queue"
 DLQ_EXCHANGE = "attendance_dlq_exchange"
 DLQ_QUEUE = "attendance_dlq"
-BINDING_KEYS = ["company.created"]
+BINDING_KEYS = ["company.created", "shifttype.created", "shifttype.updated"]
 _HANDLER_TIMEOUT = 10
 _semaphore = asyncio.Semaphore(5)
 
@@ -76,6 +76,81 @@ async def _handle_company_created(db, company_id: UUID) -> None:
     logger.info(f"Seeded default attendance policy for company {company_id}")
 
 
+async def _handle_shifttype_created(db, payload: dict) -> None:
+    """Sync a new shift type from employee-service."""
+    from app.models.shift_type import ShiftType
+    from datetime import time
+
+    st_id = UUID(payload["id"])
+    company_id = UUID(payload["company_id"])
+
+    # Check if already exists
+    existing = await db.get(ShiftType, st_id)
+    if existing:
+        logger.info(f"ShiftType {st_id} already exists in attendance-service — skipping creation")
+        return
+
+    # Parse times
+    start_time = time.fromisoformat(payload["start_time"]) if payload.get("start_time") else time(9, 0)
+    end_time = time.fromisoformat(payload["end_time"]) if payload.get("end_time") else time(17, 0)
+
+    # Calculate default work hours if not provided (placeholder logic)
+    work_hours = 8.0 # Default
+
+    shift_type = ShiftType(
+        id=st_id,
+        company_id=company_id,
+        name=payload["name"],
+        start_time=start_time,
+        end_time=end_time,
+        work_hours_per_day=work_hours,
+        break_minutes=payload.get("break_minutes", 0),
+        grace_period_minutes=payload.get("grace_period_minutes", 5),
+        color_code=payload.get("color_code"),
+        description=payload.get("description"),
+        is_night_shift=payload.get("is_overnight", False),
+        is_active=payload.get("is_active", True)
+    )
+    db.add(shift_type)
+    logger.info(f"Synced ShiftType {st_id} ({payload['name']}) to attendance-service")
+
+
+async def _handle_shifttype_updated(db, payload: dict) -> None:
+    """Sync updates to an existing shift type."""
+    from app.models.shift_type import ShiftType
+    from datetime import time
+
+    st_id = UUID(payload["id"])
+    shift_type = await db.get(ShiftType, st_id)
+
+    if not shift_type:
+        logger.warning(f"ShiftType {st_id} not found in attendance-service for update — creating it")
+        await _handle_shifttype_created(db, payload)
+        return
+
+    # Update fields if present in payload
+    if "name" in payload:
+        shift_type.name = payload["name"]
+    if "start_time" in payload:
+        shift_type.start_time = time.fromisoformat(payload["start_time"])
+    if "end_time" in payload:
+        shift_type.end_time = time.fromisoformat(payload["end_time"])
+    if "break_minutes" in payload:
+        shift_type.break_minutes = payload["break_minutes"]
+    if "grace_period_minutes" in payload:
+        shift_type.grace_period_minutes = payload["grace_period_minutes"]
+    if "color_code" in payload:
+        shift_type.color_code = payload["color_code"]
+    if "description" in payload:
+        shift_type.description = payload["description"]
+    if "is_overnight" in payload:
+        shift_type.is_night_shift = payload["is_overnight"]
+    if "is_active" in payload:
+        shift_type.is_active = payload["is_active"]
+
+    logger.info(f"Updated ShiftType {st_id} in attendance-service")
+
+
 async def _handle_message(message: "AbstractIncomingMessage") -> None:
     """Inner handler — feature flag gate + business logic."""
     event_id = "unknown"
@@ -93,11 +168,6 @@ async def _handle_message(message: "AbstractIncomingMessage") -> None:
 
         company_id = UUID(company_id_str)
 
-        if not settings.ENABLE_EVENT_DRIVEN_ONBOARDING:
-            logger.debug(f"ENABLE_EVENT_DRIVEN_ONBOARDING=False — acking {event_type} without processing")
-            await message.ack()
-            return
-
         async with AsyncSessionLocal() as db:
             if await _is_processed(db, event_id):
                 logger.info(f"Event {event_id} already processed — skipping")
@@ -105,7 +175,15 @@ async def _handle_message(message: "AbstractIncomingMessage") -> None:
                 return
 
             if event_type == "company.created":
+                if not settings.ENABLE_EVENT_DRIVEN_ONBOARDING:
+                    logger.debug(f"ENABLE_EVENT_DRIVEN_ONBOARDING=False — acking {event_type} without processing")
+                    await message.ack()
+                    return
                 await _handle_company_created(db, company_id)
+            elif event_type == "shifttype.created":
+                await _handle_shifttype_created(db, payload)
+            elif event_type == "shifttype.updated":
+                await _handle_shifttype_updated(db, payload)
             else:
                 logger.debug(f"Ignoring unhandled event: {event_type}")
 

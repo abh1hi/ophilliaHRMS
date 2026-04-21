@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user, require_role, TokenPayload, get_db_with_tenant
@@ -12,8 +12,8 @@ from app.schemas.shift_type import ShiftTypeCreate, ShiftTypeUpdate, ShiftTypeRe
 router = APIRouter(prefix="/shift-types", tags=["shift-types"])
 
 
-def _get_service(db: AsyncSession = Depends(get_db_with_tenant)) -> ShiftTypeService:
-    return ShiftTypeService(db)
+def _get_service(request: Request, db: AsyncSession = Depends(get_db_with_tenant)) -> ShiftTypeService:
+    return ShiftTypeService(db, request.app.state.event_publisher)
 
 
 @router.get("")
