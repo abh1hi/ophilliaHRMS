@@ -1,7 +1,7 @@
 """Auto punch-out scheduler (fail-safe, idempotent).
 
 Runs periodically to auto-close attendance records that were not punched out
-by the configured auto_close_time (default 23:59).
+by the auto_clock_out_at snapshot saved from the employee's assigned schedule.
 
 Uses SELECT FOR UPDATE SKIP LOCKED to:
 - Prevent conflicts with manual punch-outs happening concurrently
@@ -12,87 +12,20 @@ Records are marked as AUTO_CLOSED and an event is published to notify admins.
 """
 
 import logging
-from datetime import date, datetime, time, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attendance_record import AttendanceRecord
-from app.models.attendance_policy import AttendancePolicy
 from app.events.publisher import EventPublisher
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_AUTO_CLOSE_TIME = time(23, 59)
-
-
-async def _get_auto_close_time(db: AsyncSession, employee_id, company_id) -> time:
-    """Resolve auto_close_time: employee → department → location → company-wide → default."""
-    # Employee-level
-    result = await db.execute(
-        select(AttendancePolicy.auto_close_time).where(
-            and_(
-                AttendancePolicy.company_id == company_id,
-                AttendancePolicy.employee_id == employee_id,
-            )
-        ).limit(1)
-    )
-    row = result.scalar_one_or_none()
-    if row is not None:
-        return row
-
-    # Department-level
-    result = await db.execute(
-        select(AttendancePolicy.auto_close_time).where(
-            and_(
-                AttendancePolicy.company_id == company_id,
-                AttendancePolicy.employee_id.is_(None),
-                AttendancePolicy.department_id.isnot(None),
-                AttendancePolicy.location_id.is_(None),
-            )
-        ).limit(1)
-    )
-    row = result.scalar_one_or_none()
-    if row is not None:
-        return row
-
-    # Location-level
-    result = await db.execute(
-        select(AttendancePolicy.auto_close_time).where(
-            and_(
-                AttendancePolicy.company_id == company_id,
-                AttendancePolicy.employee_id.is_(None),
-                AttendancePolicy.location_id.isnot(None),
-            )
-        ).limit(1)
-    )
-    row = result.scalar_one_or_none()
-    if row is not None:
-        return row
-
-    # Company-wide
-    result = await db.execute(
-        select(AttendancePolicy.auto_close_time).where(
-            and_(
-                AttendancePolicy.company_id == company_id,
-                AttendancePolicy.employee_id.is_(None),
-                AttendancePolicy.location_id.is_(None),
-                AttendancePolicy.department_id.is_(None),
-            )
-        ).limit(1)
-    )
-    row = result.scalar_one_or_none()
-    if row is not None:
-        return row
-
-    return DEFAULT_AUTO_CLOSE_TIME
-
 
 async def _try_close_record(
-    db: AsyncSession,
     record: AttendanceRecord,
     now: datetime,
-    current_time: time,
     event_publisher: EventPublisher | None,
 ) -> bool:
     """Attempt to auto-close a single open record. Returns True if closed."""
@@ -103,8 +36,7 @@ async def _try_close_record(
         )
         return False
 
-    auto_close = await _get_auto_close_time(db, record.employee_id, record.company_id)
-    if current_time < auto_close:
+    if record.auto_clock_out_at is None or now < record.auto_clock_out_at:
         return False
 
     delta = now - record.clock_in
@@ -128,6 +60,7 @@ async def _try_close_record(
             "company_id": str(record.company_id),
             "employee_id": str(record.employee_id),
             "record_id": str(record.id),
+            "schedule_id": str(record.schedule_id) if record.schedule_id else None,
             "work_hours": total_hours,
             "timestamp": now.isoformat(),
         })
@@ -143,20 +76,15 @@ async def auto_close_stale_records(
     db: AsyncSession,
     event_publisher: EventPublisher | None = None,
 ) -> int:
-    """Auto-close open records whose auto_close_time has passed.
-
-    Uses SELECT FOR UPDATE SKIP LOCKED so concurrent scheduler runs and
-    manual punch-outs do not conflict. Returns the number of records closed.
-    """
-    today = date.today()
+    """Auto-close open records whose schedule auto_clock_out_at has passed."""
     now = datetime.now(timezone.utc)
-    current_time = now.time()
 
     result = await db.execute(
         select(AttendanceRecord).where(
             and_(
-                AttendanceRecord.date == today,
                 AttendanceRecord.clock_out.is_(None),
+                AttendanceRecord.auto_clock_out_at.isnot(None),
+                AttendanceRecord.auto_clock_out_at <= now,
             )
         ).with_for_update(skip_locked=True)
     )
@@ -166,7 +94,7 @@ async def auto_close_stale_records(
         return 0
 
     closed_count = sum([
-        1 if await _try_close_record(db, record, now, current_time, event_publisher) else 0
+        1 if await _try_close_record(record, now, event_publisher) else 0
         for record in open_records
     ])
 

@@ -61,6 +61,7 @@ from app.schemas.attendance import (
     DailyStatusBreakdown,
     PerformersResponse,
     TodayShiftsResponse,
+    TodayScheduleResponse,
 )
 from app.services.task_template_service import TaskTemplateService
 from app.utils.pagination import PaginationParams
@@ -155,6 +156,15 @@ async def get_my_today_shifts(
 ):
     """Get all shift records for today with shift metadata (max shifts, can start new)."""
     return await service.get_today_shifts(UUID(current_user.sub))
+
+
+@router.get("/me/schedule/today", response_model=TodayScheduleResponse)
+async def get_my_today_schedule(
+    current_user: TokenPayload = Depends(get_current_user),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Get the authenticated employee's active attendance schedule for today."""
+    return await service.get_today_schedule(UUID(current_user.sub))
 
 
 @router.get("/me", response_model=AttendanceListResponse)
@@ -409,6 +419,25 @@ async def get_alerts(
 
 
 # ──────────────────── GEOFENCES ────────────────────
+
+@router.get("/me/geofences")
+async def get_my_geofences(
+    current_user: TokenPayload = Depends(get_current_user),
+    service: AttendanceService = Depends(_get_service),
+):
+    """Get schedule-derived clock-in geofences assigned to the current employee."""
+    schedule = await service.get_today_schedule(UUID(current_user.sub))
+    gf_list = []
+    for g in schedule.allowed_clock_in_locations:
+        gf_list.append({
+            "id": str(g.id),
+            "name": g.name,
+            "latitude": g.latitude,
+            "longitude": g.longitude,
+            "radius_meters": g.radius_meters
+        })
+    return {"data": {"geofences": gf_list, "total": len(gf_list)}, "success": True, "error": None, "meta": None}
+
 
 @router.post("/geofences", response_model=GeofenceResponse, status_code=201)
 async def create_geofence(

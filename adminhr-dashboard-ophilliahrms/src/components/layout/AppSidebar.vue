@@ -87,7 +87,6 @@ const hrSetupNav = [
 const shiftNav = [
   { key: 'shift-types',       label: 'Shift Types',       icon: Clock          },
   { key: 'shift-locations',   label: 'Shift Locations',   icon: MapPin         },
-  { key: 'shift-assignments', label: 'Shift Assignments', icon: CalendarRange  },
   { key: 'shift-requests',    label: 'Shift Requests',    icon: ArrowLeftRight },
   { key: 'shift-schedules',   label: 'Shift Schedules',   icon: LayoutGrid     },
   { key: 'roster',            label: 'Roster',            icon: Calendar       },

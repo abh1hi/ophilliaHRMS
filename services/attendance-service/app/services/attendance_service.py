@@ -41,6 +41,7 @@ from app.repositories.overtime_policy_repository import OvertimePolicyRepository
 from app.repositories.shift_type_repository import ShiftTypeRepository
 from app.repositories.holiday_calendar_repository import HolidayCalendarRepository
 from app.repositories.geofence_consent_repository import GeofenceConsentRepository
+from app.services.schedule_resolver import ScheduleResolver
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,9 @@ logger = logging.getLogger(__name__)
 class AttendanceService:
     """Orchestrates clock-in/out, manual entry, and reporting.
 
-    Delegates policy resolution to PolicyResolver, geofence checks to
-    GeofenceValidator, and overtime math to OvertimeCalculator.
+    Uses schedule assignments as the source of truth for attendance rules,
+    then delegates geofence checks to GeofenceValidator and overtime math to
+    OvertimeCalculator.
     """
 
     def __init__(self, db: AsyncSession, event_publisher: Optional[EventPublisher] = None):
@@ -65,6 +67,7 @@ class AttendanceService:
         self._shift_type_repo = ShiftTypeRepository(db)
         self._holiday_repo = HolidayCalendarRepository(db)
         self._consent_repo = GeofenceConsentRepository(db)
+        self._schedule_resolver = ScheduleResolver(db)
 
     # ──────────── CLOCK IN (idempotent) ────────────
 
@@ -90,12 +93,17 @@ class AttendanceService:
         if company_id:
             await validate_employee_tenant(employee_id, company_id)
 
-        # Resolve policy and validate geofence
-        method, geofences, work_hours, work_start, late_grace, _ = await self._policy_resolver.resolve(
-            employee_id, department_id
+        now = datetime.now(timezone.utc)
+        resolved_schedule = await self._schedule_resolver.resolve_for_employee(employee_id, today)
+        self._schedule_resolver.require_clock_in_window(resolved_schedule, now)
+        self._geofence_validator.validate(
+            "geofence",
+            resolved_schedule.clock_in_locations,
+            data.latitude,
+            data.longitude,
+            data.accuracy_meters,
         )
-        self._geofence_validator.validate(method, geofences, data.latitude, data.longitude, data.accuracy_meters)
-        await self._assert_geofence_consent(employee_id, method)
+        await self._assert_geofence_consent(employee_id, "geofence")
 
         # ── Locked read: prevent two concurrent clock-ins from racing ──
         existing = await self.attendance_repo.get_by_employee_and_date_for_update(
@@ -124,26 +132,37 @@ class AttendanceService:
                 )
             shift_number = current_shift_count + 1
 
-        # Determine status (on-time vs late) using grace period
-        now = datetime.now(timezone.utc)
+        # Determine status (on-time vs late) using the assigned shift type's grace period.
         attendance_status = "present"
-        if work_start and shift_number == 1:
+        if shift_number == 1:
             clock_in_time = now.time()
             grace_end = (
-                datetime.combine(today, work_start) + timedelta(minutes=late_grace)
+                datetime.combine(today, resolved_schedule.shift_type.start_time)
+                + timedelta(minutes=resolved_schedule.shift_type.grace_period_minutes)
             ).time()
             if clock_in_time > grace_end:
                 attendance_status = "late"
 
         record = AttendanceRecord(
             employee_id=employee_id,
+            schedule_id=resolved_schedule.schedule.id,
             clock_in=now,
+            scheduled_clock_in_at=resolved_schedule.scheduled_clock_in_at,
+            scheduled_clock_out_at=resolved_schedule.scheduled_clock_out_at,
+            auto_clock_out_at=(
+                resolved_schedule.auto_clock_out_at
+                if resolved_schedule.schedule.auto_clock_out_enabled
+                else None
+            ),
+            tasks_mandatory_snapshot=resolved_schedule.schedule.tasks_mandatory,
+            allowed_clock_in_location_ids_snapshot=resolved_schedule.schedule.allowed_clock_in_location_ids,
+            allowed_clock_out_location_ids_snapshot=resolved_schedule.schedule.allowed_clock_out_location_ids,
             clock_in_lat=data.latitude,
             clock_in_lng=data.longitude,
             clock_in_location_name=data.location_name,
             status=attendance_status,
             state="punched_in",
-            method=method if method != "both" else "geofence" if data.latitude else "manual",
+            method="geofence",
             notes=data.notes,
             date=today,
             shift_number=shift_number,
@@ -176,6 +195,7 @@ class AttendanceService:
                 "company_id": str(company_id) if company_id else None,
                 "employee_id": str(employee_id),
                 "method": record.method,
+                "schedule_id": str(record.schedule_id) if record.schedule_id else None,
                 "status": record.status,
                 "shift_number": shift_number,
                 "timestamp": now.isoformat(),
@@ -320,12 +340,22 @@ class AttendanceService:
                 detail="No open clock-in record found for today. Clock in first.",
             )
 
-        # Validate geofence on clock-out too
-        method, geofences, work_hours_per_day, _, _, allow_night_shift = await self._policy_resolver.resolve(
-            employee_id, department_id
+        now = datetime.now(timezone.utc)
+        if not record.schedule_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="This open attendance record was not created from a schedule. Contact HR/Admin.",
+            )
+        resolved_schedule = await self._schedule_resolver.resolve_by_schedule_id(record.schedule_id, record.date)
+        self._schedule_resolver.require_clock_out_window(resolved_schedule, now)
+        self._geofence_validator.validate(
+            "geofence",
+            resolved_schedule.clock_out_locations,
+            data.latitude,
+            data.longitude,
         )
-        self._geofence_validator.validate(method, geofences, data.latitude, data.longitude)
-        self._check_night_shift(record, allow_night_shift)
+        self._check_night_shift(record, resolved_schedule.shift_type.is_night_shift)
+        work_hours_per_day = resolved_schedule.shift_type.work_hours_per_day
 
         # Process task completions supplied inline with punch-out FIRST
         if data.task_completions:
@@ -342,24 +372,24 @@ class AttendanceService:
         tasks = await self.task_repo.get_by_record(record.id)
 
         # ── Punch-out validations ──
-        if len(tasks) == 0:
-            await self.attendance_repo.commit()  # release lock
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="At least one task must be added before punching out",
-            )
+        if record.tasks_mandatory_snapshot:
+            if len(tasks) == 0:
+                await self.attendance_repo.commit()  # release lock
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="At least one task must be added before punching out for this schedule",
+                )
 
-        pending_tasks = [t for t in tasks if t.status == "pending"]
-        if pending_tasks:
-            await self.attendance_repo.commit()  # release lock
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"{len(pending_tasks)} task(s) still have 'pending' status. "
-                       "Update all tasks before punching out.",
-            )
+            pending_tasks = [t for t in tasks if t.status == "pending"]
+            if pending_tasks:
+                await self.attendance_repo.commit()  # release lock
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"{len(pending_tasks)} task(s) still have 'pending' status. "
+                           "Update all tasks before punching out.",
+                )
 
         # Compute work hours, overtime, and half-day/holiday status
-        now = datetime.now(timezone.utc)
         ot_threshold, ot_multiplier, is_holiday, holiday_mult = await self._resolve_ot_params(
             employee_id, department_id
         )
@@ -397,6 +427,7 @@ class AttendanceService:
             await self.event_publisher.publish("attendance.clock_out", {
                 "company_id": str(company_id) if company_id else None,
                 "employee_id": str(employee_id),
+                "schedule_id": str(record.schedule_id) if record.schedule_id else None,
                 "work_hours": total_hours,
                 "overtime_hours": overtime,
                 "day_rating": data.day_rating,
@@ -434,6 +465,10 @@ class AttendanceService:
 
     async def get_today_record(self, employee_id: UUID) -> Optional[AttendanceRecord]:
         return await self.attendance_repo.get_by_employee_and_date(employee_id, date.today())
+
+    async def get_today_schedule(self, employee_id: UUID):
+        resolved = await self._schedule_resolver.resolve_for_employee(employee_id, date.today())
+        return self._schedule_resolver.to_today_response(resolved)
 
     # ──────────── GET ALL SHIFTS TODAY ────────────
 

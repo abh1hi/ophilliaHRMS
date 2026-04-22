@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.employee_checkin import EmployeeCheckin
 from app.repositories.employee_checkin_repository import EmployeeCheckinRepository
-from app.repositories.shift_assignment_repository import ShiftAssignmentRepository
+from app.services.schedule_resolver import ScheduleResolver
 from app.schemas.employee_checkin import CheckinCreate, CheckinUpdate
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class EmployeeCheckinService:
     def __init__(self, db: AsyncSession):
         self.repo = EmployeeCheckinRepository(db)
-        self.shift_repo = ShiftAssignmentRepository(db)
+        self.schedule_resolver = ScheduleResolver(db)
 
     async def create(self, data: CheckinCreate) -> EmployeeCheckin:
         """Create a checkin log and attempt to auto-resolve shift_type_id."""
@@ -37,11 +37,11 @@ class EmployeeCheckinService:
         if checkin.shift_type_id is None:
             target_date = data.log_datetime.date()
             try:
-                assignments = await self.shift_repo.get_active_for_date(
-                    data.employee_id, target_date
+                resolved = await self.schedule_resolver.resolve_for_employee(
+                    data.employee_id, target_date, required=False
                 )
-                if assignments:
-                    checkin.shift_type_id = assignments[0].shift_type_id
+                if resolved:
+                    checkin.shift_type_id = resolved.shift_type.id
             except Exception:
                 logger.debug("Could not resolve shift for checkin — storing without shift_type_id")
 
@@ -69,11 +69,11 @@ class EmployeeCheckinService:
         checkin = await self.get(checkin_id)
         target_date = checkin.log_datetime.date()
         try:
-            assignments = await self.shift_repo.get_active_for_date(
-                checkin.employee_id, target_date
+            resolved = await self.schedule_resolver.resolve_for_employee(
+                checkin.employee_id, target_date, required=False
             )
-            if assignments:
-                checkin = await self.repo.update(checkin, {"shift_type_id": assignments[0].shift_type_id})
+            if resolved:
+                checkin = await self.repo.update(checkin, {"shift_type_id": resolved.shift_type.id})
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

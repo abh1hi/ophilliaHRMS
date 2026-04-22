@@ -5,6 +5,16 @@ export interface ShiftSchedule {
   company_id: string
   name: string
   description?: string
+  shift_type_id: string
+  allowed_clock_in_location_ids: string[]
+  allowed_clock_out_location_ids: string[]
+  clock_in_start_time: string
+  clock_in_end_time: string
+  clock_out_start_time: string
+  clock_out_end_time: string
+  auto_clock_out_enabled: boolean
+  auto_clock_out_time: string | null
+  tasks_mandatory: boolean
   effective_from?: string
   effective_to?: string
   is_active: number

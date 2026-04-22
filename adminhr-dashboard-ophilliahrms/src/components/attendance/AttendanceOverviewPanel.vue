@@ -25,8 +25,6 @@ import type {
   AttendanceStatusBreakdown,
   AttendanceTrendPoint,
 } from '../../services/attendance.service'
-import { listShiftAssignments } from '../../services/shift-assignment.service'
-import type { ShiftAssignment } from '../../services/shift-assignment.service'
 import { listShiftLocations } from '../../services/shift-location.service'
 import { listShiftTypes } from '../../services/shift-type.service'
 import { getShiftAssignmentWarnings } from '../../utils/shiftAssignmentHealth'
@@ -37,7 +35,6 @@ const kpi = ref<AttendanceKpi | null>(null)
 const trend = ref<AttendanceTrendPoint[]>([])
 const breakdown = ref<AttendanceStatusBreakdown | null>(null)
 const alerts = ref<AttendanceAlertsResponse | null>(null)
-const assignments = ref<ShiftAssignment[]>([])
 const shiftTypeIds = ref<Set<string>>(new Set())
 const locationIds = ref<Set<string>>(new Set())
 const recordsToday = ref(0)
@@ -58,13 +55,12 @@ const statusSegments = computed(() => {
 })
 
 const overlapWarnings = computed(() => {
-  return getShiftAssignmentWarnings(assignments.value, shiftTypeIds.value, locationIds.value).slice(0, 8)
+  return [] // Removed shift assignment warnings as assignments are now schedule-based
 })
 
 const setupHealth = computed(() => [
   { label: 'Shift types', value: shiftTypeIds.value.size, ok: shiftTypeIds.value.size > 0, icon: Clock },
   { label: 'Geofence locations', value: locationIds.value.size, ok: locationIds.value.size > 0, icon: MapPin },
-  { label: 'Assignments', value: assignments.value.length, ok: assignments.value.length > 0, icon: Users },
   { label: 'Today records', value: recordsToday.value, ok: recordsToday.value > 0, icon: Activity },
 ])
 
@@ -76,12 +72,11 @@ async function load() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const [k, t, b, a, ass, types, locations, records] = await Promise.all([
+    const [k, t, b, a, types, locations, records] = await Promise.all([
       getAttendanceKpi(),
       getAttendanceTrend(14),
       getAttendanceStatusBreakdown(),
       getAttendanceAlerts(),
-      listShiftAssignments(),
       listShiftTypes(),
       listShiftLocations(),
       listAttendanceRecords({ date_from: today, date_to: today, limit: 1 }),
@@ -90,7 +85,6 @@ async function load() {
     trend.value = t.items ?? []
     breakdown.value = b
     alerts.value = a
-    assignments.value = ass
     shiftTypeIds.value = new Set(types.map(item => item.id))
     locationIds.value = new Set(locations.map(item => item.id))
     recordsToday.value = records.total ?? 0

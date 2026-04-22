@@ -8,3 +8,6 @@ from app.models.idempotency_key import IdempotencyKey  # noqa: F401
 from app.models.policy_audit_log import PolicyAuditLog  # noqa: F401
 from app.models.policy_template import PolicyTemplate  # noqa: F401
 from app.models.policy_exception import PolicyException  # noqa: F401
+from app.models.shift_type import ShiftType  # noqa: F401
+from app.models.shift_schedule import ShiftSchedule  # noqa: F401
+from app.models.shift_schedule_assignment import ShiftScheduleAssignment  # noqa: F401

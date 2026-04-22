@@ -5,10 +5,11 @@ import { listShiftTypes } from '../../services/shift-type.service'
 import type { RosterEntry } from '../../services/roster.service'
 import type { ShiftType } from '../../services/shift-type.service'
 import PageHeader from '../ui/PageHeader.vue'
-import FormInput from '../ui/FormInput.vue'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import { 
-  Calendar, 
   Users, 
   ArrowRight, 
   Clock, 
@@ -99,131 +100,134 @@ function shiftWeek(days: number) {
 </script>
 
 <template>
-  <div class="space-y-10">
+  <div class="space-y-6">
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
       <PageHeader
         title="Roster"
-        subtitle="Visualize weekly shift assignments across your workforce"
+        subtitle="Visualize weekly schedule assignments across your workforce"
       />
 
       <div class="flex items-center gap-3">
-        <div class="bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-[22px] p-2 flex items-center gap-2 shadow-sm">
-           <Button variant="ghost" size="icon" @click="shiftWeek(-7)" class="h-9 w-9 rounded-xl text-slate-400 hover:text-slate-900">
+        <Card class="p-1 flex items-center gap-1 shadow-sm border">
+           <Button variant="ghost" size="icon" @click="shiftWeek(-7)" class="h-8 w-8 text-muted-foreground hover:text-foreground">
              <ChevronLeft class="w-4 h-4" />
            </Button>
            
-           <div class="flex items-center gap-4 px-2">
-             <div class="relative">
+           <div class="flex items-center gap-3 px-2">
+             <div class="relative group">
                <input type="date" v-model="fromDate" class="absolute inset-0 opacity-0 cursor-pointer" />
-               <div class="flex flex-col">
-                  <span class="text-[9px] font-bold uppercase tracking-widest text-slate-400">Start</span>
-                  <span class="text-xs font-black text-slate-900 dark:text-slate-100">{{ formatDay(fromDate).full }}</span>
+               <div class="flex flex-col text-left">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Start</span>
+                  <span class="text-sm font-semibold text-foreground">{{ formatDay(fromDate).full }}</span>
                </div>
              </div>
-             <ArrowRight class="w-3.5 h-3.5 text-slate-300" />
-             <div class="relative">
+             <ArrowRight class="w-4 h-4 text-muted-foreground" />
+             <div class="relative group">
                <input type="date" v-model="toDate" class="absolute inset-0 opacity-0 cursor-pointer" />
                <div class="flex flex-col text-right">
-                  <span class="text-[9px] font-bold uppercase tracking-widest text-slate-400">End</span>
-                  <span class="text-xs font-black text-slate-900 dark:text-slate-100">{{ formatDay(toDate).full }}</span>
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">End</span>
+                  <span class="text-sm font-semibold text-foreground">{{ formatDay(toDate).full }}</span>
                </div>
              </div>
            </div>
 
-           <Button variant="ghost" size="icon" @click="shiftWeek(7)" class="h-9 w-9 rounded-xl text-slate-400 hover:text-slate-900">
+           <Button variant="ghost" size="icon" @click="shiftWeek(7)" class="h-8 w-8 text-muted-foreground hover:text-foreground">
              <ChevronRight class="w-4 h-4" />
            </Button>
-        </div>
+        </Card>
 
-        <Button variant="outline" class="h-12 rounded-[22px] px-6 border-slate-200 text-[11px] font-bold uppercase tracking-widest">
+        <Button variant="outline" class="h-10 text-xs font-semibold shadow-sm">
            <CalendarRange class="w-4 h-4 mr-2" /> View Monthly
         </Button>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="flex flex-col items-center justify-center py-32 gap-4">
-      <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
-      <p class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Loading roster…</p>
-    </div>
+    <Card v-if="loading" class="flex flex-col items-center justify-center py-24 gap-4 shadow-sm border">
+      <div class="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin"></div>
+      <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Loading roster…</p>
+    </Card>
 
     <!-- Error State -->
-    <div v-else-if="errorMsg" class="p-6 rounded-[28px] bg-destructive/5 border border-destructive/20 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-2">
+    <Card v-else-if="errorMsg" class="p-4 border-destructive bg-destructive/10 flex items-center gap-3 shadow-sm">
       <AlertCircle class="w-5 h-5 text-destructive" />
-      <p class="text-[11px] font-bold text-destructive uppercase tracking-widest">{{ errorMsg }}</p>
-    </div>
+      <p class="text-sm font-semibold text-destructive">{{ errorMsg }}</p>
+    </Card>
 
     <!-- Empty State -->
-    <div v-else-if="employeeIds.length === 0" class="flex flex-col items-center justify-center py-32 bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl border border-dashed border-white/20 rounded-[40px]">
-      <div class="h-20 w-20 rounded-full bg-slate-50 flex items-center justify-center mb-6">
-        <Users class="w-10 h-10 text-slate-200" />
+    <Card v-else-if="employeeIds.length === 0" class="flex flex-col items-center justify-center py-24 border-dashed shadow-sm">
+      <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+        <Users class="w-8 h-8 text-muted-foreground/50" />
       </div>
-      <p class="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground italic">No shift assignments found for this date range</p>
-    </div>
+      <p class="text-sm font-semibold text-muted-foreground">No schedule assignments found for this date range.</p>
+    </Card>
 
     <!-- Roster Grid -->
-    <div v-else class="bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-[40px] overflow-hidden shadow-sm animate-in zoom-in-95 duration-500">
+    <Card v-else class="overflow-hidden shadow-sm border">
       <div class="overflow-x-auto scrollbar-hide">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="bg-slate-50/50 dark:bg-white/5">
-              <th class="text-left px-10 py-8 font-black text-slate-900 dark:text-slate-100 text-[10px] uppercase tracking-[0.2em] border-r border-white/10 w-48">Employee</th>
-              <th v-for="d in dateRange" :key="d" class="px-6 py-8 text-center border-r border-white/10 last:border-0">
-                <div class="flex flex-col items-center gap-1">
-                   <span class="text-slate-400 text-[9px] font-black uppercase tracking-widest">{{ formatDay(d).day }}</span>
-                   <span class="text-slate-900 dark:text-white text-lg font-black tracking-tighter">{{ formatDay(d).date }}</span>
+        <Table>
+          <TableHeader>
+            <TableRow class="bg-muted/50 hover:bg-muted/50">
+              <TableHead class="min-w-[200px] border-r">Employee</TableHead>
+              <TableHead v-for="d in dateRange" :key="d" class="text-center border-r last:border-r-0 min-w-[120px]">
+                <div class="flex flex-col items-center justify-center py-2">
+                   <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{{ formatDay(d).day }}</span>
+                   <span class="text-base font-semibold text-foreground">{{ formatDay(d).date }}</span>
                 </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-white/10">
-            <tr v-for="empId in employeeIds" :key="empId" class="group hover:bg-white/30 dark:hover:bg-white/5 transition-all">
-              <td class="px-10 py-6 border-r border-white/10">
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="empId in employeeIds" :key="empId" class="hover:bg-muted/50 transition-colors">
+              <TableCell class="border-r py-4">
                 <div class="flex items-center gap-3">
-                   <div class="h-8 w-8 rounded-lg bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-lg">
+                   <div class="h-8 w-8 rounded bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0 shadow-sm">
                       {{ empId.slice(0, 2).toUpperCase() }}
                    </div>
                    <div class="flex flex-col">
-                      <span class="text-[10px] font-black text-slate-900 dark:text-slate-100 tracking-tight">{{ empId.slice(0, 8) }}…</span>
-                      <span class="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Active Employee</span>
+                      <span class="text-sm font-semibold text-foreground">{{ empId.slice(0, 8) }}…</span>
+                      <span class="text-[10px] text-muted-foreground">Active Employee</span>
                    </div>
                 </div>
-              </td>
-              <td v-for="d in dateRange" :key="d" class="px-3 py-6 text-center border-r border-white/10 last:border-0">
-                <template v-let="shift = getShiftForDate(empId, d)">
-                  <div v-if="shift?.shift_type_id && shiftTypeMap[shift.shift_type_id]" class="flex justify-center animate-in zoom-in-95">
-                    <div 
+              </TableCell>
+              <TableCell v-for="d in dateRange" :key="d" class="text-center border-r last:border-r-0 p-2">
+                <template v-for="shift in [getShiftForDate(empId, d)]" :key="d">
+                  <div v-if="shift?.shift_type_id && shiftTypeMap[shift.shift_type_id]" class="flex justify-center">
+                    <Badge 
+                      variant="outline"
                       :style="{ 
-                        backgroundColor: shiftTypeMap[shift.shift_type_id].color_code ? `${shiftTypeMap[shift.shift_type_id].color_code}15` : '#f1f5f9',
-                        borderColor: shiftTypeMap[shift.shift_type_id].color_code || '#e2e8f0',
-                        color: shiftTypeMap[shift.shift_type_id].color_code || '#64748b'
+                        backgroundColor: shiftTypeMap[shift.shift_type_id].color_code ? `${shiftTypeMap[shift.shift_type_id].color_code}15` : 'var(--muted)',
+                        borderColor: shiftTypeMap[shift.shift_type_id].color_code || 'var(--border)',
+                        color: shiftTypeMap[shift.shift_type_id].color_code || 'var(--foreground)'
                       }"
-                      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap shadow-sm group-hover:scale-110 transition-transform cursor-help"
+                      class="flex items-center gap-1.5 px-3 py-1 font-semibold whitespace-nowrap shadow-sm"
                       :title="`${shiftTypeMap[shift.shift_type_id].start_time} – ${shiftTypeMap[shift.shift_type_id].end_time}`"
                     >
                       <Clock class="w-3 h-3" />
                       {{ shiftTypeMap[shift.shift_type_id].name }}
-                    </div>
+                    </Badge>
                   </div>
                   <div v-else-if="shift" class="flex justify-center">
-                    <span class="inline-flex items-center px-4 py-2 rounded-2xl border border-dashed border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assigned</span>
+                    <Badge variant="outline" class="border-dashed text-muted-foreground bg-transparent">
+                      Assigned
+                    </Badge>
                   </div>
                 </template>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
       </div>
       
       <!-- Footer Summary -->
-      <div class="bg-indigo-50/30 dark:bg-white/5 px-10 py-6 border-t border-white/10 flex items-center justify-between">
-         <div class="flex items-center gap-2">
-            <Info class="w-4 h-4 text-indigo-500" />
-            <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Roster Active</span>
+      <div class="bg-muted/30 px-6 py-4 border-t flex items-center justify-between">
+         <div class="flex items-center gap-2 text-primary">
+            <Info class="w-4 h-4" />
+            <span class="text-xs font-semibold">Roster Active</span>
          </div>
-         <p class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Showing {{ employeeIds.length }} active employees across {{ dateRange.length }} days</p>
+         <p class="text-xs font-medium text-muted-foreground">Showing {{ employeeIds.length }} active employees across {{ dateRange.length }} days</p>
       </div>
-    </div>
+    </Card>
   </div>
 </template>
 

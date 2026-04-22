@@ -26,7 +26,7 @@ class EmployeeCheckin(Base):
     # Biometric device identifier (nullable for manual logs)
     device_id = Column(String(100), nullable=True)
 
-    # Resolved from active ShiftAssignment at log time (plain UUID, no FK)
+    # Resolved from active ShiftScheduleAssignment at log time (plain UUID, no FK)
     shift_type_id = Column(UUID(as_uuid=True), nullable=True)
 
     # GPS coordinates (nullable for non-geo logs)

@@ -6,7 +6,8 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.shift_type import ShiftType
-from app.models.shift_assignment import ShiftAssignment
+from app.models.shift_schedule import ShiftSchedule
+from app.models.shift_schedule_assignment import ShiftScheduleAssignment
 
 
 class ShiftTypeRepository:
@@ -30,18 +31,20 @@ class ShiftTypeRepository:
 
         result = await self.db.execute(
             select(ShiftType)
-            .join(ShiftAssignment, ShiftAssignment.shift_type_id == ShiftType.id)
+            .join(ShiftSchedule, ShiftSchedule.shift_type_id == ShiftType.id)
+            .join(ShiftScheduleAssignment, ShiftScheduleAssignment.schedule_id == ShiftSchedule.id)
             .where(
                 and_(
-                    ShiftAssignment.company_id == self._company_id,
-                    ShiftAssignment.employee_id == employee_id,
-                    ShiftAssignment.is_active == 1,
-                    ShiftAssignment.effective_from <= target,
-                    (ShiftAssignment.effective_to >= target) | ShiftAssignment.effective_to.is_(None),
+                    ShiftScheduleAssignment.company_id == self._company_id,
+                    ShiftScheduleAssignment.employee_id == employee_id,
+                    ShiftScheduleAssignment.is_active == 1,
+                    ShiftScheduleAssignment.effective_from <= target,
+                    (ShiftScheduleAssignment.effective_to >= target) | ShiftScheduleAssignment.effective_to.is_(None),
+                    ShiftSchedule.is_active == 1,
                     ShiftType.is_active.is_(True),
                 )
             )
-            .order_by(ShiftAssignment.effective_from.desc())
+            .order_by(ShiftScheduleAssignment.effective_from.desc())
             .limit(1)
         )
         return result.scalars().first()

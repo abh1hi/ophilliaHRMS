@@ -1,7 +1,7 @@
 """Auto-attendance service.
 
 Reads EmployeeCheckin logs for a given date, pairs IN/OUT events, compares
-against shift assignments to determine attendance status, and creates
+against shift schedule assignments to determine attendance status, and creates
 AttendanceRecords automatically.
 
 Uses the same SELECT FOR UPDATE SKIP LOCKED pattern as auto_punchout to
@@ -19,7 +19,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.employee_checkin import EmployeeCheckin
 from app.models.attendance_record import AttendanceRecord
-from app.models.shift_assignment import ShiftAssignment
+from app.models.shift_schedule import ShiftSchedule
+from app.models.shift_schedule_assignment import ShiftScheduleAssignment
+from app.models.shift_type import ShiftType
 from app.events.publisher import EventPublisher
 
 logger = logging.getLogger(__name__)
@@ -92,22 +94,35 @@ async def run_auto_attendance(
         overtime_hours = 0.0
         att_status = "present"
 
-        # Resolve shift assignment to get expected work hours and grace period
+        # Resolve schedule assignment to get expected work hours and grace period.
         shift_result = await db.execute(
-            select(ShiftAssignment).where(
+            select(ShiftScheduleAssignment, ShiftSchedule, ShiftType)
+            .join(ShiftSchedule, ShiftScheduleAssignment.schedule_id == ShiftSchedule.id)
+            .join(ShiftType, ShiftSchedule.shift_type_id == ShiftType.id)
+            .where(
                 and_(
-                    ShiftAssignment.company_id == company_id,
-                    ShiftAssignment.employee_id == employee_id,
-                    ShiftAssignment.is_active == 1,
-                    ShiftAssignment.effective_from <= target_date,
-                    (ShiftAssignment.effective_to == None) | (ShiftAssignment.effective_to >= target_date),
+                    ShiftScheduleAssignment.company_id == company_id,
+                    ShiftScheduleAssignment.employee_id == employee_id,
+                    ShiftScheduleAssignment.is_active == 1,
+                    ShiftScheduleAssignment.effective_from <= target_date,
+                    (ShiftScheduleAssignment.effective_to == None) | (ShiftScheduleAssignment.effective_to >= target_date),
+                    ShiftSchedule.is_active == 1,
+                    ShiftType.is_active.is_(True),
                 )
-            ).limit(1)
+            )
+            .order_by(ShiftScheduleAssignment.effective_from.desc())
+            .limit(1)
         )
-        assignment = shift_result.scalars().first()
+        schedule_row = shift_result.first()
 
         expected_work_hours = 8.0  # default
         grace_minutes = 15
+        schedule = None
+        shift_type = None
+        if schedule_row:
+            _, schedule, shift_type = schedule_row
+            expected_work_hours = shift_type.work_hours_per_day
+            grace_minutes = shift_type.grace_period_minutes
 
         if clock_out_dt:
             # Make both timezone-naive for arithmetic if needed
@@ -123,21 +138,34 @@ async def run_auto_attendance(
         # Check lateness against shift start time (if assignment exists and has a linked shift)
         # We store shift_type_id as a plain UUID — we don't join across services
         # Use clock_in time to assess late: compare against 09:00 default + grace
-        if first_in.shift_type_id is None:
-            # Use clock_in hour > 9 + grace as heuristic
-            from datetime import time
-            grace_td = timedelta(minutes=grace_minutes)
-            default_start = datetime.combine(target_date, time(9, 0))
-            ci_naive = clock_in_dt.replace(tzinfo=None) if clock_in_dt.tzinfo else clock_in_dt
-            if ci_naive > default_start + grace_td and att_status == "present":
-                att_status = "late"
+        from datetime import time
+        grace_td = timedelta(minutes=grace_minutes)
+        expected_start = datetime.combine(target_date, shift_type.start_time if shift_type else time(9, 0))
+        ci_naive = clock_in_dt.replace(tzinfo=None) if clock_in_dt.tzinfo else clock_in_dt
+        if ci_naive > expected_start + grace_td and att_status == "present":
+            att_status = "late"
 
         # ── 5. Create AttendanceRecord (upsert via IntegrityError catch) ──
         record = AttendanceRecord(
             company_id=company_id,
             employee_id=employee_id,
+            schedule_id=schedule.id if schedule else None,
             clock_in=clock_in_dt,
             clock_out=clock_out_dt,
+            scheduled_clock_in_at=expected_start.replace(tzinfo=timezone.utc),
+            scheduled_clock_out_at=(
+                datetime.combine(target_date, shift_type.end_time, tzinfo=timezone.utc)
+                if shift_type
+                else None
+            ),
+            auto_clock_out_at=(
+                datetime.combine(target_date, schedule.auto_clock_out_time, tzinfo=timezone.utc)
+                if schedule and schedule.auto_clock_out_enabled
+                else None
+            ),
+            tasks_mandatory_snapshot=schedule.tasks_mandatory if schedule else False,
+            allowed_clock_in_location_ids_snapshot=schedule.allowed_clock_in_location_ids if schedule else None,
+            allowed_clock_out_location_ids_snapshot=schedule.allowed_clock_out_location_ids if schedule else None,
             work_hours=work_hours,
             overtime_hours=overtime_hours,
             status=att_status,

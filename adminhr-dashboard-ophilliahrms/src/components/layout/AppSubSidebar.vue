@@ -72,7 +72,6 @@ const subNavMap: Record<string, { key: string; label: string; icon: any }[]> = {
   shifts: [
     { key: 'shift-types',       label: 'Shift Types',      icon: Clock          },
     { key: 'shift-locations',   label: 'Locations',        icon: MapPin         },
-    { key: 'shift-assignments', label: 'Assignments',      icon: CalendarRange  },
     { key: 'shift-requests',    label: 'Shift Requests',   icon: ArrowLeftRight },
     { key: 'shift-schedules',   label: 'Schedules',        icon: LayoutGrid     },
     { key: 'roster',            label: 'Roster',           icon: Calendar       },
@@ -117,7 +116,6 @@ const tabToSection: Record<string, string> = {
   'leave-ledger': 'leaves',
   'shift-types': 'shifts',
   'shift-locations': 'shifts',
-  'shift-assignments': 'shifts',
   'shift-requests': 'shifts',
   'shift-schedules': 'shifts',
   roster: 'shifts',

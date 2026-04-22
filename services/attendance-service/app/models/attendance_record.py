@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, Date, DateTime, Integer, Index, UniqueConstraint, Text
+from sqlalchemy import Column, String, Float, Date, DateTime, Integer, Index, UniqueConstraint, Text, Boolean, JSON, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -17,8 +17,15 @@ class AttendanceRecord(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     employee_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    schedule_id = Column(UUID(as_uuid=True), ForeignKey("shift_schedules.id", ondelete="SET NULL"), nullable=True, index=True)
     clock_in = Column(DateTime(timezone=True), nullable=False)
     clock_out = Column(DateTime(timezone=True), nullable=True)
+    scheduled_clock_in_at = Column(DateTime(timezone=True), nullable=True)
+    scheduled_clock_out_at = Column(DateTime(timezone=True), nullable=True)
+    auto_clock_out_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    tasks_mandatory_snapshot = Column(Boolean, nullable=False, default=False)
+    allowed_clock_in_location_ids_snapshot = Column(JSON, nullable=True)
+    allowed_clock_out_location_ids_snapshot = Column(JSON, nullable=True)
 
     # Geofence location data
     clock_in_lat = Column(Float, nullable=True)

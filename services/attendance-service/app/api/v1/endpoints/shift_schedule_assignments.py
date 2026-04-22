@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.dependencies import get_current_user, TokenPayload, get_db_with_tenant
 from app.core.responses import ok
 from app.services.shift_schedule_assignment_service import ShiftScheduleAssignmentService
-from app.schemas.shift_schedule_assignment import ShiftScheduleAssignmentCreate, ShiftScheduleAssignmentResponse
+from app.schemas.shift_schedule_assignment import ShiftScheduleAssignmentCreate, ShiftScheduleAssignmentUpdate, ShiftScheduleAssignmentResponse
 
 router = APIRouter(prefix="/shift-schedule-assignments", tags=["shift-schedule-assignments"])
 
@@ -43,3 +43,13 @@ async def delete_shift_schedule_assignment(
     service: ShiftScheduleAssignmentService = Depends(_get_service),
 ):
     await service.remove(assignment_id)
+
+
+@router.patch("/{assignment_id}")
+async def update_shift_schedule_assignment(
+    assignment_id: UUID,
+    data: ShiftScheduleAssignmentUpdate,
+    _: TokenPayload = Depends(get_current_user),
+    service: ShiftScheduleAssignmentService = Depends(_get_service),
+):
+    return ok(ShiftScheduleAssignmentResponse.model_validate(await service.update(assignment_id, data)).model_dump(mode="json"))

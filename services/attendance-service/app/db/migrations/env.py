@@ -21,7 +21,6 @@ from app.models.holiday_calendar import HolidayCalendar, Holiday       # noqa: F
 from app.models.geofence_consent import GeofenceConsent                # noqa: F401
 from app.models.shift_schedule import ShiftSchedule                    # noqa: F401
 from app.models.shift_schedule_assignment import ShiftScheduleAssignment  # noqa: F401
-from app.models.shift_assignment import ShiftAssignment                # noqa: F401
 from app.models.shift_request import ShiftRequest                      # noqa: F401
 from app.models.employee_checkin import EmployeeCheckin                # noqa: F401
 from app.models.attendance_request import AttendanceRequest            # noqa: F401

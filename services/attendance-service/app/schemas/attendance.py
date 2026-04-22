@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List, Any
 from uuid import UUID
 from datetime import date, datetime, time
@@ -151,8 +151,13 @@ class AttendanceResponse(BaseModel):
     id: UUID
     employee_id: UUID
     company_id: Optional[UUID] = None
+    schedule_id: Optional[UUID] = None
     clock_in: datetime
     clock_out: Optional[datetime] = None
+    scheduled_clock_in_at: Optional[datetime] = None
+    scheduled_clock_out_at: Optional[datetime] = None
+    auto_clock_out_at: Optional[datetime] = None
+    tasks_mandatory_snapshot: bool = False
     clock_in_lat: Optional[float] = None
     clock_in_lng: Optional[float] = None
     clock_out_lat: Optional[float] = None
@@ -173,7 +178,7 @@ class AttendanceResponse(BaseModel):
     method: str
     notes: Optional[str] = None
     date: date
-    tasks: List[TaskResponse] = []
+    tasks: List[TaskResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -186,6 +191,36 @@ class TodayShiftsResponse(BaseModel):
     shift_count: int
     max_shifts: int
     can_start_new_shift: bool
+
+
+class ScheduleLocationResponse(BaseModel):
+    id: UUID
+    name: str
+    latitude: float
+    longitude: float
+    radius_meters: int
+
+    model_config = {"from_attributes": True}
+
+
+class TodayScheduleResponse(BaseModel):
+    schedule_id: UUID
+    schedule_name: str
+    shift_type_id: UUID
+    shift_type_name: str
+    date: date
+    clock_in_start_time: time
+    clock_in_end_time: time
+    clock_out_start_time: time
+    clock_out_end_time: time
+    auto_clock_out_time: time
+    tasks_mandatory: bool
+    allowed_clock_in_locations: List[ScheduleLocationResponse]
+    allowed_clock_out_locations: List[ScheduleLocationResponse]
+    can_clock_in_now: bool
+    can_clock_out_now: bool
+    clock_in_status_reason: Optional[str] = None
+    clock_out_status_reason: Optional[str] = None
 
 
 # ──────────── PAGINATED LIST ────────────

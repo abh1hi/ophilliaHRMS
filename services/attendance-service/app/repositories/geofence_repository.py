@@ -34,6 +34,17 @@ class GeofenceRepository:
         )
         return result.scalars().first()
 
+    async def get_by_ids(self, geofence_ids: List[UUID]) -> List[GeofenceLocation]:
+        if not geofence_ids:
+            return []
+        result = await self.db.execute(
+            self._scoped(select(GeofenceLocation)).where(
+                GeofenceLocation.id.in_(geofence_ids),
+                GeofenceLocation.is_active == True,
+            )
+        )
+        return list(result.scalars().all())
+
     async def get_by_name(self, name: str) -> Optional[GeofenceLocation]:
         result = await self.db.execute(
             self._scoped(select(GeofenceLocation)).where(GeofenceLocation.name == name)

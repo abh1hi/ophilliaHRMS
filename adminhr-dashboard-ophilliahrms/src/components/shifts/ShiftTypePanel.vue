@@ -43,7 +43,18 @@ onMounted(load)
 
 function openCreate() {
   selected.value = null
-  form.value = { break_minutes: 0, grace_period_minutes: 5, is_night_shift: false }
+  form.value = {
+    name: '',
+    start_time: '',
+    end_time: '',
+    work_hours_per_day: 8,
+    break_minutes: 30,
+    grace_period_minutes: 5,
+    is_night_shift: false,
+    is_active: true,
+    color_code: '#6366f1',
+    description: '',
+  }
   errorMsg.value = ''
   drawerOpen.value = true
 }
@@ -60,7 +71,15 @@ async function save() {
 
 async function confirmDelete() {
   if (!deleteTarget.value) return; deleting.value = true
-  try { await deleteShiftType(deleteTarget.value.id); deleteTarget.value = null; load() } catch {} finally { deleting.value = false }
+  try { 
+    await deleteShiftType(deleteTarget.value.id); 
+    deleteTarget.value = null; 
+    load() 
+  } catch (e: any) { 
+    errorMsg.value = e.message || 'Failed to delete shift type'
+  } finally { 
+    deleting.value = false 
+  }
 }
 </script>
 
@@ -166,6 +185,21 @@ async function confirmDelete() {
         </div>
 
         <FormTextarea label="Description" v-model="form.description" placeholder="Optional notes about this shift" />
+
+        <div class="flex items-center justify-between p-4 rounded-2xl border border-dashed hover:border-slate-300 transition-colors">
+          <div>
+            <Label class="text-xs font-bold uppercase tracking-widest text-slate-900">Active Status</Label>
+            <p class="text-[10px] text-muted-foreground mt-0.5">Enable or disable this shift type</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <Checkbox
+              id="active-toggle"
+              :checked="form.is_active !== false"
+              @update:checked="form.is_active = $event"
+            />
+            <Label for="active-toggle" class="text-xs font-bold text-slate-700 cursor-pointer">Active</Label>
+          </div>
+        </div>
       </div>
 
       <template #footer>

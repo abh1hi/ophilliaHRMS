@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './alert-dialog'
+import { Button } from './button'
 
 const props = defineProps<{
   open: boolean
@@ -46,14 +47,14 @@ function updateOpen(val: boolean) {
         </div>
       </AlertDialogHeader>
       <AlertDialogFooter class="mt-4">
-        <AlertDialogCancel @click="emit('cancel')">Cancel</AlertDialogCancel>
-        <AlertDialogAction
+        <AlertDialogCancel @click="emit('cancel')" :disabled="loading">Cancel</AlertDialogCancel>
+        <Button
           @click="emit('confirm')"
           :disabled="loading"
-          class="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+          class="bg-destructive hover:bg-destructive/90 text-destructive-foreground h-10 px-4 py-2"
         >
           {{ loading ? 'Processing...' : (confirmLabel || 'Delete') }}
-        </AlertDialogAction>
+        </Button>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>

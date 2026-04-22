@@ -28,6 +28,18 @@ class ShiftScheduleRepository:
         await self.db.refresh(schedule)
         return schedule
 
+    async def exists_shift_type(self, shift_type_id: UUID) -> bool:
+        from app.models.shift_type import ShiftType
+
+        result = await self.db.execute(
+            select(func.count(ShiftType.id)).where(
+                ShiftType.company_id == self._company_id,
+                ShiftType.id == shift_type_id,
+                ShiftType.is_active.is_(True),
+            )
+        )
+        return bool(result.scalar() or 0)
+
     async def get_by_id(self, schedule_id: UUID) -> Optional[ShiftSchedule]:
         result = await self.db.execute(
             self._scoped(select(ShiftSchedule).where(ShiftSchedule.id == schedule_id))

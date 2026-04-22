@@ -1,7 +1,6 @@
 import { apiFetchData } from './http'
-import type { ShiftAssignment } from './shift-assignment.service'
 
-export type RosterEntry = ShiftAssignment
+export type RosterEntry = any // Updated to use schedule-based entries
 
 export async function getRoster(from_date: string, to_date: string, employee_id?: string): Promise<RosterEntry[]> {
   const params = new URLSearchParams({ from_date, to_date })

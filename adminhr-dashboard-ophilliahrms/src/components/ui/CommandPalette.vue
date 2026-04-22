@@ -45,7 +45,6 @@ const allNav: NavItem[] = [
   { key: 'employee-groups',            label: 'Employee Groups',          group: 'HR Setup',   icon: Settings2       },
   { key: 'shift-types',                label: 'Shift Types',              group: 'Shifts',     icon: Clock           },
   { key: 'shift-locations',            label: 'Shift Locations',          group: 'Shifts',     icon: Clock           },
-  { key: 'shift-assignments',          label: 'Shift Assignments',        group: 'Shifts',     icon: Clock           },
   { key: 'shift-requests',             label: 'Shift Requests',           group: 'Shifts',     icon: Clock           },
   { key: 'shift-schedules',            label: 'Shift Schedules',          group: 'Shifts',     icon: Clock           },
   { key: 'roster',                     label: 'Roster',                   group: 'Shifts',     icon: Calendar        },

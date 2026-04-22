@@ -71,7 +71,6 @@ const tabToSection: Record<string, string> = {
   payroll: 'payroll',
   'shift-types': 'shifts',
   'shift-locations': 'shifts',
-  'shift-assignments': 'shifts',
   'shift-requests': 'shifts',
   'shift-schedules': 'shifts',
   roster: 'shifts',

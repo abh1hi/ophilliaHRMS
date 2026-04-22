@@ -10,7 +10,7 @@
 | 2 | Shift Locations — GPS coordinates + geofence radius per office | Shifts |
 | 3 | Shift Types — named working-hours patterns | Shifts |
 | 4 | Add Employees — one by one or bulk CSV | Employees |
-| 5 | Shift Assignments — assign each employee a shift + location | Shifts |
+| 5 | Shift Schedules — create schedules and assign employees | Shifts |
 | 6 | Leave Types — Annual, Sick, Casual, etc. | Leaves |
 | 7 | Leave Periods — annual calendar container | Leaves |
 | 8 | Holiday Lists — public + company holidays | Leaves |
@@ -134,25 +134,26 @@ Navigate to **Employees → Employee Directory**.
 
 ---
 
-## Step 5 — Shift Assignments
+## Step 5 — Shift Schedules
 
-Navigate to **Shifts → Shift Assignments**.
+Navigate to **Shifts → Shift Schedules**.
 
-Without a shift assignment, the attendance system cannot calculate work hours, late arrivals, or overtime.
+Without a shift schedule, the attendance system cannot calculate work hours, late arrivals, or overtime.
 
-### Assigning a Shift
-1. Click **New Assignment**.
-2. Select the **Employee**.
-3. Select the **Shift Type** (from Step 3).
-4. Select the **Shift Location** (geofenced site from Step 2).
-5. Set the **Effective From** date.
-6. Optionally set an **Effective To** date for temporary assignments.
-7. Save.
+### Creating a Schedule
+1. Click **New Schedule**.
+2. Select the **Shift Type** (from Step 3).
+3. Select the **Shift Location** (geofenced site from Step 2).
+4. Set the schedule name and description.
+5. Configure clock-in/out windows and auto clock-out time.
+6. Set whether tasks are mandatory for clock-out.
+7. Assign employees to the schedule.
+8. Save.
 
-> An employee can have only one active shift assignment at a time. To change a shift, create a new assignment — the old one expires when the new one starts.
+> Employees are assigned to schedules which determine their work hours, locations, and attendance rules.
 
 ### Viewing the Roster
-- **Shifts → Roster** — weekly calendar view of all assignments.
+- **Shifts → Roster** — weekly calendar view of all schedule assignments.
 - **Shifts → Shift Schedules** — timeline view by employee.
 
 ---

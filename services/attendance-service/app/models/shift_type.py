@@ -13,7 +13,8 @@ def naive_utcnow():
 class ShiftType(Base):
     """Named shift definition with timing data used to compute OT thresholds.
 
-    ShiftAssignment links an employee to a ShiftType for a date range.
+    ShiftScheduleAssignment links an employee to a schedule, and the schedule
+    links to a ShiftType for a date range.
     OvertimeCalculator uses work_hours_per_day as the daily OT threshold
     instead of the flat default from OvertimePolicy.
     """

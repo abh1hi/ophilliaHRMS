@@ -36,7 +36,7 @@ defineEmits<{ (e: 'update:modelValue', val: string): void }>()
       <SelectTrigger :class="{ 'border-destructive ring-destructive': !!error }">
         <SelectValue :placeholder="placeholder" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent class="max-h-60 overflow-y-auto">
         <SelectGroup>
           <SelectItem
             v-for="opt in options"
