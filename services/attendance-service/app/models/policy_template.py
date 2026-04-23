@@ -34,7 +34,7 @@ class PolicyTemplate(Base):
     work_hours_per_day = Column(Float, nullable=False, default=8.0)
     auto_close_time = Column(Time, nullable=True, default=time(23, 59))
     task_planning_grace_minutes = Column(Float, nullable=False, default=30.0)
-    allow_night_shift = Column(String(10), nullable=False, default="false")
+    allow_night_shift = Column(Boolean, nullable=False, default=False)
     max_shifts_per_day = Column(Float, nullable=False, default=2)
     late_grace_period_minutes = Column(Integer, nullable=False, default=0)
 

@@ -14,6 +14,7 @@ import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import FormInput from '../ui/FormInput.vue'
 import FormTextarea from '../ui/FormTextarea.vue'
 import FormSelect from '../ui/FormSelect.vue'
+import EntitySearchSelect from '../ui/EntitySearchSelect.vue'
 import { Button } from '@/components/ui/button'
 import {
   Pencil,
@@ -28,6 +29,7 @@ import {
   MapPin,
 } from 'lucide-vue-next'
 import { listShiftSchedules, createShiftSchedule, updateShiftSchedule, deleteShiftSchedule } from '../../services/shift-schedule.service'
+import { listShiftScheduleAssignments, createShiftScheduleAssignment, deleteShiftScheduleAssignment } from '../../services/shift-schedule.service'
 import type { ShiftSchedule } from '../../services/shift-schedule.service'
 import { listShiftTypes } from '../../services/shift-type.service'
 import { listShiftLocations } from '../../services/shift-location.service'
@@ -36,15 +38,17 @@ import { listEmployees } from '../../services/employee.service'
 interface ShiftType { id: string; name: string }
 interface ShiftLocation { id: string; name: string }
 interface Employee { id: string; first_name: string; last_name: string; employee_code: string }
+interface ShiftScheduleForm extends Partial<ShiftSchedule> { employee_ids: string[] }
 
 const rows = ref<ShiftSchedule[]>([])
 const loading = ref(false)
 const dialogOpen = ref(false)
-const form = ref<Partial<ShiftSchedule>>({
+const form = ref<ShiftScheduleForm>({
   allowed_clock_in_location_ids: [],
   allowed_clock_out_location_ids: [],
   auto_clock_out_enabled: true,
   tasks_mandatory: false,
+  employee_ids: [],
 })
 const selected = ref<ShiftSchedule | null>(null)
 const deleteTarget = ref<ShiftSchedule | null>(null)
@@ -58,8 +62,12 @@ const employees = ref<Employee[]>([])
 
 const shiftTypeOptions = computed(() => [
   { value: '', label: 'Select shift type' },
-  ...shiftTypes.value.map(type => ({ value: type.id, label: type.name }))
+  ...shiftTypes.value.map(type => ({ value: String(type.id), label: type.name }))
 ])
+
+const locationOptions = computed(() => 
+  shiftLocations.value.map(loc => ({ value: String(loc.id), label: loc.name }))
+)
 
 const columns = [
   { key: 'name',           label: 'Schedule Name' },
@@ -80,7 +88,7 @@ async function load() {
     rows.value = schedules
     shiftTypes.value = types
     shiftLocations.value = locations
-    employees.value = emps
+    employees.value = emps.data ?? []
   } catch (e) {
     console.error('Failed to load data:', e)
   } finally {
@@ -97,6 +105,7 @@ function openCreate() {
     allowed_clock_out_location_ids: [],
     auto_clock_out_enabled: true,
     tasks_mandatory: false,
+    employee_ids: [],
   }
   errorMsg.value = ''
   dialogOpen.value = true
@@ -104,9 +113,37 @@ function openCreate() {
 
 function openEdit(row: ShiftSchedule) {
   selected.value = row
-  form.value = { ...row }
+  form.value = { ...row, employee_ids: [] }
   errorMsg.value = ''
   dialogOpen.value = true
+  void loadAssignmentsForSchedule(row.id)
+}
+
+async function loadAssignmentsForSchedule(scheduleId: string) {
+  try {
+    const assignments = await listShiftScheduleAssignments(scheduleId)
+    form.value.employee_ids = assignments.map(item => item.employee_id)
+  } catch (e) {
+    console.error('Failed to load schedule assignments:', e)
+  }
+}
+
+async function syncAssignments(scheduleId: string) {
+  const employeeIds = Array.from(new Set(form.value.employee_ids ?? [])).filter(Boolean)
+  const existing = await listShiftScheduleAssignments(scheduleId)
+  await Promise.all(existing.map(item => deleteShiftScheduleAssignment(item.id)))
+
+  const effectiveFrom = form.value.effective_from || new Date().toISOString().slice(0, 10)
+  await Promise.all(
+    employeeIds.map((employeeId) =>
+      createShiftScheduleAssignment({
+        schedule_id: scheduleId,
+        employee_id: employeeId,
+        effective_from: effectiveFrom,
+        effective_to: form.value.effective_to || undefined,
+      }),
+    ),
+  )
 }
 
 async function save() {
@@ -114,9 +151,13 @@ async function save() {
   errorMsg.value = ''
   try {
     if (selected.value) {
-      await updateShiftSchedule(selected.value.id, form.value)
+      const { employee_ids, ...schedulePayload } = form.value
+      await updateShiftSchedule(selected.value.id, schedulePayload)
+      await syncAssignments(selected.value.id)
     } else {
-      await createShiftSchedule(form.value)
+      const { employee_ids, ...schedulePayload } = form.value
+      const created = await createShiftSchedule(schedulePayload)
+      await syncAssignments(created.id)
     }
     dialogOpen.value = false
     load()
@@ -147,6 +188,13 @@ function getShiftTypeName(id: string) {
 
 function getLocationNames(ids: string[]) {
   return ids.map(id => shiftLocations.value.find(l => l.id === id)?.name || 'Unknown').join(', ') || '—'
+}
+
+function getEmployeeName(employeeId: string) {
+  const employee = employees.value.find(item => item.id === employeeId)
+  if (!employee) return employeeId
+  const fullName = `${employee.first_name ?? ''} ${employee.last_name ?? ''}`.trim()
+  return fullName || employee.employee_code || employeeId
 }
 </script>
 
@@ -249,14 +297,14 @@ function getLocationNames(ids: string[]) {
               <MapPin class="w-4 h-4 text-slate-400" />
               <span class="text-[10px] font-black uppercase tracking-widest text-slate-700">Allowed Clock-In Locations</span>
             </div>
-            <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-              <div class="grid grid-cols-2 gap-2">
-                <label v-for="location in shiftLocations" :key="location.id" class="flex items-center gap-2">
-                  <input type="checkbox" :value="location.id" v-model="form.allowed_clock_in_location_ids" class="rounded border-slate-300" />
-                  <span class="text-sm">{{ location.name }}</span>
-                </label>
-              </div>
-            </div>
+            <EntitySearchSelect
+              v-model="form.allowed_clock_in_location_ids"
+              label=""
+              entity="local"
+              :local-options="locationOptions"
+              :multiple="true"
+              placeholder="Search and select locations..."
+            />
           </div>
 
           <div class="space-y-3">
@@ -264,14 +312,14 @@ function getLocationNames(ids: string[]) {
               <MapPin class="w-4 h-4 text-slate-400" />
               <span class="text-[10px] font-black uppercase tracking-widest text-slate-700">Allowed Clock-Out Locations</span>
             </div>
-            <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-              <div class="grid grid-cols-2 gap-2">
-                <label v-for="location in shiftLocations" :key="location.id" class="flex items-center gap-2">
-                  <input type="checkbox" :value="location.id" v-model="form.allowed_clock_out_location_ids" class="rounded border-slate-300" />
-                  <span class="text-sm">{{ location.name }}</span>
-                </label>
-              </div>
-            </div>
+            <EntitySearchSelect
+              v-model="form.allowed_clock_out_location_ids"
+              label=""
+              entity="local"
+              :local-options="locationOptions"
+              :multiple="true"
+              placeholder="Search and select locations..."
+            />
           </div>
 
           <div class="space-y-3">
@@ -290,6 +338,20 @@ function getLocationNames(ids: string[]) {
                 <label class="text-sm font-medium">Tasks Mandatory</label>
               </div>
             </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center gap-2">
+              <Users class="w-4 h-4 text-slate-400" />
+              <span class="text-[10px] font-black uppercase tracking-widest text-slate-700">Assigned Employees</span>
+            </div>
+            <EntitySearchSelect
+              v-model="form.employee_ids"
+              label=""
+              entity="employee"
+              :multiple="true"
+              placeholder="Search and select employees..."
+            />
           </div>
 
           <div class="space-y-3">

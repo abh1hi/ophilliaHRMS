@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { Search, X, ChevronDown } from 'lucide-vue-next'
 import { listEmployees } from '@/services/employee.service'
 
-type Entity = 'employee'
+type Entity = 'employee' | 'local'
+
+interface Option {
+  value: string
+  label: string
+  sub?: string
+}
 
 const props = withDefaults(defineProps<{
   modelValue: string | string[]
@@ -12,60 +18,68 @@ const props = withDefaults(defineProps<{
   multiple?: boolean
   placeholder?: string
   required?: boolean
+  localOptions?: Option[]
 }>(), {
   entity: 'employee',
   multiple: false,
   placeholder: 'Search...',
+  localOptions: () => [],
 })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: string | string[]): void
 }>()
 
-interface Option {
-  value: string
-  label: string
-  sub?: string
-}
-
 const query = ref('')
-const options = ref<Option[]>([])
+const apiOptions = ref<Option[]>([])
 const loading = ref(false)
 const open = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
 const activeIdx = ref(-1)
 
-// For multiple mode: array of selected items with label cached
 const selectedItems = ref<Option[]>([])
+
+const options = computed(() => {
+  if (props.entity === 'local') {
+    const q = query.value.toLowerCase()
+    return props.localOptions.filter(o => 
+      o.label.toLowerCase().includes(q) || (o.sub && o.sub.toLowerCase().includes(q))
+    )
+  }
+  return apiOptions.value
+})
 
 let debounceTimer: ReturnType<typeof setTimeout>
 
 async function search(q: string) {
+  if (props.entity === 'local') return
+  
   loading.value = true
   try {
     if (props.entity === 'employee') {
       const res = await listEmployees({ search: q || undefined, page: 1, page_size: 10 })
-      options.value = res.data.map(e => ({
-        value: e.id,
+      apiOptions.value = res.data.map(e => ({
+        value: String(e.id),
         label: `${e.first_name} ${e.last_name}`,
         sub: `${e.employee_code || ''} • ${e.department || ''}`.replace(/^•\s*|•\s*$/, '').trim(),
       }))
     }
   } catch {
-    options.value = []
+    apiOptions.value = []
   } finally {
     loading.value = false
   }
 }
 
 watch(query, (q) => {
+  if (props.entity === 'local') return
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => search(q), 300)
 })
 
 function onFocus() {
   open.value = true
-  if (!options.value.length) search('')
+  if (props.entity !== 'local' && !apiOptions.value.length) search('')
 }
 
 function select(opt: Option) {
@@ -113,19 +127,45 @@ function onClickOutside(e: MouseEvent) {
 onMounted(() => document.addEventListener('mousedown', onClickOutside))
 onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 
-// Sync single-value display label on mount/change
 watch(() => props.modelValue, async (val) => {
-  if (!props.multiple && typeof val === 'string' && val && !query.value) {
-    const res = await listEmployees({ search: val, page: 1, page_size: 1 })
-    const match = res.data.find(e => e.id === val)
-    if (match) query.value = `${match.first_name} ${match.last_name}`
+  if (props.multiple) {
+    const vals = Array.isArray(val) ? val : []
+    
+    if (props.entity === 'local') {
+      selectedItems.value = props.localOptions.filter(o => vals.includes(o.value))
+    } else if (props.entity === 'employee') {
+      const missing = vals.filter(v => !selectedItems.value.find(i => i.value === v))
+      if (missing.length) {
+        try {
+          const res = await listEmployees({ page: 1, page_size: 100 }) // Batch fetch for simplicity in init
+          const matches = res.data.filter(e => missing.includes(String(e.id)))
+          selectedItems.value = [
+            ...selectedItems.value,
+            ...matches.map(e => ({ value: String(e.id), label: `${e.first_name} ${e.last_name}` }))
+          ]
+        } catch {}
+      } else {
+        selectedItems.value = selectedItems.value.filter(i => vals.includes(i.value))
+      }
+    }
+  } else if (typeof val === 'string' && val && !query.value) {
+    if (props.entity === 'local') {
+      const match = props.localOptions.find(o => o.value === val)
+      if (match) query.value = match.label
+    } else if (props.entity === 'employee') {
+      const res = await listEmployees({ search: val, page: 1, page_size: 1 })
+      const match = res.data.find(e => String(e.id) === val)
+      if (match) query.value = `${match.first_name} ${match.last_name}`
+    }
+  } else if (!val) {
+    query.value = ''
   }
 }, { immediate: true })
 </script>
 
 <template>
   <div class="space-y-2" ref="containerRef">
-    <label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+    <label v-if="label" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
       {{ label }}<span v-if="required" class="text-destructive ml-0.5">*</span>
     </label>
 

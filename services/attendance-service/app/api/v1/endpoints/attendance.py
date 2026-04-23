@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Optional
 from uuid import UUID
 from datetime import date
@@ -68,6 +69,11 @@ from app.utils.pagination import PaginationParams
 from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
+logger = logging.getLogger(__name__)
+
+
+def _warn_legacy(endpoint: str, user_id: str) -> None:
+    logger.warning("Legacy attendance endpoint called: %s by user=%s", endpoint, user_id)
 
 
 # ── Dependency helpers ───────────────────────────────────────────────────────
@@ -588,6 +594,7 @@ async def create_policy_template(
     service: PolicyTemplateService = Depends(_get_policy_template_service),
 ):
     """Create a reusable policy template. HR/Admin only."""
+    _warn_legacy("/attendance/policy-templates", current_user.sub)
     return await service.create_template(data, changed_by=UUID(current_user.sub))
 
 
@@ -602,6 +609,7 @@ async def list_policy_templates(
     service: PolicyTemplateService = Depends(_get_policy_template_service),
 ):
     """List all active policy templates."""
+    _warn_legacy("/attendance/policy-templates", current_user.sub)
     templates, total = await service.list_templates(
         skip=skip, limit=limit, include_inactive=include_inactive
     )
@@ -618,6 +626,7 @@ async def update_policy_template(
     service: PolicyTemplateService = Depends(_get_policy_template_service),
 ):
     """Update a policy template. HR/Admin only."""
+    _warn_legacy("/attendance/policy-templates/{template_id}", current_user.sub)
     return await service.update_template(template_id, data)
 
 
@@ -630,6 +639,7 @@ async def delete_policy_template(
     service: PolicyTemplateService = Depends(_get_policy_template_service),
 ):
     """Soft-delete a policy template (sets is_active=False). HR/Admin only."""
+    _warn_legacy("/attendance/policy-templates/{template_id}", current_user.sub)
     return await service.delete_template(template_id)
 
 
@@ -663,6 +673,7 @@ async def create_policy_exception(
     service: PolicyExceptionService = Depends(_get_policy_exception_service),
 ):
     """Create a temporary policy override for an employee (e.g. medical, WFH). HR/Admin only."""
+    _warn_legacy("/attendance/policy-exceptions", current_user.sub)
     return await service.create_exception(data, approved_by=UUID(current_user.sub))
 
 
@@ -678,6 +689,7 @@ async def list_policy_exceptions(
     service: PolicyExceptionService = Depends(_get_policy_exception_service),
 ):
     """List all policy exceptions. HR/Admin only."""
+    _warn_legacy("/attendance/policy-exceptions", current_user.sub)
     items, total = await service.list_exceptions(
         skip=skip, limit=limit, employee_id=employee_id, include_inactive=include_inactive
     )
@@ -693,6 +705,7 @@ async def get_policy_exception(
     service: PolicyExceptionService = Depends(_get_policy_exception_service),
 ):
     """Get a specific policy exception by ID. HR/Admin only."""
+    _warn_legacy("/attendance/policy-exceptions/{exception_id}", current_user.sub)
     return await service.get_exception(exception_id)
 
 
@@ -706,6 +719,7 @@ async def update_policy_exception(
     service: PolicyExceptionService = Depends(_get_policy_exception_service),
 ):
     """Update a policy exception (e.g. extend to_date). HR/Admin only."""
+    _warn_legacy("/attendance/policy-exceptions/{exception_id}", current_user.sub)
     return await service.update_exception(exception_id, data)
 
 
@@ -718,6 +732,7 @@ async def delete_policy_exception(
     service: PolicyExceptionService = Depends(_get_policy_exception_service),
 ):
     """Hard-delete a policy exception. HR/Admin only."""
+    _warn_legacy("/attendance/policy-exceptions/{exception_id}", current_user.sub)
     await service.delete_exception(exception_id)
 
 
@@ -839,6 +854,7 @@ async def export_attendance_csv(
     service: AttendanceService = Depends(_get_service),
 ):
     """Export attendance data as CSV. HR/Admin only."""
+    _warn_legacy("/attendance/export/csv", current_user.sub)
     import csv
     import io
     from starlette.responses import StreamingResponse
@@ -939,6 +955,7 @@ async def get_attendance_record(
     service: AttendanceService = Depends(_get_service),
 ):
     """Get a specific attendance record by ID."""
+    _warn_legacy("/attendance/{record_id}", current_user.sub)
     return await service.get_record(record_id)
 
 
@@ -952,4 +969,5 @@ async def update_attendance_record(
     service: AttendanceService = Depends(_get_service),
 ):
     """Manually correct an attendance record. HR/Super Admin only."""
+    _warn_legacy("/attendance/{record_id}", current_user.sub)
     return await service.update_record(record_id, data)

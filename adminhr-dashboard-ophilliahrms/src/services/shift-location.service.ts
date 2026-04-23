@@ -19,18 +19,18 @@ export async function listShiftLocations(): Promise<ShiftLocation[]> {
 }
 
 export async function createShiftLocation(payload: Partial<ShiftLocation>): Promise<ShiftLocation> {
-  const { name, latitude, longitude, radius_meters } = payload
+  const { name, latitude, longitude, radius_meters, address, is_active } = payload
   return apiFetchAuth<ShiftLocation>('/attendance/geofences', {
     method: 'POST',
-    body: JSON.stringify({ name, latitude, longitude, radius_meters }),
+    body: JSON.stringify({ name, latitude, longitude, radius_meters, address, is_active }),
   })
 }
 
 export async function updateShiftLocation(id: string, payload: Partial<ShiftLocation>): Promise<ShiftLocation> {
-  const { name, latitude, longitude, radius_meters } = payload
+  const { name, latitude, longitude, radius_meters, address, is_active } = payload
   return apiFetchAuth<ShiftLocation>(`/attendance/geofences/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ name, latitude, longitude, radius_meters }),
+    body: JSON.stringify({ name, latitude, longitude, radius_meters, address, is_active }),
   })
 }
 

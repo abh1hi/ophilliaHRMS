@@ -140,6 +140,18 @@ async function confirmDelete() {
         @update:lng="() => {}"
         @update:radius="() => {}"
       />
+      <div v-if="rows.length" class="p-4 border-t border-slate-100 bg-slate-50/50">
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2">Configured Locations</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div v-for="location in rows" :key="location.id" class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-800 truncate">{{ location.name }}</p>
+              <span class="text-[10px] font-bold text-slate-500">{{ location.radius_meters }}m</span>
+            </div>
+            <p class="text-xs text-slate-500 truncate">{{ location.address || 'No address added' }}</p>
+          </div>
+        </div>
+      </div>
       <div v-else class="flex flex-col items-center justify-center py-16 text-slate-400">
         <MapPin class="w-10 h-10 mb-3 text-slate-200" />
         <p class="text-sm font-medium">No locations to display. Add your first location.</p>

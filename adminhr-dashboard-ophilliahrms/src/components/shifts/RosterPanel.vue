@@ -2,8 +2,10 @@
 import { ref, computed, watch } from 'vue'
 import { getRoster } from '../../services/roster.service'
 import { listShiftTypes } from '../../services/shift-type.service'
+import { listEmployees } from '../../services/employee.service'
 import type { RosterEntry } from '../../services/roster.service'
 import type { ShiftType } from '../../services/shift-type.service'
+import type { Employee } from '../../services/employee.types'
 import PageHeader from '../ui/PageHeader.vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -39,9 +41,11 @@ const toDate = ref(week.to)
 const loading = ref(false)
 const entries = ref<RosterEntry[]>([])
 const shiftTypes = ref<ShiftType[]>([])
+const employees = ref<Employee[]>([])
 const errorMsg = ref('')
 
 const shiftTypeMap = computed(() => Object.fromEntries(shiftTypes.value.map(t => [t.id, t])))
+const employeeMap = computed(() => Object.fromEntries(employees.value.map(e => [e.id, e])))
 
 const dateRange = computed(() => {
   const dates: string[] = []
@@ -68,14 +72,23 @@ async function loadRoster() {
   if (!fromDate.value || !toDate.value) return
   loading.value = true; errorMsg.value = ''
   try {
-    const [rosterData, shiftTypesData] = await Promise.all([
+    const [rosterData, shiftTypesData, employeesData] = await Promise.all([
       getRoster(fromDate.value, toDate.value),
       listShiftTypes(),
+      listEmployees({ page: 1, page_size: 500 }),
     ])
     entries.value = rosterData
     shiftTypes.value = shiftTypesData
+    employees.value = employeesData.data ?? []
   } catch (e: any) { errorMsg.value = e.message }
   finally { loading.value = false }
+}
+
+function employeeDisplay(employeeId: string) {
+  const employee = employeeMap.value[employeeId]
+  if (!employee) return employeeId.slice(0, 8)
+  const fullName = `${employee.first_name ?? ''} ${employee.last_name ?? ''}`.trim()
+  return fullName || employee.employee_code || employeeId.slice(0, 8)
 }
 
 watch([fromDate, toDate], loadRoster, { immediate: true })
@@ -182,11 +195,11 @@ function shiftWeek(days: number) {
               <TableCell class="border-r py-4">
                 <div class="flex items-center gap-3">
                    <div class="h-8 w-8 rounded bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0 shadow-sm">
-                      {{ empId.slice(0, 2).toUpperCase() }}
+                      {{ employeeDisplay(empId).slice(0, 2).toUpperCase() }}
                    </div>
                    <div class="flex flex-col">
-                      <span class="text-sm font-semibold text-foreground">{{ empId.slice(0, 8) }}…</span>
-                      <span class="text-[10px] text-muted-foreground">Active Employee</span>
+                      <span class="text-sm font-semibold text-foreground">{{ employeeDisplay(empId) }}</span>
+                      <span class="text-[10px] text-muted-foreground">{{ empId.slice(0, 8) }}…</span>
                    </div>
                 </div>
               </TableCell>

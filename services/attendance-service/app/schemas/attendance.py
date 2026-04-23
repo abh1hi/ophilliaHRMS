@@ -301,6 +301,7 @@ class GeofenceCreate(BaseModel):
     latitude: float
     longitude: float
     radius_meters: int = 200
+    is_active: bool = True
 
     @field_validator("name")
     @classmethod
@@ -322,6 +323,7 @@ class GeofenceUpdate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     radius_meters: Optional[int] = None
+    is_active: Optional[bool] = None
 
     @field_validator("name")
     @classmethod

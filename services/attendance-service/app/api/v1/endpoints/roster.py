@@ -5,12 +5,14 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.dependencies import get_current_user, TokenPayload, get_db_with_tenant
+from app.api.v1.dependencies import require_role, TokenPayload, get_db_with_tenant
+from app.core.constants import UserRole
 from app.core.responses import ok
 from app.repositories.shift_schedule_assignment_repository import ShiftScheduleAssignmentRepository
 from app.schemas.shift_schedule_assignment import ShiftScheduleAssignmentResponse
 
 router = APIRouter(prefix="/roster", tags=["roster"])
+_HR_ROLES = require_role(UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 
 
 @router.get("")
@@ -18,7 +20,7 @@ async def get_roster(
     from_date: date = Query(...),
     to_date: date = Query(...),
     employee_id: Optional[UUID] = Query(None),
-    _: TokenPayload = Depends(get_current_user),
+    _: TokenPayload = Depends(_HR_ROLES),
     db: AsyncSession = Depends(get_db_with_tenant),
 ):
     repo = ShiftScheduleAssignmentRepository(db)

@@ -17,9 +17,19 @@ export interface ShiftSchedule {
   tasks_mandatory: boolean
   effective_from?: string
   effective_to?: string
-  is_active: number
+  is_active: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface ShiftScheduleAssignment {
+  id: string
+  schedule_id: string
+  employee_id: string
+  effective_from: string
+  effective_to?: string | null
+  notes?: string | null
+  is_active: number
 }
 
 export async function listShiftSchedules(): Promise<ShiftSchedule[]> {
@@ -42,4 +52,28 @@ export async function updateShiftSchedule(id: string, payload: Partial<ShiftSche
 
 export async function deleteShiftSchedule(id: string): Promise<void> {
   await apiFetchData<void>(`/shift-schedules/${id}`, { method: 'DELETE' })
+}
+
+export async function listShiftScheduleAssignments(scheduleId?: string): Promise<ShiftScheduleAssignment[]> {
+  const params = new URLSearchParams()
+  if (scheduleId) params.set('schedule_id', scheduleId)
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return apiFetchData<ShiftScheduleAssignment[]>(`/shift-schedule-assignments${suffix}`)
+}
+
+export async function createShiftScheduleAssignment(payload: {
+  schedule_id: string
+  employee_id: string
+  effective_from: string
+  effective_to?: string
+  notes?: string
+}): Promise<ShiftScheduleAssignment> {
+  return apiFetchData<ShiftScheduleAssignment>('/shift-schedule-assignments', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteShiftScheduleAssignment(id: string): Promise<void> {
+  await apiFetchData<void>(`/shift-schedule-assignments/${id}`, { method: 'DELETE' })
 }

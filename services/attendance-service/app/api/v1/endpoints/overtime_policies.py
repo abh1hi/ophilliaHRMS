@@ -40,7 +40,7 @@ async def create_overtime_policy(
     current_user: TokenPayload = Depends(_HR_ROLES),
     svc: OvertimeService = Depends(_svc),
 ):
-    policy = await svc.create_policy(data.model_dump(), changed_by=UUID(current_user.user_id))
+    policy = await svc.create_policy(data.model_dump(), changed_by=UUID(current_user.sub))
     return ok(OvertimePolicyResponse.model_validate(policy).model_dump(mode="json"))
 
 
@@ -51,7 +51,7 @@ async def create_from_template(
     svc: OvertimeService = Depends(_svc),
 ):
     policy = await svc.create_from_template(
-        data.template_key, changed_by=UUID(current_user.user_id)
+        data.template_key, changed_by=UUID(current_user.sub)
     )
     return ok(OvertimePolicyResponse.model_validate(policy).model_dump(mode="json"))
 
@@ -66,7 +66,7 @@ async def update_overtime_policy(
     policy = await svc.update_policy(
         policy_id,
         data.model_dump(exclude_none=True),
-        changed_by=UUID(current_user.user_id),
+        changed_by=UUID(current_user.sub),
     )
     return ok(OvertimePolicyResponse.model_validate(policy).model_dump(mode="json"))
 
@@ -77,7 +77,7 @@ async def delete_overtime_policy(
     current_user: TokenPayload = Depends(_HR_ROLES),
     svc: OvertimeService = Depends(_svc),
 ):
-    await svc.delete_policy(policy_id, changed_by=UUID(current_user.user_id))
+    await svc.delete_policy(policy_id, changed_by=UUID(current_user.sub))
 
 
 @router.get("/{policy_id}/audit")

@@ -26,7 +26,7 @@ async def get_my_consent(
     current_user: TokenPayload = Depends(get_current_user),
     svc: GeofenceConsentService = Depends(_svc),
 ):
-    status_dict = await svc.get_consent_status(UUID(current_user.user_id))
+    status_dict = await svc.get_consent_status(UUID(current_user.sub))
     return ok(GeofenceConsentStatusResponse(**status_dict).model_dump(mode="json"))
 
 
@@ -39,7 +39,7 @@ async def give_consent(
     ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     record = await svc.give_consent(
-        UUID(current_user.user_id), ip_address=ip, user_agent=user_agent
+        UUID(current_user.sub), ip_address=ip, user_agent=user_agent
     )
     return ok(GeofenceConsentResponse.model_validate(record).model_dump(mode="json"))
 
@@ -49,7 +49,7 @@ async def withdraw_consent(
     current_user: TokenPayload = Depends(get_current_user),
     svc: GeofenceConsentService = Depends(_svc),
 ):
-    record = await svc.withdraw_consent(UUID(current_user.user_id))
+    record = await svc.withdraw_consent(UUID(current_user.sub))
     return ok(GeofenceConsentResponse.model_validate(record).model_dump(mode="json"))
 
 
