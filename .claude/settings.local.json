@@ -28,7 +28,9 @@
       "Read(//c/Users/abhin/Desktop/ophilliaHRMS/services/payroll-service/app/repositories/**)",
       "Bash(xargs ls *)",
       "Bash(sed \"s/.*op\\\\.create_table\\(\\\\\"//\")",
-      "Bash(sed 's/\".*//')"
+      "Bash(sed 's/\".*//')",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/frontend-tailless-ophillia-hrms-vue/src/**)",
+      "Read(//c/Users/abhin/Desktop/ophilliaHRMS/frontend-tailless-ophillia-hrms-vue/src/store/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\abhin\\Desktop\\ophilliaHRMS\\sdlc-audit",

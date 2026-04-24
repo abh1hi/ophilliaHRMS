@@ -15,6 +15,13 @@ export interface ShiftSchedule {
   auto_clock_out_enabled: boolean
   auto_clock_out_time: string | null
   tasks_mandatory: boolean
+  off_days?: string[]
+  break_window_start?: string | null
+  break_window_end?: string | null
+  validity_start?: string | null
+  validity_end?: string | null
+  validity_auto_extended?: boolean
+  assigned_employee_ids?: string[]
   effective_from?: string
   effective_to?: string
   is_active: boolean

@@ -221,6 +221,11 @@ class TodayScheduleResponse(BaseModel):
     can_clock_out_now: bool
     clock_in_status_reason: Optional[str] = None
     clock_out_status_reason: Optional[str] = None
+    clock_in_status: Optional[str] = None    # ClockInStatus value for UI state machine
+    is_off_day: bool = False                 # True if today is a scheduled off day
+    shift_start_time: Optional[time] = None  # Shift type start time
+    shift_end_time: Optional[time] = None    # Shift type end time
+    grace_period_minutes: int = 0
 
 
 # ──────────── PAGINATED LIST ────────────

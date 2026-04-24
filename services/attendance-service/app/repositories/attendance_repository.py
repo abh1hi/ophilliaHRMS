@@ -255,6 +255,21 @@ class AttendanceRepository:
         )
         return result.scalar() or 0
 
+    async def get_pending_tasks_record(
+        self, employee_id: UUID, record_date: date
+    ) -> Optional[AttendanceRecord]:
+        """Return an auto-closed record with tasks_pending_from_auto_close=True for the given date."""
+        result = await self.db.execute(
+            self._scoped(select(AttendanceRecord)).where(
+                and_(
+                    AttendanceRecord.employee_id == employee_id,
+                    AttendanceRecord.date == record_date,
+                    AttendanceRecord.tasks_pending_from_auto_close == True,  # noqa: E712
+                )
+            ).limit(1)
+        )
+        return result.scalar_one_or_none()
+
     # ──────────── ALERTS / KPI ────────────
 
     async def get_missed_punchout_today(self) -> List[AttendanceRecord]:

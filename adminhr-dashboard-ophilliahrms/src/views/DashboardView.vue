@@ -27,6 +27,7 @@ import ShiftLocationPanel from '../components/shifts/ShiftLocationPanel.vue'
 import ShiftRequestPanel from '../components/shifts/ShiftRequestPanel.vue'
 import ShiftSchedulePanel from '../components/shifts/ShiftSchedulePanel.vue'
 import RosterPanel from '../components/shifts/RosterPanel.vue'
+import VisualShiftScheduler from '../components/shifts/VisualShiftScheduler.vue'
 import AttendanceOverviewPanel from '../components/attendance/AttendanceOverviewPanel.vue'
 import AttendanceRecordsPanel from '../components/attendance/AttendanceRecordsPanel.vue'
 import AttendanceCheckinPanel from '../components/attendance/AttendanceCheckinPanel.vue'
@@ -119,6 +120,7 @@ const headerTitles: Record<string, { title: string; subtitle: string }> = {
   'shift-requests':           { title: 'Shift Requests',        subtitle: 'Review employee shift change requests'                   },
   'shift-schedules':          { title: 'Shift Schedules',       subtitle: 'View and manage shift schedules'                         },
   roster:                     { title: 'Roster',                subtitle: 'Visual shift roster management'                          },
+  'visual-shift-scheduler':   { title: 'Visual Shift Scheduler', subtitle: 'Roster & timeline view of all employee shifts'          },
   'workspace-hub':            { title: 'Workspace',             subtitle: 'Team collaboration hub'                                  },
   'workspace-calendar':       { title: 'Calendar',              subtitle: 'Team calendar and events'                                },
   'workspace-board':          { title: 'Task Board',            subtitle: 'Kanban-style task management'                            },
@@ -212,11 +214,12 @@ function handleLogout() {
           <EmployeeGroupPanel  v-else-if="currentTab === 'employee-groups'"  />
 
           <!-- Shifts -->
-          <ShiftTypePanel       v-else-if="currentTab === 'shift-types'"       />
-          <ShiftLocationPanel   v-else-if="currentTab === 'shift-locations'"   />
-          <ShiftRequestPanel    v-else-if="currentTab === 'shift-requests'"    />
-          <ShiftSchedulePanel   v-else-if="currentTab === 'shift-schedules'"   />
-          <RosterPanel          v-else-if="currentTab === 'roster'"            />
+          <ShiftTypePanel          v-else-if="currentTab === 'shift-types'"             />
+          <ShiftLocationPanel      v-else-if="currentTab === 'shift-locations'"         />
+          <ShiftRequestPanel       v-else-if="currentTab === 'shift-requests'"          />
+          <ShiftSchedulePanel      v-else-if="currentTab === 'shift-schedules'"         />
+          <RosterPanel             v-else-if="currentTab === 'roster'"                  />
+          <VisualShiftScheduler    v-else-if="currentTab === 'visual-shift-scheduler'"  />
 
           <!-- Overtime -->
           <OvertimePolicyPanel  v-else-if="currentTab === 'ot-policies'"  />

@@ -15,6 +15,18 @@ export interface AttendanceRecord {
   method: string
   notes?: string
   shift_number: number
+  // new fields
+  effective_clock_in_at?: string
+  break_minutes_total?: number
+  early_out_hours_override?: number | null
+  early_out_reviewed_by?: string | null
+  early_out_reviewed_at?: string | null
+  is_off_day_work?: boolean
+  off_day_work_type?: string | null
+  off_day_ot_rate?: number | null
+  tasks_pending_from_auto_close?: boolean
+  hr_approved_late_clockin_until?: string | null
+  late_clockin_mark_as?: string | null
   created_at: string
   updated_at: string
 }

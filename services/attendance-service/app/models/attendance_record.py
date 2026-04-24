@@ -40,6 +40,27 @@ class AttendanceRecord(Base):
     # Computed fields
     work_hours = Column(Float, nullable=True)
     overtime_hours = Column(Float, default=0.0)
+    break_minutes_total = Column(Float, nullable=False, default=0.0)
+
+    # For early_in: effective_clock_in_at = shift start time (hours count from here, not actual clock_in)
+    effective_clock_in_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Early-out review: HR sets actual payable hours after reviewing
+    early_out_hours_override = Column(Float, nullable=True)
+    early_out_reviewed_by = Column(UUID(as_uuid=True), nullable=True)
+    early_out_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Off-day work tracking
+    is_off_day_work = Column(Boolean, nullable=False, default=False)
+    off_day_work_type = Column(String(20), nullable=True)    # "normal" | "overtime"
+    off_day_ot_rate = Column(Float, nullable=True)
+
+    # Mandatory task pending from auto-close: blocks next-day clock-in
+    tasks_pending_from_auto_close = Column(Boolean, nullable=False, default=False)
+
+    # HR-approved late clock-in window (UTC expiry datetime)
+    hr_approved_late_clockin_until = Column(DateTime(timezone=True), nullable=True)
+    late_clockin_mark_as = Column(String(30), nullable=True)  # "normal_with_late_flag" | "half_day"
 
     # Day rating: 1-5 stars entered at punch-out
     day_rating = Column(Integer, nullable=True)

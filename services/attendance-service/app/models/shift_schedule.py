@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, Integer, Date, Index, Time, Boolean, JSON, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 import uuid
 from datetime import datetime, timezone
 
@@ -27,6 +27,22 @@ class ShiftSchedule(Base):
     tasks_mandatory = Column(Boolean, default=False, nullable=False)
     allowed_clock_in_location_ids = Column(JSON, nullable=False, default=list)
     allowed_clock_out_location_ids = Column(JSON, nullable=False, default=list)
+
+    # Off days: list of weekday names e.g. ["saturday", "sunday"]
+    off_days = Column(ARRAY(String), nullable=True, default=list)
+
+    # Break window: soft restriction (notification sent if outside)
+    break_window_start = Column(Time, nullable=True)
+    break_window_end = Column(Time, nullable=True)
+
+    # Validity period with auto-extension tracking
+    validity_start = Column(Date, nullable=True)
+    validity_end = Column(Date, nullable=True)
+    validity_auto_extended = Column(Boolean, nullable=False, default=False)
+
+    # Assigned employees snapshot (list of employee UUIDs as strings)
+    assigned_employee_ids = Column(JSON, nullable=False, default=list)
+
     effective_from = Column(Date, nullable=True)
     effective_to = Column(Date, nullable=True)
     is_active = Column(Integer, default=1, nullable=False)

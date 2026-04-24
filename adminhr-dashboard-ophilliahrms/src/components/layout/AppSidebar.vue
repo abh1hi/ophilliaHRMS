@@ -85,11 +85,12 @@ const hrSetupNav = [
 ]
 
 const shiftNav = [
-  { key: 'shift-types',       label: 'Shift Types',       icon: Clock          },
-  { key: 'shift-locations',   label: 'Shift Locations',   icon: MapPin         },
-  { key: 'shift-requests',    label: 'Shift Requests',    icon: ArrowLeftRight },
-  { key: 'shift-schedules',   label: 'Shift Schedules',   icon: LayoutGrid     },
-  { key: 'roster',            label: 'Roster',            icon: Calendar       },
+  { key: 'shift-types',             label: 'Shift Types',       icon: Clock          },
+  { key: 'shift-locations',         label: 'Shift Locations',   icon: MapPin         },
+  { key: 'shift-requests',          label: 'Shift Requests',    icon: ArrowLeftRight },
+  { key: 'shift-schedules',         label: 'Shift Schedules',   icon: LayoutGrid     },
+  { key: 'roster',                  label: 'Roster',            icon: Calendar       },
+  { key: 'visual-shift-scheduler',  label: 'Visual Scheduler',  icon: LayoutGrid     },
 ]
 
 const attendanceNav = [

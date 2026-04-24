@@ -2,13 +2,20 @@
 import { ref, onMounted } from 'vue'
 import PageHeader from '../ui/PageHeader.vue'
 import DataTable from '../ui/DataTable.vue'
-import SlideDrawer from '../ui/SlideDrawer.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import FormInput from '../ui/FormInput.vue'
 import FormTextarea from '../ui/FormTextarea.vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   Pencil,
   Trash2,
@@ -132,90 +139,98 @@ async function confirmDelete() {
       </template>
     </DataTable>
 
-    <SlideDrawer :open="drawerOpen" :title="selected ? 'Edit Shift Type' : 'New Shift Type'" width="w-full max-w-lg" @close="drawerOpen = false">
-      <div class="space-y-8 py-4">
-        <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50 mb-2">
-          <Info class="w-4 h-4 text-indigo-500 mt-0.5" />
-          <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
-            Define the timing for this shift. Work hours per day are used to calculate overtime thresholds automatically.
-          </p>
-        </div>
+    <Dialog :open="drawerOpen" @update:open="drawerOpen = $event">
+      <DialogContent class="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{{ selected ? 'Edit Shift Type' : 'New Shift Type' }}</DialogTitle>
+          <DialogDescription>
+            Define shift timing, duration, and settings for this shift type.
+          </DialogDescription>
+        </DialogHeader>
 
-        <FormInput label="Shift Name" v-model="form.name" required placeholder="e.g. Morning, Night, Afternoon" />
+        <div class="space-y-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div class="bg-indigo-50/30 p-4 rounded-2xl flex items-start gap-3 border border-indigo-100/50">
+            <Info class="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
+            <p class="text-[11px] text-indigo-700 font-medium leading-relaxed">
+              Define the timing for this shift. Work hours per day are used to calculate overtime thresholds automatically.
+            </p>
+          </div>
 
-        <div class="grid grid-cols-2 gap-6 p-6 bg-slate-50/50 rounded-3xl border border-white/10">
-          <FormInput label="Start Time" type="time" v-model="form.start_time" required />
-          <FormInput label="End Time" type="time" v-model="form.end_time" required />
-        </div>
+          <FormInput label="Shift Name" v-model="form.name" required placeholder="e.g. Morning, Night, Afternoon" />
 
-        <div class="grid grid-cols-2 gap-6">
-          <FormInput label="Work Hours / Day" type="number" v-model.number="form.work_hours_per_day" placeholder="8" />
-          <FormInput label="Break Duration (min)" type="number" v-model.number="form.break_minutes" />
-        </div>
+          <div class="grid grid-cols-2 gap-4">
+            <FormInput label="Start Time" type="time" v-model="form.start_time" required />
+            <FormInput label="End Time" type="time" v-model="form.end_time" required />
+          </div>
 
-        <FormInput label="Grace Period (min)" type="number" v-model.number="form.grace_period_minutes" />
+          <div class="grid grid-cols-2 gap-4">
+            <FormInput label="Work Hours / Day" type="number" v-model.number="form.work_hours_per_day" placeholder="8" />
+            <FormInput label="Break Duration (min)" type="number" v-model.number="form.break_minutes" />
+          </div>
 
-        <div class="flex items-center justify-between p-6 rounded-3xl border border-dashed hover:border-slate-300 transition-colors">
-          <div class="flex items-center gap-4">
-            <div class="relative group">
-              <input
-                type="color"
-                :value="form.color_code || '#6366f1'"
-                @input="form.color_code = ($event.target as HTMLInputElement).value"
-                class="w-12 h-12 rounded-2xl border-2 border-white shadow-xl cursor-pointer"
-              />
-              <div class="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm">
-                <Palette class="w-2.5 h-2.5 text-slate-400" />
+          <FormInput label="Grace Period (min)" type="number" v-model.number="form.grace_period_minutes" />
+
+          <div class="flex items-center justify-between p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors">
+            <div class="flex items-center gap-4">
+              <div class="relative group">
+                <input
+                  type="color"
+                  :value="form.color_code || '#6366f1'"
+                  @input="form.color_code = ($event.target as HTMLInputElement).value"
+                  class="w-12 h-12 rounded-2xl border-2 border-white shadow-md cursor-pointer"
+                />
+                <div class="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm">
+                  <Palette class="w-2.5 h-2.5 text-slate-400" />
+                </div>
+              </div>
+              <div>
+                <Label class="text-xs font-bold uppercase tracking-widest text-slate-900">Colour Label</Label>
+                <p class="text-[10px] text-slate-500 mt-0.5">Shown in roster view</p>
               </div>
             </div>
-            <div>
-              <Label class="text-xs font-bold uppercase tracking-widest text-slate-900">Colour Label</Label>
-              <p class="text-[10px] text-muted-foreground mt-0.5">Shown in roster view</p>
+
+            <div class="flex items-center gap-3">
+              <Checkbox
+                id="night-shift-toggle"
+                :checked="!!form.is_night_shift"
+                @update:checked="form.is_night_shift = $event"
+              />
+              <Label for="night-shift-toggle" class="text-xs font-bold text-slate-700 cursor-pointer">Night Shift</Label>
             </div>
           </div>
 
-          <div class="flex items-center gap-3">
-            <Checkbox
-              id="night-shift-toggle"
-              :checked="!!form.is_night_shift"
-              @update:checked="form.is_night_shift = $event"
-            />
-            <Label for="night-shift-toggle" class="text-xs font-bold text-slate-700 cursor-pointer">Night Shift</Label>
+          <FormTextarea label="Description" v-model="form.description" placeholder="Optional notes about this shift" :rows="3" />
+
+          <div class="flex items-center justify-between p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors">
+            <div>
+              <Label class="text-xs font-bold uppercase tracking-widest text-slate-900">Active Status</Label>
+              <p class="text-[10px] text-slate-500 mt-0.5">Enable or disable this shift type</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <Checkbox
+                id="active-toggle"
+                :checked="form.is_active !== false"
+                @update:checked="form.is_active = $event"
+              />
+              <Label for="active-toggle" class="text-xs font-bold text-slate-700 cursor-pointer">Active</Label>
+            </div>
           </div>
         </div>
 
-        <FormTextarea label="Description" v-model="form.description" placeholder="Optional notes about this shift" />
-
-        <div class="flex items-center justify-between p-4 rounded-2xl border border-dashed hover:border-slate-300 transition-colors">
-          <div>
-            <Label class="text-xs font-bold uppercase tracking-widest text-slate-900">Active Status</Label>
-            <p class="text-[10px] text-muted-foreground mt-0.5">Enable or disable this shift type</p>
+        <DialogFooter>
+          <div class="flex items-center justify-between gap-4 w-full">
+            <p v-if="errorMsg" class="text-xs font-bold text-destructive">{{ errorMsg }}</p>
+            <div v-else />
+            <div class="flex gap-3">
+              <Button variant="outline" @click="drawerOpen = false" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[11px]">Cancel</Button>
+              <Button @click="save" :disabled="saving" class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-lg font-bold uppercase tracking-widest text-[11px]">
+                {{ saving ? 'Saving...' : 'Save' }}
+              </Button>
+            </div>
           </div>
-          <div class="flex items-center gap-3">
-            <Checkbox
-              id="active-toggle"
-              :checked="form.is_active !== false"
-              @update:checked="form.is_active = $event"
-            />
-            <Label for="active-toggle" class="text-xs font-bold text-slate-700 cursor-pointer">Active</Label>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex-1">
-            <p v-if="errorMsg" class="text-[10px] font-bold text-destructive uppercase tracking-tight animate-in fade-in">{{ errorMsg }}</p>
-          </div>
-          <div class="flex gap-3">
-            <Button variant="outline" @click="drawerOpen = false" class="rounded-full px-6 h-10 font-bold uppercase tracking-widest text-[11px]">Cancel</Button>
-            <Button @click="save" :disabled="saving" class="rounded-full px-10 h-10 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 font-bold uppercase tracking-widest text-[11px]">
-              {{ saving ? 'Saving...' : 'Save' }}
-            </Button>
-          </div>
-        </div>
-      </template>
-    </SlideDrawer>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <ConfirmDialog
       :open="!!deleteTarget"

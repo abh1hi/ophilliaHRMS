@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timezone, timedelta
 from typing import Optional
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,27 @@ from app.repositories.shift_schedule_repository import ShiftScheduleRepository
 from app.repositories.shift_type_repository import ShiftTypeRepository
 from app.schemas.attendance import TodayScheduleResponse, ScheduleLocationResponse
 
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def now_ist() -> datetime:
+    """Current time in IST (UTC+5:30). All shift window comparisons use this."""
+    return datetime.now(IST)
+
+
+def to_ist(dt: datetime) -> datetime:
+    return dt.astimezone(IST)
+
+
+class ClockInStatus:
+    """Possible clock-in statuses based on current time vs shift windows."""
+    BEFORE_WINDOW = "before_window"      # before clock_in_start_time
+    EARLY_IN = "early_in"                # in window, before shift start
+    PRESENT = "present"                  # in window, within grace period
+    LATE = "late"                        # in window, after grace period
+    WINDOW_CLOSED = "window_closed"      # after clock_in_end_time, no HR approval
+    HR_APPROVED = "hr_approved"          # after window, HR approval active
+
 
 @dataclass
 class ResolvedSchedule:
@@ -28,21 +50,38 @@ class ResolvedSchedule:
 
     @property
     def scheduled_clock_in_at(self) -> datetime:
-        return datetime.combine(self.target_date, self.shift_type.start_time, tzinfo=timezone.utc)
+        # Shift times are stored in IST; combine with target_date in IST then convert to UTC
+        dt_ist = datetime.combine(self.target_date, self.shift_type.start_time, tzinfo=IST)
+        return dt_ist.astimezone(timezone.utc)
 
     @property
     def scheduled_clock_out_at(self) -> datetime:
         end_date = self.target_date
         if self.shift_type.end_time <= self.shift_type.start_time:
             end_date = end_date + timedelta(days=1)
-        return datetime.combine(end_date, self.shift_type.end_time, tzinfo=timezone.utc)
+        dt_ist = datetime.combine(end_date, self.shift_type.end_time, tzinfo=IST)
+        return dt_ist.astimezone(timezone.utc)
 
     @property
     def auto_clock_out_at(self) -> datetime:
         auto_date = self.target_date
         if self.schedule.auto_clock_out_time <= self.schedule.clock_in_start_time:
             auto_date = auto_date + timedelta(days=1)
-        return datetime.combine(auto_date, self.schedule.auto_clock_out_time, tzinfo=timezone.utc)
+        dt_ist = datetime.combine(auto_date, self.schedule.auto_clock_out_time, tzinfo=IST)
+        return dt_ist.astimezone(timezone.utc)
+
+    def grace_end_time(self) -> time:
+        """Time (IST) at which late marking begins: shift_start + grace_period_minutes."""
+        shift_start_dt = datetime.combine(self.target_date, self.shift_type.start_time, tzinfo=IST)
+        grace_end_dt = shift_start_dt + timedelta(minutes=self.shift_type.grace_period_minutes)
+        return grace_end_dt.timetz()
+
+    def is_off_day(self, check_date: date) -> bool:
+        """Return True if check_date is an off day per the schedule's off_days list."""
+        if not self.schedule.off_days:
+            return False
+        weekday_name = check_date.strftime("%A").lower()
+        return weekday_name in [d.lower() for d in self.schedule.off_days]
 
 
 class ScheduleResolver:
@@ -157,48 +196,108 @@ class ScheduleResolver:
             return start <= now_time <= end
         return now_time >= start or now_time <= end
 
-    def require_clock_in_window(self, resolved: ResolvedSchedule, now: datetime) -> None:
-        now_time = now.time()
-        if not self.is_within_window(
-            now_time,
-            resolved.schedule.clock_in_start_time,
-            resolved.schedule.clock_in_end_time,
-        ):
+    def get_clock_in_status(
+        self,
+        resolved: ResolvedSchedule,
+        now: datetime,
+        hr_approved_until: Optional[datetime] = None,
+    ) -> str:
+        """Return one of ClockInStatus values based on current IST time vs schedule windows."""
+        now_ist_dt = to_ist(now)
+        now_time = now_ist_dt.time()
+        target_date = resolved.target_date
+
+        window_start = resolved.schedule.clock_in_start_time
+        window_end = resolved.schedule.clock_in_end_time
+        shift_start = resolved.shift_type.start_time
+        grace_end = resolved.grace_end_time()
+
+        in_window = self.is_within_window(now_time, window_start, window_end)
+
+        if not in_window:
+            # Check if we're before window start or after window end
+            if self.is_within_window(now_time, time(0, 0), window_start) and now_time < window_start:
+                return ClockInStatus.BEFORE_WINDOW
+            # After window: check HR approval
+            if hr_approved_until and now.astimezone(timezone.utc) <= hr_approved_until.astimezone(timezone.utc):
+                return ClockInStatus.HR_APPROVED
+            return ClockInStatus.WINDOW_CLOSED
+
+        # Inside window — determine specific status
+        if now_time < shift_start:
+            return ClockInStatus.EARLY_IN
+        if now_time <= grace_end.replace(tzinfo=None):
+            return ClockInStatus.PRESENT
+        return ClockInStatus.LATE
+
+    def require_clock_in_window(
+        self,
+        resolved: ResolvedSchedule,
+        now: datetime,
+        hr_approved_until: Optional[datetime] = None,
+    ) -> str:
+        """Validate clock-in is allowed; return clock-in status or raise 422.
+
+        Returns the ClockInStatus string so caller knows what status to record.
+        """
+        clock_in_status = self.get_clock_in_status(resolved, now, hr_approved_until)
+
+        if clock_in_status == ClockInStatus.BEFORE_WINDOW:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
-                    "Clock-in is not allowed right now. Allowed window is "
-                    f"{resolved.schedule.clock_in_start_time} to {resolved.schedule.clock_in_end_time}."
+                    f"Too early. Clock-in window opens at "
+                    f"{resolved.schedule.clock_in_start_time.strftime('%I:%M %p')} IST."
+                ),
+            )
+        if clock_in_status == ClockInStatus.WINDOW_CLOSED:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Clock-in window has closed. "
+                    "Please submit a late arrival request for HR approval."
                 ),
             )
 
+        return clock_in_status
+
+    def check_clock_out_early(self, resolved: ResolvedSchedule, now: datetime) -> bool:
+        """Return True if clock-out is before the clock-out window (early out)."""
+        now_time = to_ist(now).time()
+        return now_time < resolved.schedule.clock_out_start_time
+
     def require_clock_out_window(self, resolved: ResolvedSchedule, now: datetime) -> None:
-        now_time = now.time()
+        """For normal clock-out validation (not early-out path). Raises 422 if after window."""
+        now_time = to_ist(now).time()
         if not self.is_within_window(
             now_time,
             resolved.schedule.clock_out_start_time,
             resolved.schedule.clock_out_end_time,
         ):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Clock-out is not allowed right now. Allowed window is "
-                    f"{resolved.schedule.clock_out_start_time} to {resolved.schedule.clock_out_end_time}."
-                ),
-            )
+            # Allow early clock-out (handled separately); only block if after window
+            if now_time > resolved.schedule.clock_out_end_time:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Clock-out window has passed. Your attendance may have been auto-closed."
+                    ),
+                )
 
     def to_today_response(self, resolved: ResolvedSchedule, now: Optional[datetime] = None) -> TodayScheduleResponse:
         current = now or datetime.now(timezone.utc)
+        current_ist_time = to_ist(current).time()
         can_clock_in = self.is_within_window(
-            current.time(),
+            current_ist_time,
             resolved.schedule.clock_in_start_time,
             resolved.schedule.clock_in_end_time,
         )
         can_clock_out = self.is_within_window(
-            current.time(),
+            current_ist_time,
             resolved.schedule.clock_out_start_time,
             resolved.schedule.clock_out_end_time,
         )
+        ci_status = self.get_clock_in_status(resolved, current)
+        off_day = resolved.is_off_day(resolved.target_date)
         return TodayScheduleResponse(
             schedule_id=resolved.schedule.id,
             schedule_name=resolved.schedule.name,
@@ -217,4 +316,9 @@ class ScheduleResolver:
             can_clock_out_now=can_clock_out,
             clock_in_status_reason=None if can_clock_in else "Current time is outside the schedule clock-in window.",
             clock_out_status_reason=None if can_clock_out else "Current time is outside the schedule clock-out window.",
+            clock_in_status=ci_status,
+            is_off_day=off_day,
+            shift_start_time=resolved.shift_type.start_time,
+            shift_end_time=resolved.shift_type.end_time,
+            grace_period_minutes=resolved.shift_type.grace_period_minutes,
         )

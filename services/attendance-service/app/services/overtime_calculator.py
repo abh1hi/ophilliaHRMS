@@ -21,17 +21,20 @@ class OvertimeCalculator:
         daily_ot_multiplier: float = 1.0,
         is_holiday: bool = False,
         holiday_multiplier: float = 2.0,
+        break_minutes: float = 0.0,
     ) -> tuple[float, float, str]:
         """Return (total_hours, ot_pay_hours, status_update).
 
-        total_hours:    raw hours worked (stored on the record)
+        total_hours:    net hours worked after subtracting break time
         ot_pay_hours:   overtime pay-equivalent hours (after multiplier)
         status_update:  'half_day' when total_hours < half of expected day,
                         'holiday' when clocked in on a public holiday,
                         '' otherwise
         """
-        delta = clock_out - clock_in
-        total_hours = round(delta.total_seconds() / 3600, 2)
+        raw_delta = clock_out - clock_in
+        raw_hours = raw_delta.total_seconds() / 3600
+        net_hours = max(0.0, raw_hours - (break_minutes / 60))
+        total_hours = round(net_hours, 2)
 
         if is_holiday:
             ot_pay_hours = round(total_hours * holiday_multiplier, 2)

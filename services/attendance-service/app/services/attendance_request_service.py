@@ -12,6 +12,8 @@ from app.repositories.attendance_request_repository import AttendanceRequestRepo
 from app.repositories.attendance_repository import AttendanceRepository
 from app.schemas.attendance_request import AttendanceRequestCreate, AttendanceRequestReview
 
+LATE_CLOCKIN_APPROVAL_MINUTES = 10
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,15 +87,92 @@ class AttendanceRequestService:
         }
 
         if data.status == "approved":
-            await self._create_attendance_records(req)
+            request_type = getattr(req, "request_type", "regularization")
+
+            if request_type == "late_clockin":
+                await self._approve_late_clockin(req, data)
+            elif request_type == "off_day_work":
+                update_data["off_day_work_type"] = getattr(data, "off_day_work_type", None)
+                update_data["off_day_ot_rate"] = getattr(data, "off_day_ot_rate", None)
+                await self._approve_off_day_work(req, data)
+            else:
+                await self._create_attendance_records(req)
 
         return await self.repo.update(req, update_data)
+
+    async def _approve_late_clockin(self, req: AttendanceRequest, data: AttendanceRequestReview) -> None:
+        """Set a 10-minute approval window on the employee's attendance record for today."""
+        from datetime import timezone as tz
+
+        target_date = req.for_date or req.from_date
+        window_until = datetime.now(tz.utc) + timedelta(minutes=LATE_CLOCKIN_APPROVAL_MINUTES)
+        mark_as = getattr(data, "mark_as", "normal_with_late_flag") or "normal_with_late_flag"
+
+        existing = await self.attendance_repo.get_by_employee_and_date(req.employee_id, target_date)
+        if existing:
+            await self.attendance_repo.update(existing, {
+                "hr_approved_late_clockin_until": window_until,
+                "late_clockin_mark_as": mark_as,
+            })
+        else:
+            # Create a placeholder record that clock_in will populate
+            record = AttendanceRecord(
+                employee_id=req.employee_id,
+                schedule_id=None,
+                clock_in=datetime.now(tz.utc),
+                clock_out=datetime.now(tz.utc),
+                hr_approved_late_clockin_until=window_until,
+                late_clockin_mark_as=mark_as,
+                status="absent",
+                state="completed",
+                method="request_approved",
+                notes="Placeholder for HR-approved late clock-in",
+                date=target_date,
+                shift_number=1,
+            )
+            try:
+                await self.attendance_repo.create(record)
+                await self.attendance_repo.commit()
+            except Exception:
+                await self.attendance_repo.rollback()
+
+    async def _approve_off_day_work(self, req: AttendanceRequest, data: AttendanceRequestReview) -> None:
+        """Create an attendance record for off-day work approval."""
+        from sqlalchemy.exc import IntegrityError
+        from datetime import timezone as tz
+
+        target_date = req.for_date or req.from_date
+        work_type = getattr(data, "off_day_work_type", "normal") or "normal"
+        ot_rate = getattr(data, "off_day_ot_rate", None)
+
+        clock_in_dt = datetime(target_date.year, target_date.month, target_date.day, 9, 0, 0, tzinfo=tz.utc)
+        record = AttendanceRecord(
+            employee_id=req.employee_id,
+            clock_in=clock_in_dt,
+            clock_out=None,
+            work_hours=None,
+            overtime_hours=0.0,
+            status="present",
+            method="request_approved",
+            notes=f"Off-day work approved: {req.explanation or req.reason}",
+            date=target_date,
+            state="punched_in",
+            is_off_day_work=True,
+            off_day_work_type=work_type,
+            off_day_ot_rate=ot_rate,
+            shift_number=1,
+        )
+        try:
+            await self.attendance_repo.create(record)
+            await self.attendance_repo.commit()
+        except IntegrityError:
+            await self.attendance_repo.rollback()
+            logger.debug(f"Off-day work record already exists for employee={req.employee_id} date={target_date}")
 
     async def _create_attendance_records(self, req: AttendanceRequest) -> None:
         """For each date in the approved range, create/upsert an AttendanceRecord."""
         from sqlalchemy.exc import IntegrityError
 
-        company_id = self.attendance_repo._company_id
         cursor = req.from_date
         end = req.to_date
 

@@ -17,6 +17,7 @@ import {
   Search,
 } from 'lucide-vue-next'
 import { useCommandPaletteStore } from '../../stores/commandPalette.store'
+import NotificationBell from './NotificationBell.vue'
 
 const palette = useCommandPaletteStore()
 
@@ -147,6 +148,9 @@ function onLogout() {
       <span class="text-slate-400">Search</span>
       <kbd class="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-1 py-0.5 rounded ml-1">⌘K</kbd>
     </button>
+
+    <!-- Notification bell -->
+    <NotificationBell class="shrink-0 mx-1" />
 
     <!-- User menu -->
     <div class="flex items-center gap-3 shrink-0 ml-2">

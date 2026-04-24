@@ -39,8 +39,12 @@ async def _try_close_record(
     if record.auto_clock_out_at is None or now < record.auto_clock_out_at:
         return False
 
-    delta = now - record.clock_in
-    total_hours = round(delta.total_seconds() / 3600, 2)
+    # Use effective_clock_in_at when employee clocked in early (hours count from shift start)
+    effective_clock_in = record.effective_clock_in_at or record.clock_in
+    break_minutes = record.break_minutes_total or 0.0
+    raw_delta = now - effective_clock_in
+    raw_hours = raw_delta.total_seconds() / 3600
+    total_hours = round(max(0.0, raw_hours - (break_minutes / 60)), 2)
 
     record.clock_out = now
     record.work_hours = total_hours
@@ -49,6 +53,12 @@ async def _try_close_record(
     record.state = "completed"
     record.notes = (record.notes or "") + " [AUTO_CLOSED by system]"
     record.version = (record.version or 1) + 1
+
+    # Flag tasks_pending if mandatory tasks exist and none were completed
+    has_mandatory = record.tasks_mandatory_snapshot
+    pending_tasks = [t for t in record.tasks if t.status == "pending"]
+    if has_mandatory and pending_tasks:
+        record.tasks_pending_from_auto_close = True
 
     for task in record.tasks:
         if task.status == "pending":
@@ -62,6 +72,7 @@ async def _try_close_record(
             "record_id": str(record.id),
             "schedule_id": str(record.schedule_id) if record.schedule_id else None,
             "work_hours": total_hours,
+            "tasks_pending": record.tasks_pending_from_auto_close,
             "timestamp": now.isoformat(),
         })
 

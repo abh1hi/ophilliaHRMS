@@ -41,7 +41,7 @@ from app.repositories.overtime_policy_repository import OvertimePolicyRepository
 from app.repositories.shift_type_repository import ShiftTypeRepository
 from app.repositories.holiday_calendar_repository import HolidayCalendarRepository
 from app.repositories.geofence_consent_repository import GeofenceConsentRepository
-from app.services.schedule_resolver import ScheduleResolver
+from app.services.schedule_resolver import ScheduleResolver, ClockInStatus, to_ist
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +93,40 @@ class AttendanceService:
         if company_id:
             await validate_employee_tenant(employee_id, company_id)
 
+        # Hard block: previous day auto-closed with mandatory tasks pending
+        yesterday = today - timedelta(days=1)
+        pending_task_record = await self.attendance_repo.get_pending_tasks_record(employee_id, yesterday)
+        if pending_task_record:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "You have pending tasks from yesterday that must be completed before clocking in. "
+                    "Submit yesterday's tasks at POST /api/v1/attendance/tasks/complete-pending."
+                ),
+            )
+
         now = datetime.now(timezone.utc)
         resolved_schedule = await self._schedule_resolver.resolve_for_employee(employee_id, today)
-        self._schedule_resolver.require_clock_in_window(resolved_schedule, now)
+
+        # Check off day: employee cannot clock in on off days without HR approval
+        if resolved_schedule.is_off_day(today):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Today is a scheduled off day. Submit an off-day work request "
+                    "for HR approval before clocking in."
+                ),
+            )
+
+        # Resolve late clock-in approval window from any open attendance record
+        existing_for_approval = await self.attendance_repo.get_by_employee_and_date(employee_id, today)
+        hr_approved_until = getattr(existing_for_approval, "hr_approved_late_clockin_until", None) if existing_for_approval else None
+
+        clock_in_status_value = self._schedule_resolver.require_clock_in_window(
+            resolved_schedule, now, hr_approved_until
+        )
+
+        # For HR-approved late clock-in: still enforce geofence
         self._geofence_validator.validate(
             "geofence",
             resolved_schedule.clock_in_locations,
@@ -132,21 +163,37 @@ class AttendanceService:
                 )
             shift_number = current_shift_count + 1
 
-        # Determine status (on-time vs late) using the assigned shift type's grace period.
-        attendance_status = "present"
-        if shift_number == 1:
-            clock_in_time = now.time()
-            grace_end = (
-                datetime.combine(today, resolved_schedule.shift_type.start_time)
-                + timedelta(minutes=resolved_schedule.shift_type.grace_period_minutes)
-            ).time()
-            if clock_in_time > grace_end:
-                attendance_status = "late"
+        # Map resolver status to DB status string
+        _status_map = {
+            ClockInStatus.EARLY_IN: "early_in",
+            ClockInStatus.PRESENT: "present",
+            ClockInStatus.LATE: "late",
+            ClockInStatus.HR_APPROVED: "late",   # HR-approved late is still "late"
+        }
+        attendance_status = _status_map.get(clock_in_status_value, "present") if shift_number == 1 else "present"
+
+        # For HR-approved late: apply mark_as override if set on the existing record
+        if clock_in_status_value == ClockInStatus.HR_APPROVED and existing_for_approval:
+            mark_as = getattr(existing_for_approval, "late_clockin_mark_as", None)
+            if mark_as == "half_day":
+                attendance_status = "half_day"
+
+        # For early_in: work hours count from shift start, not actual clock-in
+        effective_clock_in = now
+        if clock_in_status_value == ClockInStatus.EARLY_IN:
+            effective_clock_in = resolved_schedule.scheduled_clock_in_at
+
+        # For HR-approved late: clear the approval window so it can't be reused
+        if clock_in_status_value == ClockInStatus.HR_APPROVED and existing_for_approval:
+            await self.attendance_repo.update(existing_for_approval, {
+                "hr_approved_late_clockin_until": None,
+            })
 
         record = AttendanceRecord(
             employee_id=employee_id,
             schedule_id=resolved_schedule.schedule.id,
             clock_in=now,
+            effective_clock_in_at=effective_clock_in,
             scheduled_clock_in_at=resolved_schedule.scheduled_clock_in_at,
             scheduled_clock_out_at=resolved_schedule.scheduled_clock_out_at,
             auto_clock_out_at=(
@@ -347,7 +394,15 @@ class AttendanceService:
                 detail="This open attendance record was not created from a schedule. Contact HR/Admin.",
             )
         resolved_schedule = await self._schedule_resolver.resolve_by_schedule_id(record.schedule_id, record.date)
-        self._schedule_resolver.require_clock_out_window(resolved_schedule, now)
+
+        # Detect early clock-out (before clock-out window)
+        is_early_out = self._schedule_resolver.check_clock_out_early(resolved_schedule, now)
+
+        if not is_early_out:
+            # Normal path: validate window (will raise if after window end)
+            self._schedule_resolver.require_clock_out_window(resolved_schedule, now)
+
+        # Geofence validation always runs (even for early out — location still captured)
         self._geofence_validator.validate(
             "geofence",
             resolved_schedule.clock_out_locations,
@@ -389,15 +444,29 @@ class AttendanceService:
                            "Update all tasks before punching out.",
                 )
 
+        # Use effective_clock_in_at for work hours when employee clocked in early
+        effective_clock_in = record.effective_clock_in_at or record.clock_in
+
+        # Deduct total break time from raw hours
+        break_minutes = record.break_minutes_total or 0.0
+
         # Compute work hours, overtime, and half-day/holiday status
         ot_threshold, ot_multiplier, is_holiday, holiday_mult = await self._resolve_ot_params(
             employee_id, department_id
         )
         total_hours, overtime, status_update = self._ot_calculator.compute(
-            record.clock_in, now, work_hours_per_day,
+            effective_clock_in, now, work_hours_per_day,
             ot_threshold, ot_multiplier, is_holiday, holiday_mult,
+            break_minutes=break_minutes,
         )
-        current_status = status_update if status_update else record.status
+
+        # Determine final status
+        if is_early_out:
+            current_status = "early_out"
+        elif status_update:
+            current_status = status_update
+        else:
+            current_status = record.status
 
         # Calculate productivity score
         productivity = self._calculate_productivity_score(
@@ -424,6 +493,16 @@ class AttendanceService:
         # Publish events (after commit — fire-and-forget)
         if self.event_publisher:
             company_id = self.attendance_repo.db.info.get("company_id")
+            if is_early_out:
+                await self.event_publisher.publish("attendance.early_clockout", {
+                    "company_id": str(company_id) if company_id else None,
+                    "employee_id": str(employee_id),
+                    "record_id": str(record.id),
+                    "clock_out": now.isoformat(),
+                    "actual_hours": total_hours,
+                    "early_out_reason": data.notes,
+                    "timestamp": now.isoformat(),
+                })
             await self.event_publisher.publish("attendance.clock_out", {
                 "company_id": str(company_id) if company_id else None,
                 "employee_id": str(employee_id),

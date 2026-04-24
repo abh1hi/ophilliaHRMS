@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, DateTime, Integer, Index, Text
+from sqlalchemy import Column, String, Date, DateTime, Integer, Index, Text, Boolean, Float
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime, timezone
@@ -17,11 +17,17 @@ class AttendanceRequest(Base):
     company_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     employee_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
+    # Request type: "regularization" | "late_clockin" | "off_day_work" | "missed_punch"
+    request_type = Column(String(30), nullable=False, default="regularization")
+
+    # Specific date for single-day requests (late_clockin, off_day_work, missed_punch)
+    for_date = Column(Date, nullable=True)
+
     # Date range for the regularization request
     from_date = Column(Date, nullable=False)
     to_date = Column(Date, nullable=False)
 
-    # Reason: "on_site_duty" | "work_from_home" | "other"
+    # Reason: "on_site_duty" | "work_from_home" | "other" | "late_arrival" | "off_day_work"
     reason = Column(String(50), nullable=False)
     explanation = Column(Text, nullable=True)
 
@@ -31,6 +37,15 @@ class AttendanceRequest(Base):
     # Half-day settings
     half_day = Column(Integer, nullable=False, default=0)
     half_day_date = Column(Date, nullable=True)
+
+    # For late_clockin: how HR wants to mark the approved attendance
+    # "normal_with_late_flag" | "half_day"
+    mark_as = Column(String(30), nullable=True)
+
+    # For off_day_work: how the day should be counted
+    is_off_day_request = Column(Boolean, nullable=False, default=False)
+    off_day_work_type = Column(String(20), nullable=True)   # "normal" | "overtime"
+    off_day_ot_rate = Column(Float, nullable=True)          # e.g. 1.5, 2.0
 
     # Workflow: "pending" | "approved" | "rejected" | "cancelled"
     status = Column(String(20), nullable=False, default="pending", index=True)
